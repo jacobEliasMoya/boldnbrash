@@ -1,0 +1,62 @@
+.postcard {
+  display: grid;
+  border-radius: var(--radius-panel, 0.625rem);
+  box-shadow: 0 0.3rem 0 var(--portfolio-surface);
+}
+
+.email {
+  position: relative;
+  perspective: 900px;
+}
+
+.tab {
+  position: relative;
+  transform-origin: center top;
+  border-radius: 0 0 var(--radius-panel, 0.625rem) var(--radius-panel, 0.625rem);
+}
+
+.tab::before {
+  position: absolute;
+  inset: -0.25rem 0 auto;
+  height: 0.5rem;
+  background: radial-gradient(circle, var(--portfolio-canvas) 0.14rem, transparent 0.18rem)
+    0 50% / 0.75rem 0.5rem repeat-x;
+  content: '';
+  pointer-events: none;
+}
+
+@media (min-width: 40rem) {
+  .postcard {
+    grid-template-columns: minmax(0, 3fr) minmax(9rem, 1fr);
+  }
+
+  .tab {
+    transform-origin: left center;
+    border-radius: 0 var(--radius-panel, 0.625rem) var(--radius-panel, 0.625rem) 0;
+  }
+
+  .tab::before {
+    inset: 0 auto 0 -0.25rem;
+    width: 0.5rem;
+    height: auto;
+    background: radial-gradient(circle, var(--portfolio-canvas) 0.14rem, transparent 0.18rem)
+      50% 0 / 0.5rem 0.75rem repeat-y;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tab {
+    transition: transform 240ms ease-out, box-shadow 240ms ease-out;
+  }
+
+  .email:is(:hover, :focus-visible) .tab {
+    transform: rotateX(-8deg);
+    box-shadow: 0 0.4rem 0.6rem #0003;
+  }
+}
+
+@media (min-width: 40rem) and (prefers-reduced-motion: no-preference) {
+  .email:is(:hover, :focus-visible) .tab {
+    transform: rotateY(-10deg);
+  }
+}
