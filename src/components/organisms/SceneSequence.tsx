@@ -1,7 +1,7 @@
 'use client'
 
 import { Children, useEffect, useRef, useState, type ReactNode } from 'react'
-import { MotionConfig, useSpring } from 'motion/react'
+import { motion, MotionConfig, useReducedMotion, useSpring } from 'motion/react'
 
 const scenes = [
   { id: 'top', label: 'Home' },
@@ -10,9 +10,11 @@ const scenes = [
   { id: 'about', label: 'About' },
   { id: 'contact', label: 'Contact' },
 ]
-const sceneStops = [0, 1, 4, 5, 6]
-const skillStart = 1
-const skillTravel = 2
+const sceneStops = [0, 1.4, 4, 5, 6]
+const skillStart = 1.4
+const skillTravel = 1.6
+const heroFillTravel = 1
+const heroRevealTravel = sceneStops[1] - heroFillTravel
 
 const origins = [
   [50, 50],
@@ -22,61 +24,62 @@ const origins = [
 ]
 
 export function SceneSequence({ children }: { children: ReactNode }) {
+  const reduceMotion = useReducedMotion()
   const timeline = useSpring(0, { stiffness: 160, damping: 30, mass: 0.5 })
   const track = useRef<HTMLDivElement>(null)
   const panels = useRef<(HTMLElement | null)[]>([])
   const [enhanced, setEnhanced] = useState(false)
   const [active, setActive] = useState(0)
+  const [hoveredNav, setHoveredNav] = useState<string | null>(null)
 
   useEffect(() => {
     const previousScrollRestoration = history.scrollRestoration
     const media = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const compact = window.matchMedia('(max-width: 760px), (max-height: 560px)')
+
     let frame = 0
     let current = 0
     let pendingFocus: number | null = null
-
     function update() {
       frame = 0
       const node = track.current
-      if (!node || media.matches || compact.matches) return
+      if (!node || media.matches) return
       const bounds = node.getBoundingClientRect()
-      const travel = Math.max(1, node.offsetHeight - window.innerHeight)
+      const travel = Math.max(
+        1,
+        node.offsetHeight - (node.firstElementChild?.clientHeight ?? window.innerHeight),
+      )
       const progress = Math.max(0, Math.min(6, (-bounds.top / travel) * 6))
       timeline.set(progress)
       render(timeline.get())
     }
 
     function render(value: number) {
-      if (media.matches || compact.matches) return
+      if (media.matches) return
       const progress = Math.max(0, Math.min(6, value))
-      const skillProgress = Math.max(
-        0,
-        Math.min(1, (progress - skillStart) / skillTravel),
-      )
-      const entrance = Math.max(0, Math.min(1, (progress - 0.32) / 0.68))
+      const heroFill = Math.max(0, Math.min(1, progress / heroFillTravel))
+      panels.current[0]?.querySelectorAll<HTMLElement>('.hero-letter').forEach((letter) => {
+        const index = Number(letter.dataset.fillIndex ?? 0)
+        const letterFill = Math.max(0, Math.min(1, heroFill * 18 - index))
+        letter.style.setProperty('--letter-fill', `${letterFill * 100}%`)
+      })
+      const skillProgress = Math.max(0, Math.min(1, (progress - skillStart) / skillTravel))
+      const entrance = Math.max(0, Math.min(1, (progress - heroFillTravel) / heroRevealTravel))
       const skillsPanel = panels.current[1]
       skillsPanel?.style.setProperty(
         '--wheel-angle',
         `${(1 - entrance) * 65 - skillProgress * 288}deg`,
       )
-      skillsPanel?.style.setProperty(
-        '--wheel-entry',
-        `${(1 - entrance) * 30}vw`,
-      )
-      window.dispatchEvent(
-        new CustomEvent('portfolio:skills-progress', { detail: skillProgress }),
-      )
+      skillsPanel?.style.setProperty('--wheel-entry', `${(1 - entrance) * 30}vw`)
+      window.dispatchEvent(new CustomEvent('portfolio:skills-progress', { detail: skillProgress }))
       let visible = 0
       panels.current.forEach((panel, index) => {
         if (!panel) return
         const reveal =
           index === 0
             ? 1
-            : Math.max(
-                0,
-                Math.min(1, (progress - sceneStops[index] + 0.68) / 0.68),
-              )
+            : index === 1
+              ? Math.max(0, Math.min(1, (progress - heroFillTravel) / heroRevealTravel))
+              : Math.max(0, Math.min(1, progress - sceneStops[index] + 1))
         if (index > 0) {
           const portal = panels.current[index - 1]?.querySelector(
             `[data-portal="${scenes[index].id}"]`,
@@ -95,13 +98,12 @@ export function SceneSequence({ children }: { children: ReactNode }) {
             Math.max(x, panelBounds.width - x),
             Math.max(y, panelBounds.height - y),
           )
+          const startingRadius = index === 1 && portalBounds ? portalBounds.width / 2 : 0
+          const openingRadius = startingRadius + reveal * (radius - startingRadius)
           panel.style.clipPath =
-            reveal === 1
-              ? 'none'
-              : `circle(${reveal * radius}px at ${x}px ${y}px)`
+            reveal === 1 ? 'none' : `circle(${openingRadius}px at ${x}px ${y}px)`
         }
-        panel.style.visibility =
-          index === 0 || reveal > 0 ? 'visible' : 'hidden'
+        panel.style.visibility = index === 0 || reveal > 0 ? 'visible' : 'hidden'
         if (reveal > 0.7) visible = index
       })
       if (visible !== current) {
@@ -133,7 +135,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     }
 
     function setup() {
-      const enabled = !media.matches && !compact.matches
+      const enabled = !media.matches
       history.scrollRestoration = enabled ? 'manual' : previousScrollRestoration
       setEnhanced(enabled)
       if (!enabled) {
@@ -150,22 +152,10 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     }
 
     function navigate(event: MouseEvent) {
-      const anchor = (event.target as Element).closest<HTMLAnchorElement>(
-        'a[href^="#"]',
-      )
-      if (
-        !anchor ||
-        event.metaKey ||
-        event.ctrlKey ||
-        event.altKey ||
-        event.shiftKey
-      )
-        return
-      const index = scenes.findIndex(
-        (scene) => `#${scene.id}` === anchor.getAttribute('href'),
-      )
-      if (index < 0 || !track.current || media.matches || compact.matches)
-        return
+      const anchor = (event.target as Element).closest<HTMLAnchorElement>('a[href^="#"]')
+      if (!anchor || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return
+      const index = scenes.findIndex((scene) => `#${scene.id}` === anchor.getAttribute('href'))
+      if (index < 0 || !track.current || media.matches) return
       event.preventDefault()
       history.pushState(null, '', `#${scenes[index].id}`)
       goTo(index)
@@ -175,7 +165,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       const node = track.current
       if (!node) return
       const start = window.scrollY + node.getBoundingClientRect().top
-      const distance = node.offsetHeight - window.innerHeight
+      const distance =
+        node.offsetHeight - (node.firstElementChild?.clientHeight ?? window.innerHeight)
       // Direct navigation lands on a fully opened scene.
       window.scrollTo({
         top: start + (distance * sceneStops[index]) / 6,
@@ -192,18 +183,12 @@ export function SceneSequence({ children }: { children: ReactNode }) {
 
     function selectSkill(event: Event) {
       const index = (event as CustomEvent<number>).detail
-      if (
-        !Number.isInteger(index) ||
-        index < 0 ||
-        index > 4 ||
-        media.matches ||
-        compact.matches
-      )
-        return
+      if (!Number.isInteger(index) || index < 0 || index > 4 || media.matches) return
       const node = track.current
       if (!node) return
       const start = window.scrollY + node.getBoundingClientRect().top
-      const distance = node.offsetHeight - window.innerHeight
+      const distance =
+        node.offsetHeight - (node.firstElementChild?.clientHeight ?? window.innerHeight)
       event.preventDefault()
       const position = skillStart + (index / 4) * skillTravel
       window.scrollTo({
@@ -217,15 +202,13 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       const index = window.location.hash
         ? scenes.findIndex((scene) => `#${scene.id}` === window.location.hash)
         : 0
-      if (index >= 0 && !media.matches && !compact.matches) goTo(index, true)
+      if (index >= 0 && !media.matches) goTo(index, true)
     }
 
     const stopRendering = timeline.on('change', render)
     const stopFocus = timeline.on('animationComplete', settleFocus)
     setup()
-    const initial = requestAnimationFrame(() =>
-      requestAnimationFrame(restoreHash),
-    )
+    const initial = requestAnimationFrame(() => requestAnimationFrame(restoreHash))
     window.addEventListener('scroll', schedule, { passive: true })
     window.addEventListener('resize', schedule)
     document.addEventListener('click', navigate)
@@ -233,7 +216,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     window.addEventListener('popstate', restoreHash)
     window.addEventListener('hashchange', restoreHash)
     media.addEventListener('change', setup)
-    compact.addEventListener('change', setup)
+
     return () => {
       history.scrollRestoration = previousScrollRestoration
       stopRendering()
@@ -248,7 +231,6 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       window.removeEventListener('popstate', restoreHash)
       window.removeEventListener('hashchange', restoreHash)
       media.removeEventListener('change', setup)
-      compact.removeEventListener('change', setup)
     }
   }, [timeline])
 
@@ -263,24 +245,58 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         <a className="skip-link" href="#work">
           Skip to selected work
         </a>
-        <header
+        <motion.header
           className={`site-header tone-${active === 3 ? 'paper' : 'dark'}`}
+          initial={reduceMotion ? false : { opacity: 0, y: -24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: reduceMotion ? 0 : 0.7, ease: [0.22, 1, 0.36, 1] }}
         >
           <a className="wordmark" href="#top" aria-label="Jacob Moya home">
-            Jacob Moya
+            <span className="header-monogram" aria-hidden="true" />
           </a>
-          <nav aria-label="Portfolio">
-            {scenes.slice(1).map((scene, index) => (
-              <a
+          <nav aria-label="Portfolio" onMouseLeave={() => setHoveredNav(null)}>
+            {scenes.map((scene, index) => (
+              <motion.a
                 key={scene.id}
                 href={`#${scene.id}`}
-                aria-current={active === index + 1 ? 'location' : undefined}
+                aria-current={active === index ? 'location' : undefined}
+                aria-label={scene.id === 'top' ? 'Home' : undefined}
+                onHoverStart={() => setHoveredNav(scene.id)}
+                onFocus={() => setHoveredNav(scene.id)}
+                onBlur={() => setHoveredNav(null)}
+                initial={reduceMotion ? false : { opacity: 0, y: -12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  duration: reduceMotion ? 0 : 0.55,
+                  delay: reduceMotion ? 0 : 0.12 + index * 0.07,
+                  ease: [0.22, 1, 0.36, 1],
+                }}
               >
-                {scene.label}
-              </a>
+                {(hoveredNav ?? scenes[active].id) === scene.id && (
+                  <motion.span
+                    className="nav-highlight"
+                    layoutId="nav-highlight"
+                    transition={
+                      reduceMotion
+                        ? { duration: 0 }
+                        : { type: 'spring', stiffness: 420, damping: 34 }
+                    }
+                    aria-hidden="true"
+                  />
+                )}
+                <span className="nav-label">
+                  {scene.id === 'top' ? (
+                    <svg className="nav-home-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M3.5 10.7 12 3.8l8.5 6.9v9.1h-6v-5.6h-5v5.6h-6Z" />
+                    </svg>
+                  ) : (
+                    scene.label
+                  )}
+                </span>
+              </motion.a>
             ))}
           </nav>
-        </header>
+        </motion.header>
         <main ref={track} className="scene-track">
           <div className="scene-stage">
             {Children.map(children, (child, index) => (
@@ -298,15 +314,6 @@ export function SceneSequence({ children }: { children: ReactNode }) {
             ))}
           </div>
         </main>
-        <div
-          className={`journey-indicator tone-${active === 3 ? 'paper' : 'dark'}`}
-          style={active === 4 ? { visibility: 'hidden' } : undefined}
-          aria-hidden="true"
-        >
-          <span>0{active + 1}</span>
-          <i />
-          <span>05</span>
-        </div>
       </div>
     </MotionConfig>
   )
