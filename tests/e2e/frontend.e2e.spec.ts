@@ -400,19 +400,22 @@ test('the category pill contains the heading and stack and expands into its proj
   await expect(toggle).toHaveAttribute('aria-expanded', 'false')
   await expect(pill.getByRole('heading', { name: 'Frontend Development' })).toBeVisible()
   await expect(pill.locator('.skills-technologies')).toBeVisible()
-  const closedHeight = await pill.evaluate((element) => element.offsetHeight)
+  const closedHeight = await pill.evaluate((element) => (element as HTMLElement).offsetHeight)
   expect(closedHeight).toBeLessThan(220)
   await toggle.click()
   const card = pill.getByRole('article', { name: 'Design system', exact: true })
   await expect(card).toBeInViewport()
   await expect
-    .poll(() => pill.evaluate((element) => element.offsetHeight))
+    .poll(() => pill.evaluate((element) => (element as HTMLElement).offsetHeight))
     .toBeGreaterThan(closedHeight * 2)
   await page.getByRole('button', { name: 'Hide projects for Frontend Development' }).click()
   await expect(card).not.toBeVisible()
   await expect
     .poll(() =>
-      pill.evaluate((element, height) => Math.abs(element.offsetHeight - height), closedHeight),
+      pill.evaluate(
+        (element, height) => Math.abs((element as HTMLElement).offsetHeight - height),
+        closedHeight,
+      ),
     )
     .toBeLessThan(2)
 })
