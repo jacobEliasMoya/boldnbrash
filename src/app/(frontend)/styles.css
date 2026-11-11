@@ -2,8 +2,7 @@
 
 @font-face {
   font-family: 'Instrument Sans';
-  src: url('/fonts/instrument-sans/InstrumentSans-Variable.ttf')
-    format('truetype');
+  src: url('/fonts/instrument-sans/InstrumentSans-Variable.ttf') format('truetype');
   font-style: normal;
   font-weight: 400 700;
   font-display: swap;
@@ -109,12 +108,22 @@ ul {
   padding: 25px var(--gutter);
   background: var(--ink);
   color: var(--paper);
-  border-bottom: 1px solid #efebe13b;
 }
 .wordmark {
-  font-size: clamp(19px, 1.6vw, 26px);
-  line-height: 1;
-  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+}
+.header-monogram {
+  display: block;
+  width: 40px;
+  height: 40px;
+  background-color: currentColor;
+  -webkit-mask: url('/jm-symbol.svg') center / contain no-repeat;
+  mask: url('/jm-symbol.svg') center / contain no-repeat;
 }
 .site-header nav {
   display: flex;
@@ -123,26 +132,40 @@ ul {
 }
 .site-header nav a {
   position: relative;
+  isolation: isolate;
+  display: grid;
+  place-items: center;
   font: 12px var(--mono);
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  padding-block: 10px;
+  min-width: 42px;
+  min-height: 38px;
+  padding: 9px 12px;
+  border-radius: 10px;
 }
-.site-header nav a::after {
-  content: '';
+.nav-highlight {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: currentColor;
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 180ms ease;
+  z-index: -1;
+  inset: 0;
+  border-radius: 10px;
+  background: rgb(239 235 225 / 0.14);
+  border: 1px solid rgb(239 235 225 / 0.12);
 }
-.site-header nav a:hover::after,
-.site-header nav a[aria-current]::after {
-  transform: scaleX(1);
+.site-header.tone-paper .nav-highlight {
+  background: rgb(8 8 9 / 0.1);
+  border-color: rgb(8 8 9 / 0.1);
+}
+.nav-label {
+  display: grid;
+  place-items: center;
+}
+.nav-home-icon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linejoin: round;
 }
 .scene {
   position: relative;
@@ -213,8 +236,7 @@ ul {
   margin-right: 150px;
 }
 
-/* Enhancement keeps native document scrolling. Compact screens and reduced
-   motion use the same semantic sections in normal document flow. */
+/* Enhancement keeps native document scrolling; reduced motion uses document flow. */
 .portfolio[data-enhanced] .scene-track {
   height: 1060svh;
 }
@@ -246,7 +268,6 @@ ul {
 }
 .portfolio[data-enhanced] .site-header.tone-paper {
   color: var(--ink);
-  border-color: #08080945;
 }
 .portfolio[data-enhanced]::after {
   content: '';
@@ -294,11 +315,65 @@ ul {
 .hero-copy .eyebrow {
   margin-bottom: 30px;
 }
+.hero-copy .hero-greeting {
+  gap: 0.65em;
+}
+.hero-greeting > .name-pill {
+  display: inline-block;
+  padding: 0.3em 0.9em;
+  border-radius: 8px;
+  background: var(--blue);
+  color: var(--paper);
+}
 .hero-copy h1 {
-  font-size: clamp(72px, 8.7vw, 148px);
-  line-height: 0.88;
+  font-size: clamp(72px, 8.2vw, 144px);
+  line-height: 0.94;
   letter-spacing: -0.035em;
   text-transform: uppercase;
+}
+.hero-line {
+  display: block;
+}
+.hero-letter {
+  display: inline-block;
+}
+.portfolio[data-enhanced] .hero-letter {
+  color: transparent;
+  background: linear-gradient(
+    90deg,
+    var(--blue) 0 var(--letter-fill, 0%),
+    var(--paper) var(--letter-fill, 0%) 100%
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+}
+.hero-period {
+  position: relative;
+  display: inline-block;
+  width: 0.24em;
+  height: 0.18em;
+  margin-left: 0.025em;
+  vertical-align: baseline;
+  border-radius: 50%;
+}
+.hero-period::after {
+  content: '';
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: max(100%, 44px);
+  height: max(100%, 44px);
+  transform: translate(-50%, -50%);
+}
+.hero-period > span {
+  display: block;
+  width: 0.18em;
+  height: 0.18em;
+  border-radius: 50%;
+  background: var(--blue);
+}
+.hero-period:hover > span,
+.hero-period:focus-visible > span {
+  box-shadow: 0 0 0 4px #cbbcff55;
 }
 .hero-description {
   margin-top: 26px;
@@ -421,8 +496,7 @@ ul {
   left: 50%;
   top: 50%;
   margin: -45px 0 0 -105px;
-  transform: rotate(calc(180deg + var(--skill-index) * 72deg))
-    translateX(var(--wheel-radius))
+  transform: rotate(calc(180deg + var(--skill-index) * 72deg)) translateX(var(--wheel-radius))
     rotate(calc(-180deg - var(--skill-index) * 72deg - var(--wheel-angle)));
 }
 .wheel-rotor button {
@@ -1116,7 +1190,7 @@ ul {
     padding-top: 55px;
   }
   .hero-copy h1 {
-    font-size: clamp(64px, 15vw, 105px);
+    font-size: clamp(44px, 13vw, 98px);
   }
   .hero-copy .eyebrow {
     margin-bottom: 24px;
@@ -1349,13 +1423,7 @@ ul {
   position: absolute;
   inset: 115px 0 75px 46%;
   overflow: hidden;
-  mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    black 12%,
-    black 88%,
-    transparent
-  );
+  mask-image: linear-gradient(to bottom, transparent, black 12%, black 88%, transparent);
 }
 .portfolio:not([data-enhanced]) .wheel-window {
   position: static;
@@ -1364,14 +1432,9 @@ ul {
 }
 
 .scene-skills {
-  --skills-blue: #2710a8;
+  --skills-blue: var(--blue);
   --skills-highlight: #cbbcff;
   background: var(--skills-blue);
-  background-image: radial-gradient(
-    ellipse at 72% 48%,
-    transparent 30%,
-    #10064e80 100%
-  );
   color: var(--paper);
   --wheel-angle: 0deg;
   --wheel-entry: 0vw;
@@ -1388,13 +1451,6 @@ ul {
   width: 100%;
   height: 100%;
   display: block;
-}
-.particle-fallback {
-  position: absolute;
-  inset: 0;
-}
-.particle-logo canvas[data-ready] + .particle-fallback {
-  visibility: hidden;
 }
 .wheel-selection {
   min-height: 115px;
@@ -1421,4 +1477,60 @@ ul {
 
 .scene-skills .eyebrow > span {
   color: var(--skills-highlight);
+}
+
+@media (max-width: 760px), (max-height: 560px) {
+  .portfolio[data-enhanced] .site-header {
+    top: 12px;
+    gap: 8px;
+    padding: 6px 0 12px;
+  }
+  .portfolio[data-enhanced] .site-header nav {
+    gap: clamp(9px, 3vw, 18px);
+  }
+  .portfolio[data-enhanced] .scene {
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .portfolio[data-enhanced] .scene-content {
+    height: auto;
+    min-height: 100%;
+    padding-top: 110px;
+    padding-bottom: 80px;
+  }
+  .portfolio[data-enhanced] .hero-scene {
+    gap: 18px;
+  }
+  .portfolio[data-enhanced] .hero-mark {
+    width: min(55vw, 230px);
+  }
+  .portfolio[data-enhanced] .wheel-window {
+    position: relative;
+    inset: auto;
+    height: 340px;
+    margin-top: 24px;
+    overflow: hidden;
+  }
+  .portfolio[data-enhanced] .skills-wheel {
+    width: 420px;
+    height: 420px;
+    right: -190px;
+    top: 50%;
+    --wheel-radius: 155px;
+  }
+  .portfolio[data-enhanced] .circle-portal {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    margin: 0;
+    transform: translate(-50%, -50%);
+    width: 90px;
+  }
+  .portfolio[data-enhanced] .contact-scene {
+    padding-bottom: 260px;
+  }
+  .portfolio[data-enhanced] .journey-indicator {
+    bottom: 18px;
+    pointer-events: none;
+  }
 }

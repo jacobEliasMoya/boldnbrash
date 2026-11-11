@@ -1,11 +1,6 @@
 'use client'
 
-import {
-  motion,
-  useAnimationFrame,
-  useReducedMotion,
-  useSpring,
-} from 'motion/react'
+import { motion, useAnimationFrame, useReducedMotion, useSpring } from 'motion/react'
 import { useEffect, useRef } from 'react'
 
 type Particle = {
@@ -27,15 +22,7 @@ type Particle = {
   color: string
   alpha: number
 }
-const palette = [
-  '#cbbcff',
-  '#a58cff',
-  '#8467ff',
-  '#6546ff',
-  '#4c2cff',
-  '#3814ff',
-  '#2710a8',
-]
+const palette = ['#cbbcff', '#a58cff', '#8467ff', '#6546ff', '#4c2cff', '#3814ff', '#2710a8']
 
 function noise(seed: number) {
   const value = Math.sin(seed * 127.1 + 311.7) * 43758.5453
@@ -47,11 +34,8 @@ function drawParticles(
   points: Particle[],
   time: number,
   step: number,
-  mx: number,
-  my: number,
   yaw: number,
   pitch: number,
-  interactive: boolean,
   reduceMotion: boolean | null,
 ) {
   const cosY = Math.cos(yaw)
@@ -60,32 +44,17 @@ function drawParticles(
   const sinX = Math.sin(pitch)
   for (const point of points) {
     const drift = reduceMotion ? 0 : Math.sin(time * 0.0006 + point.phase) * 1.2
-    let targetX = point.homeX + drift
-    let targetY =
-      point.homeY +
-      (reduceMotion ? 0 : Math.cos(time * 0.0005 + point.phase) * 1.2)
-    if (interactive && !reduceMotion) {
-      const dx = point.homeX - mx
-      const dy = point.homeY - my
-      const distance = Math.hypot(dx, dy)
-      if (distance < 85) {
-        const force = (1 - distance / 85) * 28
-        targetX += (dx / Math.max(distance, 1)) * force
-        targetY += (dy / Math.max(distance, 1)) * force
-      }
-    }
+    const targetX = point.homeX + drift
+    const targetY = point.homeY + (reduceMotion ? 0 : Math.cos(time * 0.0005 + point.phase) * 1.2)
     if (reduceMotion) {
       point.x = point.homeX
       point.y = point.homeY
       point.z = point.homeZ
     } else {
-      point.vx =
-        (point.vx + (targetX - point.x) * 0.035 * step) * Math.pow(0.79, step)
-      point.vy =
-        (point.vy + (targetY - point.y) * 0.035 * step) * Math.pow(0.79, step)
+      point.vx = (point.vx + (targetX - point.x) * 0.035 * step) * Math.pow(0.79, step)
+      point.vy = (point.vy + (targetY - point.y) * 0.035 * step) * Math.pow(0.79, step)
       point.vz =
-        (point.vz + (point.homeZ + drift * 0.5 - point.z) * 0.035 * step) *
-        Math.pow(0.79, step)
+        (point.vz + (point.homeZ + drift * 0.5 - point.z) * 0.035 * step) * Math.pow(0.79, step)
       point.z += point.vz * step
       point.x += point.vx * step
       point.y += point.vy * step
@@ -105,16 +74,9 @@ function drawParticles(
   points.sort((a, b) => a.depth - b.depth)
   for (const point of points) {
     context.fillStyle = point.color
-    context.globalAlpha =
-      point.alpha * Math.max(0.48, Math.min(1, 0.82 + point.depth / 250))
+    context.globalAlpha = point.alpha * Math.max(0.48, Math.min(1, 0.82 + point.depth / 250))
     context.beginPath()
-    context.arc(
-      point.screenX,
-      point.screenY,
-      point.size * point.perspective,
-      0,
-      Math.PI * 2,
-    )
+    context.arc(point.screenX, point.screenY, point.size * point.perspective, 0, Math.PI * 2)
     context.fill()
   }
 }
@@ -130,8 +92,6 @@ export function ParticleMonogram() {
   const reduceMotion = useReducedMotion()
   const rotationX = useSpring(0, { stiffness: 75, damping: 22 })
   const rotationY = useSpring(0, { stiffness: 75, damping: 22 })
-  const pointerX = useSpring(250, { stiffness: 100, damping: 22 })
-  const pointerY = useSpring(250, { stiffness: 100, damping: 22 })
 
   useEffect(() => {
     const element = canvas.current
@@ -153,12 +113,9 @@ export function ParticleMonogram() {
         resetPointer()
         return
       }
-      const mark = element!.getBoundingClientRect()
       pointer.current = true
       rotationY.set((x - 0.5) * 0.9)
       rotationX.set(-(y - 0.5) * 0.6)
-      pointerX.set(((event.clientX - mark.left) / mark.width) * 500)
-      pointerY.set(((event.clientY - mark.top) / mark.height) * 500)
     }
     window.addEventListener('pointermove', move, { passive: true })
     document.documentElement.addEventListener('pointerleave', resetPointer)
@@ -197,18 +154,13 @@ export function ParticleMonogram() {
             6,
             Math.max(
               0,
-              Math.floor(
-                ((homeX / 500) * 0.3 +
-                  (homeY / 500) * 0.55 +
-                  noise(seed + 2) * 0.25) *
-                  7,
-              ),
+              Math.floor(((homeX / 500) * 0.3 + (homeY / 500) * 0.55 + noise(seed + 2) * 0.25) * 7),
             ),
           )
           const homeZ = (noise(seed + 8) - 0.5) * 145
           points.push({
             homeZ,
-            z: reduceMotion ? homeZ : (noise(seed + 9) - 0.5) * 500,
+            z: homeZ,
             vz: 0,
             screenX: 0,
             screenY: 0,
@@ -216,8 +168,8 @@ export function ParticleMonogram() {
             perspective: 1,
             homeX,
             homeY,
-            x: reduceMotion ? homeX : 250 + (noise(seed + 3) - 0.5) * 650,
-            y: reduceMotion ? homeY : 250 + (noise(seed + 4) - 0.5) * 650,
+            x: homeX,
+            y: homeY,
             vx: 0,
             vy: 0,
             phase: noise(seed + 5) * Math.PI * 2,
@@ -241,12 +193,13 @@ export function ParticleMonogram() {
       resetPointer()
       ready.current = false
     }
-  }, [reduceMotion, pointerX, pointerY, rotationX, rotationY])
+  }, [reduceMotion, rotationX, rotationY])
 
-  useAnimationFrame((time, delta) => {
+  useAnimationFrame((_time, delta) => {
+    const time = performance.now()
     const element = canvas.current
-    if (!element || !ready.current || document.hidden || scene.current?.inert)
-      return
+    if (!element || !ready.current || document.hidden || scene.current?.inert) return
+
     if (reduceMotion && painted.current) return
     const context = element.getContext('2d')
     if (!context) return
@@ -254,33 +207,24 @@ export function ParticleMonogram() {
     context.setTransform(scale.current, 0, 0, scale.current, 0, 0)
     context.clearRect(0, 0, 500, 500)
     context.translate(rotationY.get() * 48, -rotationX.get() * 42)
-    const mx = pointerX.get()
-    const my = pointerY.get()
     drawParticles(
       context,
       particles.current,
       time,
       step,
-      mx,
-      my,
-      -0.18 +
-        (reduceMotion ? 0 : rotationY.get() + Math.sin(time * 0.00032) * 0.12),
-      0.08 +
-        (reduceMotion ? 0 : rotationX.get() + Math.cos(time * 0.00027) * 0.045),
-      pointer.current,
+      -0.18 + (reduceMotion ? 0 : rotationY.get() + Math.sin(time * 0.00032) * 0.12),
+      0.08 + (reduceMotion ? 0 : rotationX.get() + Math.cos(time * 0.00027) * 0.045),
       reduceMotion,
     )
     context.globalAlpha = 1
     painted.current = true
-    element.dataset.ready = ''
   })
 
   return (
     <motion.div
       className="particle-logo"
-      data-portal="skills"
       role="img"
-      aria-label="Three-dimensional Jacob Moya monogram formed from electric-blue particles"
+      aria-label="Three-dimensional Jacob Moya monogram formed from purple particles"
       initial={reduceMotion ? false : { opacity: 0, scale: 0.94, y: 16 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={{
@@ -289,15 +233,6 @@ export function ParticleMonogram() {
       }}
     >
       <canvas ref={canvas} aria-hidden="true" width="500" height="500" />
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        className="particle-fallback"
-        src="/jm-symbol.svg"
-        width="500"
-        height="500"
-        alt=""
-        aria-hidden="true"
-      />
     </motion.div>
   )
 }
