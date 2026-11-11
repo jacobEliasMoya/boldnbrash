@@ -3,9 +3,18 @@
 import { ParticleMonogram } from '@/components/atoms/ParticleMonogram'
 import { motion, useReducedMotion } from 'motion/react'
 
-const entrance = { opacity: 0, y: -20 }
+const entrance = { opacity: 0, y: 10 }
 const entered = { opacity: 1, y: 0 }
 const letterStep = 0.055
+
+function entranceTransition(delay: number, reduceMotion: boolean | null) {
+  return {
+    type: 'spring' as const,
+    duration: reduceMotion ? 0 : 0.65,
+    bounce: reduceMotion ? 0 : 0.12,
+    delay: reduceMotion ? 0 : delay,
+  }
+}
 
 function AnimatedWord({
   word,
@@ -27,11 +36,7 @@ function AnimatedWord({
           key={`${letter}-${index}`}
           initial={reduceMotion ? false : entrance}
           animate={entered}
-          transition={{
-            duration: reduceMotion ? 0 : 0.52,
-            delay: reduceMotion ? 0 : start + index * letterStep,
-            ease: [0.22, 1, 0.36, 1],
-          }}
+          transition={entranceTransition(start + index * letterStep, reduceMotion)}
         >
           {letter}
         </motion.span>
@@ -42,11 +47,6 @@ function AnimatedWord({
 
 export function PortfolioHero() {
   const reduceMotion = useReducedMotion()
-  const transition = (delay: number) => ({
-    duration: reduceMotion ? 0 : 0.62,
-    delay: reduceMotion ? 0 : delay,
-    ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
-  })
 
   return (
     <div className="hero-scene scene-content">
@@ -55,7 +55,7 @@ export function PortfolioHero() {
           className="eyebrow hero-greeting"
           initial={reduceMotion ? false : entrance}
           animate={entered}
-          transition={transition(0.82)}
+          transition={entranceTransition(0.82, reduceMotion)}
         >
           Hi, I’m <span className="name-pill">Jake</span>
         </motion.p>
@@ -71,11 +71,7 @@ export function PortfolioHero() {
                   key={`${letter}-${index}`}
                   initial={reduceMotion ? false : entrance}
                   animate={entered}
-                  transition={{
-                    duration: reduceMotion ? 0 : 0.52,
-                    delay: reduceMotion ? 0 : 1.64 + index * letterStep,
-                    ease: [0.22, 1, 0.36, 1],
-                  }}
+                  transition={entranceTransition(1.64 + index * letterStep, reduceMotion)}
                 >
                   {letter}
                 </motion.span>
@@ -87,11 +83,7 @@ export function PortfolioHero() {
               aria-label="Explore my skills"
               initial={reduceMotion ? false : entrance}
               animate={entered}
-              transition={{
-                duration: reduceMotion ? 0 : 0.52,
-                delay: reduceMotion ? 0 : 1.64 + 6 * letterStep,
-                ease: [0.22, 1, 0.36, 1],
-              }}
+              transition={entranceTransition(1.64 + 6 * letterStep, reduceMotion)}
             >
               <span data-portal="skills" aria-hidden="true" />
             </motion.a>
@@ -101,7 +93,7 @@ export function PortfolioHero() {
           className="hero-description w-full"
           initial={reduceMotion ? false : entrance}
           animate={entered}
-          transition={transition(2.18)}
+          transition={entranceTransition(2.18, reduceMotion)}
         >
           I build for the web. Half the fun is finding out why it broke.
         </motion.p>

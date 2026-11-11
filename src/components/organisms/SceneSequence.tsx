@@ -2,6 +2,8 @@
 
 import { Children, useEffect, useRef, useState, type ReactNode } from 'react'
 import { motion, MotionConfig, useReducedMotion, useSpring } from 'motion/react'
+import { sceneDuration, sceneStops, skillSegments, skillStart, skillTravel } from './skillsTimeline'
+import { MobileMenu } from './MobileMenu'
 
 const scenes = [
   { id: 'top', label: 'Home' },
@@ -10,9 +12,6 @@ const scenes = [
   { id: 'about', label: 'About' },
   { id: 'contact', label: 'Contact' },
 ]
-const sceneStops = [0, 1.4, 4, 5, 6]
-const skillStart = 1.4
-const skillTravel = 1.6
 const heroFillTravel = 1
 const heroRevealTravel = sceneStops[1] - heroFillTravel
 
@@ -31,6 +30,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
   const [enhanced, setEnhanced] = useState(false)
   const [active, setActive] = useState(0)
   const [hoveredNav, setHoveredNav] = useState<string | null>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
     const previousScrollRestoration = history.scrollRestoration
@@ -48,14 +48,14 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         1,
         node.offsetHeight - (node.firstElementChild?.clientHeight ?? window.innerHeight),
       )
-      const progress = Math.max(0, Math.min(6, (-bounds.top / travel) * 6))
+      const progress = Math.max(0, Math.min(sceneDuration, (-bounds.top / travel) * sceneDuration))
       timeline.set(progress)
       render(timeline.get())
     }
 
     function render(value: number) {
       if (media.matches) return
-      const progress = Math.max(0, Math.min(6, value))
+      const progress = Math.max(0, Math.min(sceneDuration, value))
       const heroFill = Math.max(0, Math.min(1, progress / heroFillTravel))
       panels.current[0]?.querySelectorAll<HTMLElement>('.hero-letter').forEach((letter) => {
         const index = Number(letter.dataset.fillIndex ?? 0)
@@ -63,14 +63,14 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         letter.style.setProperty('--letter-fill', `${letterFill * 100}%`)
       })
       const skillProgress = Math.max(0, Math.min(1, (progress - skillStart) / skillTravel))
-      const entrance = Math.max(0, Math.min(1, (progress - heroFillTravel) / heroRevealTravel))
-      const skillsPanel = panels.current[1]
-      skillsPanel?.style.setProperty(
-        '--wheel-angle',
-        `${(1 - entrance) * 65 - skillProgress * 288}deg`,
+      window.dispatchEvent(
+        new CustomEvent('portfolio:skills-progress', {
+          detail: {
+            progress: skillProgress,
+            intro: Math.max(0, Math.min(1, progress - sceneStops[1])),
+          },
+        }),
       )
-      skillsPanel?.style.setProperty('--wheel-entry', `${(1 - entrance) * 30}vw`)
-      window.dispatchEvent(new CustomEvent('portfolio:skills-progress', { detail: skillProgress }))
       let visible = 0
       panels.current.forEach((panel, index) => {
         if (!panel) return
@@ -169,7 +169,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         node.offsetHeight - (node.firstElementChild?.clientHeight ?? window.innerHeight)
       // Direct navigation lands on a fully opened scene.
       window.scrollTo({
-        top: start + (distance * sceneStops[index]) / 6,
+        top: start + (distance * sceneStops[index]) / sceneDuration,
         behavior: 'instant',
       })
       pendingFocus = index
@@ -182,20 +182,31 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     }
 
     function selectSkill(event: Event) {
-      const index = (event as CustomEvent<number>).detail
+      const detail = (event as CustomEvent<number | { index: number; offset: number }>).detail
+      const index = typeof detail === 'number' ? detail : detail.index
+      const offset = typeof detail === 'number' ? 0.95 : detail.offset
       if (!Number.isInteger(index) || index < 0 || index > 4 || media.matches) return
+      if (!Number.isFinite(offset) || offset < 0 || offset > skillSegments[index].duration) return
       const node = track.current
       if (!node) return
       const start = window.scrollY + node.getBoundingClientRect().top
       const distance =
         node.offsetHeight - (node.firstElementChild?.clientHeight ?? window.innerHeight)
       event.preventDefault()
-      const position = skillStart + (index / 4) * skillTravel
-      window.scrollTo({
-        top: start + (distance * position) / 6,
-        behavior: 'instant',
-      })
+      const position = skillStart + skillSegments[index].start + Math.max(0.001, offset)
+      window.scrollTo({ top: start + (distance * position) / sceneDuration, behavior: 'instant' })
+      timeline.jump(position)
+      render(position)
       update()
+    }
+
+    function selectScene(event: Event) {
+      const index = (event as CustomEvent<number>).detail
+      if (!Number.isInteger(index) || index < 0 || index >= scenes.length || media.matches) return
+      event.preventDefault()
+      history.pushState(null, '', `#${scenes[index].id}`)
+      if (panels.current[index]) panels.current[index]!.scrollTop = 0
+      goTo(index, true)
     }
 
     function restoreHash() {
@@ -213,6 +224,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     window.addEventListener('resize', schedule)
     document.addEventListener('click', navigate)
     window.addEventListener('portfolio:select-skill', selectSkill)
+    window.addEventListener('portfolio:select-scene', selectScene)
     window.addEventListener('popstate', restoreHash)
     window.addEventListener('hashchange', restoreHash)
     media.addEventListener('change', setup)
@@ -228,6 +240,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       window.removeEventListener('resize', schedule)
       document.removeEventListener('click', navigate)
       window.removeEventListener('portfolio:select-skill', selectSkill)
+      window.removeEventListener('portfolio:select-scene', selectScene)
       window.removeEventListener('popstate', restoreHash)
       window.removeEventListener('hashchange', restoreHash)
       media.removeEventListener('change', setup)
@@ -241,7 +254,11 @@ export function SceneSequence({ children }: { children: ReactNode }) {
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="portfolio" data-enhanced={enhanced ? '' : undefined}>
+      <div
+        className="portfolio"
+        data-enhanced={enhanced ? '' : undefined}
+        data-menu-open={menuOpen ? '' : undefined}
+      >
         <a className="skip-link" href="#work">
           Skip to selected work
         </a>
@@ -254,7 +271,11 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           <a className="wordmark" href="#top" aria-label="Jacob Moya home">
             <span className="header-monogram" aria-hidden="true" />
           </a>
-          <nav aria-label="Portfolio" onMouseLeave={() => setHoveredNav(null)}>
+          <nav
+            className="desktop-navigation"
+            aria-label="Portfolio"
+            onMouseLeave={() => setHoveredNav(null)}
+          >
             {scenes.map((scene, index) => (
               <motion.a
                 key={scene.id}
@@ -296,8 +317,27 @@ export function SceneSequence({ children }: { children: ReactNode }) {
               </motion.a>
             ))}
           </nav>
+          <MobileMenu
+            scenes={scenes}
+            active={active}
+            onOpenChange={setMenuOpen}
+            onNavigate={(index) => {
+              const handled = !window.dispatchEvent(
+                new CustomEvent('portfolio:select-scene', { detail: index, cancelable: true }),
+              )
+              if (!handled) {
+                history.pushState(null, '', `#${scenes[index].id}`)
+                panels.current[index]?.scrollIntoView({ behavior: 'instant' })
+              }
+            }}
+          />
         </motion.header>
-        <main ref={track} className="scene-track">
+        <main
+          ref={track}
+          className="scene-track"
+          data-duration={sceneDuration}
+          style={enhanced ? { height: `${100 + sceneDuration * 160}svh` } : undefined}
+        >
           <div className="scene-stage">
             {Children.map(children, (child, index) => (
               <section
