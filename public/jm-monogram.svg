@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" fill="none">
+<defs>
+<mask id="mark"><circle cx="250" cy="250" r="244" fill="white"/><path d="M0 118H158V207C158 283 90 345 0 345Z" fill="black"/><path d="M252 510V322a48 48 0 0 1 96 0v188Zm117 0V322a48 48 0 0 1 96 0v188Z" fill="black"/></mask>
+<radialGradient id="blue" cx="80%" cy="12%" r="105%"><stop stop-color="#6740ff"/><stop offset=".45" stop-color="#3814ff"/><stop offset=".8" stop-color="#1808b5"/><stop offset="1" stop-color="#3b13ff"/></radialGradient>
+<filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".8" numOctaves="3" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncR type="linear" slope="1.5" intercept="-.25"/><feFuncG type="linear" slope="1.5" intercept="-.25"/><feFuncB type="linear" slope="1.5" intercept="-.25"/></feComponentTransfer><feBlend in="SourceGraphic" mode="multiply"/></filter>
+</defs><g mask="url(#mark)"><path fill="url(#blue)" filter="url(#grain)" d="M0 0h500v500H0z"/></g>
+</svg>
