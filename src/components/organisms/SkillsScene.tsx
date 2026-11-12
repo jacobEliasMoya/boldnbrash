@@ -8,6 +8,7 @@ import {
   useSpring,
   useTransform,
   type MotionValue,
+  type PanInfo,
 } from 'motion/react'
 import { PlatformArtwork, SystemArtwork } from '@/components/atoms/ProjectArtwork'
 import { clamp, getSkillPosition, skillSegments, skills } from './skillsTimeline'
@@ -134,7 +135,12 @@ function SkillCategoryPill({
         <button
           type="button"
           className="skills-pill-toggle"
-          aria-label={`${reveal > 0 ? 'Hide' : 'Show'} projects for ${skill.name}`}
+          aria-label={
+            animated
+              ? `Select ${skill.name}`
+              : `${reveal > 0 ? 'Hide' : 'Show'} projects for ${skill.name}`
+          }
+          aria-pressed={animated ? active : undefined}
           aria-expanded={reveal > 0}
           aria-controls={`skills-pill-projects-${index}`}
           onClick={() => onToggle(index, reveal > 0)}
@@ -239,10 +245,15 @@ export function SkillsScene() {
   const [radius, setRadius] = useState(280)
   const ringTarget = useMotionValue(0)
   const ringPosition = useSpring(ringTarget, { stiffness: 110, damping: 26, mass: 0.8 })
+  const drag = useRef<{ start: number } | null>(null)
+  const ignoreClickUntil = useRef(0)
+  const [dragging, setDragging] = useState(false)
   useEffect(() => {
+    if (drag.current) return
     const segment = skillSegments[selection.index]
     const turn = clamp((selection.phase - (segment.duration - 0.28)) / 0.28)
-    ringTarget.set(selection.index + turn)
+    const target = selection.index + turn
+    ringTarget.set(target + Math.round((ringTarget.get() - target) / skills.length) * skills.length)
   }, [selection.index, selection.phase, ringTarget])
   useLayoutEffect(() => {
     const container = browser.current
@@ -259,6 +270,7 @@ export function SkillsScene() {
   }, [animated])
   useEffect(() => {
     function update(event: Event) {
+      if (drag.current) return
       setPinned(true)
       const { progress, intro } = (event as CustomEvent<{ progress: number; intro: number }>).detail
       setSelection({ ...getSkillPosition(progress), intro })
@@ -276,15 +288,41 @@ export function SkillsScene() {
     }
   }, [openedProject])
   function toggleProjects(index: number, expanded: boolean) {
+    if (performance.now() < ignoreClickUntil.current) return
     if (!animated) {
       setExpandedIndex(expanded ? null : index)
       return
     }
-    const offset = expanded ? 0 : 0.95
+    selectSkill(index)
+  }
+  function selectSkill(index: number) {
+    const offset = 0
     const handled = !window.dispatchEvent(
       new CustomEvent('portfolio:select-skill', { detail: { index, offset }, cancelable: true }),
     )
     if (!handled) setSelection({ index, phase: offset, intro: 1 })
+  }
+  function startDrag(event: PointerEvent) {
+    if (!animated || (event.target as Element).closest('a, button:not(.skills-pill-toggle)')) return
+    drag.current = { start: ringPosition.get() }
+    setDragging(true)
+    setSelection((current) => ({ ...current, phase: 0 }))
+  }
+  function rotateDrag(_: PointerEvent, info: PanInfo) {
+    if (!drag.current) return
+    const position = drag.current.start - info.offset.y / 180
+    ringTarget.set(position)
+    const index = ((Math.round(position) % skills.length) + skills.length) % skills.length
+    setSelection({ index, phase: 0, intro: 1 })
+  }
+  function finishDrag(_: PointerEvent, info: PanInfo) {
+    if (!drag.current) return
+    const position = Math.round(drag.current.start - info.offset.y / 180)
+    ringTarget.set(position)
+    drag.current = null
+    setDragging(false)
+    ignoreClickUntil.current = performance.now() + 350
+    selectSkill(((position % skills.length) + skills.length) % skills.length)
   }
   return (
     <div className="skills-scene skills-index scene-content">
@@ -301,7 +339,16 @@ export function SkillsScene() {
           What I build, the tools I reach for, and the work behind them.
         </p>
       </div>
-      <div ref={browser} className="skills-browser" role="list" aria-label="Skill categories">
+      <motion.div
+        ref={browser}
+        className="skills-browser"
+        role="list"
+        aria-label="Skill categories"
+        data-dragging={dragging ? '' : undefined}
+        onPanStart={startDrag}
+        onPan={rotateDrag}
+        onPanEnd={finishDrag}
+      >
         {skills.map((skill, index) => (
           <SkillCategoryPill
             key={skill.name}
@@ -319,7 +366,7 @@ export function SkillsScene() {
             }}
           />
         ))}
-      </div>
+      </motion.div>
       <span className="skills-index-portal" data-portal="work" aria-hidden="true" />
       <dialog
         ref={dialog}

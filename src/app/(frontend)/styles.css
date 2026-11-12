@@ -286,7 +286,7 @@ ul {
   position: fixed;
   z-index: 70;
   inset: 12px;
-  border: 1px solid #a8a49c80;
+  border: 3px solid #f7f5ef;
   border-radius: 25px;
   pointer-events: none;
 }
@@ -405,6 +405,68 @@ ul {
 .hero-mark-animation {
   position: relative;
   isolation: isolate;
+}
+.portfolio-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  overflow: hidden;
+  background: var(--blue);
+  color: var(--paper);
+}
+.portfolio-loader::after {
+  content: '';
+  position: absolute;
+  inset: 12px;
+  border: 3px solid #f7f5ef;
+  border-radius: 25px;
+  pointer-events: none;
+}
+.portfolio-loader-avatar {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: clamp(640px, 100vw, 1280px);
+  height: auto;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  pointer-events: none;
+}
+.portfolio-loader-name-anchor {
+  position: absolute;
+  top: calc(50% - clamp(20px, 3.125vw, 40px));
+  left: 50%;
+  transform: translate(-50%, -100%);
+  z-index: 1;
+}
+.portfolio-loader-name {
+  display: flex;
+  align-items: baseline;
+  gap: clamp(100px, 18vw, 230px);
+  white-space: nowrap;
+  font: 900 clamp(42px, 9.4vw, 132px)/0.9 var(--display);
+  letter-spacing: -0.05em;
+}
+.portfolio-loader-skip {
+  position: absolute;
+  right: clamp(28px, 4vw, 64px);
+  bottom: 32px;
+  z-index: 3;
+  padding: 12px;
+  border: 0;
+  background: transparent;
+  font:
+    12px 'JetBrains Mono',
+    monospace;
+}
+@media (prefers-reduced-motion: reduce) {
+  .portfolio-loader-name {
+    gap: 0;
+  }
+  .portfolio-loader-name-anchor {
+    top: 50%;
+    transform: translate(-50%, -50%);
+  }
 }
 .hero-mini-jacob {
   position: absolute;
@@ -1606,9 +1668,16 @@ ul {
   height: 0;
 }
 .portfolio[data-enhanced] .skills-browser {
+  cursor: grab;
+  touch-action: pan-x;
+  user-select: none;
   perspective: 1100px;
   perspective-origin: 50% 50%;
   overflow: hidden;
+}
+.portfolio[data-enhanced] .skills-browser[data-dragging],
+.portfolio[data-enhanced] .skills-browser[data-dragging] .skills-pill-toggle {
+  cursor: grabbing;
 }
 .portfolio[data-enhanced] .skills-category-pill {
   position: absolute;

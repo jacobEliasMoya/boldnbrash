@@ -1,0 +1,84 @@
+{
+  "canvas": {
+    "width": 1280,
+    "height": 720
+  },
+  "walkDirection": "left",
+  "poses": {
+    "contact": {
+      "file": "walk-sheet.png",
+      "crop": {
+        "left": 0,
+        "top": 0,
+        "width": 444,
+        "height": 444
+      },
+      "anchor": [
+        186,
+        396
+      ],
+      "bodyX": 246
+    },
+    "passing": {
+      "file": "walk-sheet.png",
+      "crop": {
+        "left": 887,
+        "top": 0,
+        "width": 444,
+        "height": 444
+      },
+      "anchor": [
+        188,
+        396
+      ],
+      "bodyX": 217
+    },
+    "stand": {
+      "file": "standing.png",
+      "anchor": [
+        640,
+        622
+      ]
+    }
+  },
+  "frames": [
+    {
+      "keep": "approved-opening.webp",
+      "ms": 100
+    },
+    {
+      "pose": "contact",
+      "at": [
+        1170,
+        622
+      ],
+      "plant": "left-step-1",
+      "walk": true,
+      "ms": 120
+    },
+    {
+      "pose": "passing",
+      "at": [
+        1170,
+        622
+      ],
+      "plant": "left-step-1",
+      "walk": true,
+      "ms": 120
+    },
+    {
+      "pose": "stand",
+      "at": [
+        1101,
+        622
+      ],
+      "ms": 150,
+      "patches": [
+        {
+          "file": "registered-wave-pose.png",
+          "mask": "wave-arm-mask.png"
+        }
+      ]
+    }
+  ]
+}
