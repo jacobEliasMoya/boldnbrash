@@ -48,6 +48,10 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     let wheelDirection = 0
 
     function normalizeWheel(event: WheelEvent) {
+      if (document.documentElement.dataset.introLoading === 'true') {
+        event.preventDefault()
+        return
+      }
       const node = track.current
       if (!node || media.matches || event.ctrlKey || event.defaultPrevented || !event.deltaY) return
       let target = event.target instanceof Element ? event.target : null

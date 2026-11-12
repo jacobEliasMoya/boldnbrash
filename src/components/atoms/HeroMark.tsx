@@ -2,12 +2,13 @@
 
 import { useEffect, useRef } from 'react'
 import { useReducedMotion } from 'motion/react'
-import { ParticleMonogram } from './ParticleMonogram'
+import { ParticleMonogram, type WalkRipple } from './ParticleMonogram'
 import { drawHeroFrame, getHeroScrollPose, heroFrameCount, heroStandingCenter } from './heroFrames'
 
 export function HeroMark() {
   const canvas = useRef<HTMLCanvasElement>(null)
   const root = useRef<HTMLDivElement>(null)
+  const ripples = useRef<WalkRipple[]>([])
   const reduceMotion = useReducedMotion()
 
   useEffect(() => {
@@ -22,6 +23,7 @@ export function HeroMark() {
     let lastCenter: number | null = null
     let facingRight = false
     let walkingDistance = 0
+    let lastRippleStep = -1
     let progress = Number(element.closest('.scene')?.getAttribute('data-jake-progress') ?? 0)
     const frames = Array.from({ length: heroFrameCount }, (_, index) => {
       const image = new Image()
@@ -48,6 +50,23 @@ export function HeroMark() {
       lastCenter = center
       // Advance the gait forward by distance, even when the scroll timeline reverses.
       const walkingStep = Math.floor(walkingDistance / 50)
+      if (
+        walking &&
+        walkingStep !== lastRippleStep &&
+        walkingStep % 2 === 0 &&
+        center > 0 &&
+        center < 580
+      ) {
+        ripples.current = [
+          ...ripples.current.slice(-2),
+          {
+            x: ((center + 30) / 640) * 500,
+            y: (546 / 640) * 500,
+            time: performance.now(),
+          },
+        ]
+        lastRippleStep = walkingStep
+      }
       const sourceFrame = walking ? [4, 5, 6, 5][walkingStep % 4] : undefined
       const mirrored = walking ? facingRight : pose.mirrored
       const key = `${pose.frame}:${sourceFrame}:${mirrored}:${pose.mode}:${center}`
@@ -99,6 +118,7 @@ export function HeroMark() {
 
     return () => {
       disposed = true
+      ripples.current = []
       observer.disconnect()
       window.removeEventListener('resize', measure)
       window.removeEventListener('portfolio:hero-progress', updateScroll)
@@ -110,7 +130,7 @@ export function HeroMark() {
 
   return (
     <div ref={root} className="hero-mark-animation" data-mode="logo">
-      <ParticleMonogram />
+      <ParticleMonogram ripples={ripples} />
       <canvas
         ref={canvas}
         className="hero-mini-jacob"

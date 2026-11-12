@@ -1,7 +1,9 @@
 'use client'
 
 import { motion, useAnimationFrame, useReducedMotion, useSpring } from 'motion/react'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type RefObject } from 'react'
+
+export type WalkRipple = { x: number; y: number; time: number }
 
 type Particle = {
   x: number
@@ -37,6 +39,7 @@ function drawParticles(
   yaw: number,
   pitch: number,
   reduceMotion: boolean | null,
+  ripples: WalkRipple[],
 ) {
   const cosY = Math.cos(yaw)
   const sinY = Math.sin(yaw)
@@ -69,6 +72,19 @@ function drawParticles(
     point.perspective = 760 / (760 - point.depth)
     point.screenX = 250 + rotatedX * point.perspective * 0.9
     point.screenY = 250 + rotatedY * point.perspective * 0.9
+    for (const ripple of ripples) {
+      const age = time - ripple.time
+      const dx = point.screenX - ripple.x
+      const dy = point.screenY - ripple.y
+      const distance = Math.hypot(dx, dy)
+      const wave = distance - age * 0.22
+      const envelope = Math.exp(-((wave / 32) ** 2)) * (1 - age / 1300)
+      const displacement = Math.sin(wave / 12) * envelope * 3.5
+      if (distance > 0) {
+        point.screenX += (dx / distance) * displacement
+        point.screenY += (dy / distance) * displacement
+      }
+    }
   }
   // Far particles draw first, so the near surface reads as a volume.
   points.sort((a, b) => a.depth - b.depth)
@@ -81,7 +97,7 @@ function drawParticles(
   }
 }
 
-export function ParticleMonogram() {
+export function ParticleMonogram({ ripples }: { ripples?: RefObject<WalkRipple[]> }) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const particles = useRef<Particle[]>([])
   const scene = useRef<HTMLElement | null>(null)
@@ -204,6 +220,11 @@ export function ParticleMonogram() {
     const context = element.getContext('2d')
     if (!context) return
     const step = Math.min(delta / 16.667, 2)
+    const activeRipples = reduceMotion
+      ? []
+      : (ripples?.current ?? []).filter((ripple) => time - ripple.time < 1300)
+    if (element.dataset.ripples !== String(activeRipples.length))
+      element.dataset.ripples = String(activeRipples.length)
     context.setTransform(scale.current, 0, 0, scale.current, 0, 0)
     context.clearRect(0, 0, 500, 500)
     context.translate(rotationY.get() * 48, -rotationX.get() * 42)
@@ -215,6 +236,7 @@ export function ParticleMonogram() {
       -0.18 + (reduceMotion ? 0 : rotationY.get() + Math.sin(time * 0.00032) * 0.12),
       0.08 + (reduceMotion ? 0 : rotationX.get() + Math.cos(time * 0.00027) * 0.045),
       reduceMotion,
+      activeRipples,
     )
     context.globalAlpha = 1
     painted.current = true

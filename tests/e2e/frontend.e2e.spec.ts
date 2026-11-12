@@ -9,6 +9,10 @@ import {
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000'
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('portfolio:intro-seen', '1'))
+})
+
 test('reduced motion retains the monogram without loading the mini Jake sequence', async ({
   page,
 }) => {
@@ -24,6 +28,67 @@ test('reduced motion retains the monogram without loading the mini Jake sequence
 })
 
 test.use({ viewport: { width: 1440, height: 900 } })
+
+test('Jake footsteps ripple the JM particles and settle when he stops', async ({ page }) => {
+  await page.goto(baseURL)
+  const monogram = page.locator('.particle-logo canvas')
+  await expect(page.locator('.hero-mini-jacob')).toHaveAttribute('data-frame', '0')
+  await expect(monogram).toHaveAttribute('data-ripples', '0')
+  await scrollTimeline(page, 0.16)
+  await expect
+    .poll(async () => Number(await monogram.getAttribute('data-ripples')))
+    .toBeGreaterThan(0)
+  await expect(monogram).toHaveAttribute('data-ripples', '0', { timeout: 3500 })
+  await scrollTimeline(page, 0.53)
+  await expect
+    .poll(async () => Number(await monogram.getAttribute('data-ripples')))
+    .toBeGreaterThan(0)
+  await expect(monogram).toHaveAttribute('data-ripples', '0', { timeout: 3500 })
+})
+
+test('clicking selects a closed skill and wheel scrolling opens that selection', async ({
+  page,
+}) => {
+  await page.goto(baseURL + '/#skills')
+  const select = page.getByRole('button', { name: 'Select Headless CMS', exact: true })
+  await select.click()
+  await expect(select).toHaveAttribute('aria-pressed', 'true')
+  await expect(select).toHaveAttribute('aria-expanded', 'false')
+  const list = page.getByRole('list', { name: 'Skill categories' })
+  await expect(list.locator('[data-expanded]')).toHaveCount(0)
+  const bounds = (await list.boundingBox())!
+  await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)
+  for (let index = 0; index < 6; index++) await page.mouse.wheel(0, 120)
+  await expect(select).toHaveAttribute('aria-expanded', 'true')
+  await expect(select).toHaveAttribute('aria-pressed', 'true')
+  await expect(
+    page.locator('.skills-category-pill[data-active] .skills-project-stage'),
+  ).toHaveAttribute('data-skill', 'Headless CMS')
+})
+
+test('dragging rotates and wraps the wheel without opening projects, then scroll resumes there', async ({
+  page,
+}) => {
+  await page.goto(baseURL + '/#skills')
+  await expect(page.locator('#skills')).toHaveAttribute('aria-hidden', 'false')
+  const list = page.getByRole('list', { name: 'Skill categories' })
+  const bounds = (await list.boundingBox())!
+  const x = bounds.x + bounds.width / 2
+  const y = bounds.y + bounds.height / 2
+  await page.mouse.move(x, y)
+  await page.mouse.down()
+  await page.mouse.move(x, y + 180, { steps: 18 })
+  await page.mouse.up()
+  const select = page.getByRole('button', { name: 'Select Python Automation', exact: true })
+  await expect(select).toHaveAttribute('aria-pressed', 'true')
+  await expect(select).toHaveAttribute('aria-expanded', 'false')
+  await expect(list.locator('[data-expanded]')).toHaveCount(0)
+  await scrollTimeline(page, skillStart + skillSegments[7].start + 0.95)
+  await expect(select).toHaveAttribute('aria-expanded', 'true')
+  await expect(
+    page.getByRole('article', { name: 'ProductivePython', exact: true }),
+  ).toBeInViewport()
+})
 
 test('Jake turns toward his travel direction and keeps his gait forward when scrolling reverses', async ({
   page,
@@ -266,7 +331,7 @@ test('mobile retains reveals and scrollable content; reduced motion retains docu
   await expect(page.locator('#skills')).toHaveJSProperty('inert', true)
   await page.getByRole('link', { name: 'Explore my skills' }).click()
   await expect(page.locator('#skills')).toHaveAttribute('aria-hidden', 'false')
-  await page.getByRole('button', { name: 'Show projects for Headless CMS', exact: true }).click()
+  await page.getByRole('button', { name: 'Select Headless CMS', exact: true }).click()
   await expect(
     page.locator('.skills-category-pill[data-active] .skills-project-stage'),
   ).toHaveAttribute('data-skill', 'Headless CMS')
@@ -356,7 +421,7 @@ test('skill categories retain the card layout, stack, and scroll progression', a
 test('category controls and project details work by keyboard', async ({ page }) => {
   await page.goto(baseURL + '/#skills')
   await expect(page.locator('#skills')).toHaveAttribute('aria-hidden', 'false')
-  const cms = page.getByRole('button', { name: 'Show projects for Headless CMS', exact: true })
+  const cms = page.getByRole('button', { name: 'Select Headless CMS', exact: true })
   await cms.focus()
   await cms.press('Enter')
   await expect(
@@ -394,9 +459,7 @@ test('mobile category controls stay usable and project information fits the card
             .evaluate((el) => Math.abs(new DOMMatrixReadOnly(getComputedStyle(el).transform).m43)),
         )
         .toBeLessThan(1)
-      await page
-        .getByRole('button', { name: 'Show projects for ' + skill.name, exact: true })
-        .click()
+      await page.getByRole('button', { name: 'Select ' + skill.name, exact: true }).click()
       await expect(
         page.locator('.skills-category-pill[data-active] .skills-category-current h3').last(),
       ).toHaveText(skill.name)
@@ -573,7 +636,7 @@ test('the category pill contains the heading and stack and expands into its proj
   await page.goto(baseURL + '/#skills')
   await expect(page.locator('#skills')).toHaveAttribute('aria-hidden', 'false')
   const pill = page.locator('.skills-category-pill[data-active]')
-  const toggle = page.getByRole('button', { name: 'Show projects for Frontend Development' })
+  const toggle = page.getByRole('button', { name: 'Select Frontend Development' })
   await expect(toggle).toHaveAttribute('aria-expanded', 'false')
   await expect(pill.getByRole('heading', { name: 'Frontend Development' })).toBeVisible()
   await expect(pill.locator('.skills-technologies')).toBeVisible()
@@ -583,12 +646,14 @@ test('the category pill contains the heading and stack and expands into its proj
   const closedHeight = await pill.evaluate((element) => (element as HTMLElement).offsetHeight)
   expect(closedHeight).toBeLessThan(220)
   await toggle.click()
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  await scrollTimeline(page, skillStart + 0.95)
   const card = pill.getByRole('article', { name: skills[0].projects[0].title, exact: true })
   await expect(card).toBeInViewport()
   await expect
     .poll(() => pill.evaluate((element) => (element as HTMLElement).offsetHeight))
     .toBeGreaterThan(closedHeight * 2)
-  await page.getByRole('button', { name: 'Hide projects for Frontend Development' }).click()
+  await page.getByRole('button', { name: 'Select Frontend Development' }).click()
   await expect(card).not.toBeVisible()
   await expect
     .poll(() => pill.evaluate((element) => (element as HTMLElement).offsetHeight))
@@ -626,9 +691,10 @@ test('all skill categories are listed as matching expandable pills', async ({ pa
     await expect(pill.locator('.skills-technologies')).toHaveText(
       skill.technologies.join(' \u00b7 '),
     )
-    await pill.getByRole('button', { name: 'Show projects for ' + skill.name, exact: true }).click()
+    await pill.getByRole('button', { name: 'Select ' + skill.name, exact: true }).click()
+    await scrollTimeline(page, skillStart + skillSegments[skills.indexOf(skill)].start + 0.95)
     await expect(
-      pill.getByRole('button', { name: 'Hide projects for ' + skill.name, exact: true }),
+      pill.getByRole('button', { name: 'Select ' + skill.name, exact: true }),
     ).toHaveAttribute('aria-expanded', 'true')
     await expect(
       pill.getByRole('article', { name: skill.projects[0].title, exact: true }),
