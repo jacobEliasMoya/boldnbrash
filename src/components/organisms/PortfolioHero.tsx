@@ -1,6 +1,6 @@
 'use client'
 
-import { ParticleMonogram } from '@/components/atoms/ParticleMonogram'
+import { HeroMark } from '@/components/atoms/HeroMark'
 import { motion, useReducedMotion } from 'motion/react'
 
 const entrance = { opacity: 0, y: 10 }
@@ -100,7 +100,7 @@ export function PortfolioHero() {
         <span className="sr-only">Jacob Moya’s creative development portfolio</span>
       </div>
       <div className="hero-mark">
-        <ParticleMonogram />
+        <HeroMark />
       </div>
       <div className="scene-footnote">
         <span>Southern California</span>
