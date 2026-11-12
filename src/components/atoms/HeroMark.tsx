@@ -19,6 +19,9 @@ export function HeroMark() {
     let ready = false
     let paintedPose = ''
     let edgeCenter = 760
+    let lastCenter: number | null = null
+    let facingRight = false
+    let walkingDistance = 0
     let progress = Number(element.closest('.scene')?.getAttribute('data-jake-progress') ?? 0)
     const frames = Array.from({ length: heroFrameCount }, (_, index) => {
       const image = new Image()
@@ -36,19 +39,27 @@ export function HeroMark() {
             ? heroStandingCenter +
               ((pose.center - heroStandingCenter) / 470) * (edgeCenter - heroStandingCenter)
             : heroStandingCenter
-      const key = `${pose.frame}:${pose.sourceFrame}:${pose.mirrored}:${pose.mode}:${center}`
+      const walking = pose.sourceFrame !== undefined
+      if (walking && lastCenter !== null) {
+        const movement = center - lastCenter
+        if (Math.abs(movement) > 0.01) facingRight = movement > 0
+        walkingDistance += Math.abs(movement)
+      }
+      lastCenter = center
+      // Advance the gait forward by distance, even when the scroll timeline reverses.
+      const walkingStep = Math.floor(walkingDistance / 50)
+      const sourceFrame = walking ? [4, 5, 6, 5][walkingStep % 4] : undefined
+      const mirrored = walking ? facingRight : pose.mirrored
+      const key = `${pose.frame}:${sourceFrame}:${mirrored}:${pose.mode}:${center}`
       if (key === paintedPose) return
-      drawHeroFrame(
-        context!,
-        frames[pose.sourceFrame ?? pose.frame],
-        pose.sourceFrame,
-        center,
-        pose.mirrored,
-      )
+      drawHeroFrame(context!, frames[sourceFrame ?? pose.frame], sourceFrame, center, mirrored)
       surface!.style.opacity = pose.mode === 'gone' ? '0' : '1'
       surface!.dataset.frame = String(pose.frame)
       surface!.dataset.direction = pose.mirrored ? 'out' : 'in'
       surface!.dataset.center = String(center)
+      surface!.dataset.facing = facingRight ? 'right' : 'left'
+      surface!.dataset.walkStep = String(walkingStep)
+      surface!.dataset.sourceFrame = String(sourceFrame ?? pose.frame)
       element!.dataset.mode = pose.mode
       paintedPose = key
     }
