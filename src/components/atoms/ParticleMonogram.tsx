@@ -2,6 +2,7 @@
 
 import { motion, useAnimationFrame, useReducedMotion, useSpring } from 'motion/react'
 import { useEffect, useRef, type RefObject } from 'react'
+import { getPortalBounds } from './portalBounds'
 
 export type WalkRipple = { x: number; y: number; time: number }
 
@@ -40,6 +41,9 @@ function drawParticles(
   pitch: number,
   reduceMotion: boolean | null,
   ripples: WalkRipple[],
+  formation: number,
+  origin: { x: number; y: number; radius: number },
+  offset: { x: number; y: number },
 ) {
   const cosY = Math.cos(yaw)
   const sinY = Math.sin(yaw)
@@ -85,6 +89,18 @@ function drawParticles(
         point.screenY += (dy / distance) * displacement
       }
     }
+    // Each particle has a stable place inside the period and a staggered flight path.
+    const delay = noise(point.homeX * 37 + point.homeY * 13) * 0.18
+    const travel = Math.max(0, Math.min(1, (formation - delay) / (1 - delay)))
+    const blend = travel * travel * (3 - 2 * travel)
+    const radius = Math.sqrt(noise(point.homeY * 17 + point.homeX)) * origin.radius * 0.7
+    const angle = point.phase
+    const startX = origin.x + Math.cos(angle) * radius
+    const startY = origin.y + Math.sin(angle) * radius
+    point.screenX = startX + (point.screenX + offset.x - startX) * blend
+    point.screenY = startY + (point.screenY + offset.y - startY) * blend
+      - Math.sin(Math.PI * blend) * Math.sin(angle) * 24
+    point.perspective *= 0.25 + 0.75 * blend
   }
   // Far particles draw first, so the near surface reads as a volume.
   points.sort((a, b) => a.depth - b.depth)
@@ -105,6 +121,9 @@ export function ParticleMonogram({ ripples }: { ripples?: RefObject<WalkRipple[]
   const scale = useRef(1)
   const painted = useRef(false)
   const ready = useRef(false)
+  const formationTime = useRef(0)
+  const reducedPreference = useRef(false)
+  const geometry = useRef({ x: 0, y: 0, width: 500, height: 500, size: 500 })
   const reduceMotion = useReducedMotion()
   const rotationX = useSpring(0, { stiffness: 75, damping: 22 })
   const rotationY = useSpring(0, { stiffness: 75, damping: 22 })
@@ -114,6 +133,8 @@ export function ParticleMonogram({ ripples }: { ripples?: RefObject<WalkRipple[]
     if (!element) return
     scene.current = element.closest('.scene')
     const hero = element.closest('.hero-scene')
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)')
+    reducedPreference.current = media.matches
     function resetPointer() {
       if (!pointer.current) return
       pointer.current = false
@@ -138,16 +159,39 @@ export function ParticleMonogram({ ripples }: { ripples?: RefObject<WalkRipple[]
     window.addEventListener('blur', resetPointer)
     let disposed = false
     const resize = () => {
-      const size = element.getBoundingClientRect().width
+      const mark = element.parentElement!.getBoundingClientRect()
+      const bounds = hero!.getBoundingClientRect()
+      const size = mark.width
       if (!size) return
       const ratio = Math.min(window.devicePixelRatio || 1, 2)
-      element.width = Math.round(size * ratio)
-      element.height = Math.round(size * ratio)
-      scale.current = element.width / 500
+      geometry.current = { x: mark.left - bounds.left, y: mark.top - bounds.top,
+        width: bounds.width, height: bounds.height, size }
+      element.width = Math.round(bounds.width * ratio)
+      element.height = Math.round(bounds.height * ratio)
+      element.style.width = `${bounds.width}px`
+      element.style.height = `${bounds.height}px`
+      element.style.left = `${bounds.left - mark.left}px`
+      element.style.top = `${bounds.top - mark.top}px`
+      scale.current = ratio * size / 500
       painted.current = false
+      reducedPreference.current = media.matches
+      if (media.matches && particles.current.length) {
+        const context = element.getContext('2d')
+        if (context) {
+          context.setTransform(scale.current, 0, 0, scale.current, 0, 0)
+          drawParticles(context, particles.current, 0, 1, -0.18, 0.08, true, [], 1,
+            { x: 0, y: 0, radius: 0 },
+            { x: geometry.current.x / (size / 500), y: geometry.current.y / (size / 500) })
+          context.globalAlpha = 1
+          element.dataset.formation = '1.000'
+          painted.current = true
+        }
+      }
     }
     const observer = new ResizeObserver(resize)
-    observer.observe(element)
+    observer.observe(element.parentElement!)
+    media.addEventListener('change', resize)
+    if (hero) observer.observe(hero)
     resize()
     const image = new Image()
     image.onload = () => {
@@ -198,11 +242,13 @@ export function ParticleMonogram({ ripples }: { ripples?: RefObject<WalkRipple[]
       particles.current = points
       ready.current = true
       painted.current = false
+      resize()
     }
     image.src = '/jm-symbol.svg'
     return () => {
       disposed = true
       observer.disconnect()
+      media.removeEventListener('change', resize)
       window.removeEventListener('pointermove', move)
       document.documentElement.removeEventListener('pointerleave', resetPointer)
       window.removeEventListener('blur', resetPointer)
@@ -216,18 +262,35 @@ export function ParticleMonogram({ ripples }: { ripples?: RefObject<WalkRipple[]
     const element = canvas.current
     if (!element || !ready.current || document.hidden || scene.current?.inert) return
 
-    if (reduceMotion && painted.current) return
+    if ((reduceMotion || reducedPreference.current) && painted.current) return
     const context = element.getContext('2d')
     if (!context) return
     const step = Math.min(delta / 16.667, 2)
+    const period = scene.current?.querySelector<HTMLElement>('.hero-period > [data-portal]')
+    const bounds = element.getBoundingClientRect()
+    const dot = period ? getPortalBounds(period) : undefined
+    const unit = geometry.current.size / 500
+    const origin = dot ? { x: (dot.left + dot.width / 2 - bounds.left) / unit,
+      y: (dot.top + dot.height / 2 - bounds.top) / unit, radius: dot.width / 2 / unit }
+      : { x: 250, y: 250, radius: 4 }
+    if (scene.current?.dataset.periodReady === 'true' && !document.documentElement.dataset.introLoading)
+      formationTime.current = Math.min(1600, formationTime.current + Math.min(delta, 50))
+    const entrance = formationTime.current / 1600
+    const gather = Number(scene.current?.dataset.particleGather ?? 0)
+    const formation = reduceMotion ? 1 : entrance * (1 - gather)
+    element.dataset.formation = formation.toFixed(3)
     const activeRipples = reduceMotion
       ? []
       : (ripples?.current ?? []).filter((ripple) => time - ripple.time < 1300)
     if (element.dataset.ripples !== String(activeRipples.length))
       element.dataset.ripples = String(activeRipples.length)
+    context.setTransform(1, 0, 0, 1, 0, 0)
+    context.clearRect(0, 0, element.width, element.height)
+    // Keep the packed origin invisible until the period has finished entering.
+    if (!reduceMotion && !reducedPreference.current &&
+      (scene.current?.dataset.periodReady !== 'true' || document.documentElement.dataset.introLoading))
+      return
     context.setTransform(scale.current, 0, 0, scale.current, 0, 0)
-    context.clearRect(0, 0, 500, 500)
-    context.translate(rotationY.get() * 48, -rotationX.get() * 42)
     drawParticles(
       context,
       particles.current,
@@ -237,6 +300,10 @@ export function ParticleMonogram({ ripples }: { ripples?: RefObject<WalkRipple[]
       0.08 + (reduceMotion ? 0 : rotationX.get() + Math.cos(time * 0.00027) * 0.045),
       reduceMotion,
       activeRipples,
+      formation,
+      origin,
+      { x: geometry.current.x / unit + rotationY.get() * 48,
+        y: geometry.current.y / unit - rotationX.get() * 42 },
     )
     context.globalAlpha = 1
     painted.current = true
@@ -247,7 +314,7 @@ export function ParticleMonogram({ ripples }: { ripples?: RefObject<WalkRipple[]
       className="particle-logo"
       role="img"
       aria-label="Three-dimensional Jacob Moya monogram formed from purple particles"
-      initial={reduceMotion ? false : { opacity: 0, scale: 0.94, y: 16 }}
+      initial={false}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={{
         duration: reduceMotion ? 0 : 1.1,

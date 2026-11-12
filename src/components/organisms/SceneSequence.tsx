@@ -5,6 +5,7 @@ import { motion, MotionConfig, useReducedMotion, useMotionValue } from 'motion/r
 import { sceneDuration, sceneStops, skillSegments, skillStart, skillTravel } from './skillsTimeline'
 import { MobileMenu } from './MobileMenu'
 import { heroAnimationTravel } from '@/components/atoms/heroFrames'
+import { getPortalBounds } from '@/components/atoms/portalBounds'
 import { toPlaybackTime, fromPlaybackTime } from './scrollPlayback'
 
 const scenes = [
@@ -33,6 +34,71 @@ export function SceneSequence({ children }: { children: ReactNode }) {
   const [active, setActive] = useState(0)
   const [hoveredNav, setHoveredNav] = useState<string | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
+
+  useEffect(() => {
+    const element = track.current
+    if (!element) return
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)')
+    let frame = 0
+    let previous = 0
+    let x = 0
+    let y = 0
+    let targetX = 0
+    let targetY = 0
+
+    function paint(time: number) {
+      const delta = previous ? Math.min(time - previous, 50) : 16
+      previous = time
+      const ease = 1 - Math.exp(-delta / 240)
+      x += (targetX - x) * ease
+      y += (targetY - y) * ease
+      const settled = Math.abs(targetX - x) + Math.abs(targetY - y) < 0.02
+      if (settled) {
+        x = targetX
+        y = targetY
+      }
+      element!.style.setProperty('--background-x', `${x.toFixed(3)}px`)
+      element!.style.setProperty('--background-y', `${y.toFixed(3)}px`)
+      frame = settled ? 0 : requestAnimationFrame(paint)
+      if (settled) previous = 0
+    }
+    function update(nextX: number, nextY: number) {
+      targetX = nextX
+      targetY = nextY
+      if (!frame) frame = requestAnimationFrame(paint)
+    }
+    function reset() {
+      update(0, 0)
+    }
+    function move(event: PointerEvent) {
+      if (media.matches || event.pointerType !== 'mouse' || document.hidden) return
+      // A distant layer moves against the pointer, with much less travel than the logo.
+      update((0.5 - event.clientX / window.innerWidth) * 28,
+        (0.5 - event.clientY / window.innerHeight) * 20)
+    }
+    function preferenceChanged() {
+      if (!media.matches) return
+      cancelAnimationFrame(frame)
+      frame = previous = x = y = targetX = targetY = 0
+      element!.style.removeProperty('--background-x')
+      element!.style.removeProperty('--background-y')
+    }
+    window.addEventListener('pointermove', move, { passive: true })
+    document.documentElement.addEventListener('pointerleave', reset)
+    window.addEventListener('blur', reset)
+    document.addEventListener('visibilitychange', reset)
+    media.addEventListener('change', preferenceChanged)
+    return () => {
+      cancelAnimationFrame(frame)
+      window.removeEventListener('pointermove', move)
+      document.documentElement.removeEventListener('pointerleave', reset)
+      window.removeEventListener('blur', reset)
+      document.removeEventListener('visibilitychange', reset)
+      media.removeEventListener('change', preferenceChanged)
+      element.style.removeProperty('--background-x')
+      element.style.removeProperty('--background-y')
+    }
+  }, [])
 
   useEffect(() => {
     const previousScrollRestoration = history.scrollRestoration
@@ -170,6 +236,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         0,
         Math.min(1, (progress - heroAnimationTravel) / (heroFillTravel - heroAnimationTravel)),
       )
+      if (panels.current[0]) panels.current[0].dataset.particleGather = String(heroFill)
       panels.current[0]?.querySelectorAll<HTMLElement>('.hero-letter').forEach((letter) => {
         const index = Number(letter.dataset.fillIndex ?? 0)
         const letterFill = Math.max(0, Math.min(1, heroFill * 18 - index))
@@ -197,7 +264,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           const portal = panels.current[index - 1]?.querySelector(
             `[data-portal="${scenes[index].id}"]`,
           )
-          const portalBounds = portal?.getBoundingClientRect()
+          const portalBounds = portal ? getPortalBounds(portal) : undefined
           const panelBounds = panel.getBoundingClientRect()
           const [fallbackX, fallbackY] = origins[index - 1]
           const x = portalBounds

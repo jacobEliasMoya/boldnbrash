@@ -84,7 +84,12 @@ export function PortfolioHero() {
               initial={reduceMotion ? false : entrance}
               animate={entered}
               transition={entranceTransition(1.64 + 6 * letterStep, reduceMotion)}
+              onAnimationComplete={() => {
+                const hero = document.querySelector<HTMLElement>('.scene-top')
+                if (hero) hero.dataset.periodReady = 'true'
+              }}
             >
+              <span className="hero-period-glyph" aria-hidden="true">.</span>
               <span data-portal="skills" aria-hidden="true" />
             </motion.a>
           </span>

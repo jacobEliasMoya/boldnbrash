@@ -313,6 +313,44 @@ ul {
   color: var(--ink);
 }
 
+/* The actual JM silhouette supplies the background geometry. */
+.scene-top::before,
+.scene-skills::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  aspect-ratio: 1;
+  -webkit-mask: url('/jm-symbol.svg') center / contain no-repeat;
+  mask: url('/jm-symbol.svg') center / contain no-repeat;
+  transform: translate(-50%, -50%);
+  translate: var(--background-x, 0px) var(--background-y, 0px);
+  pointer-events: none;
+}
+.scene-top::before {
+  top: 50%;
+  left: 68%;
+  width: max(88vw, 132svh);
+  background: #17171a;
+}
+.scene-skills::after {
+  top: 58%;
+  left: 3%;
+  width: max(88vw, 132svh);
+  background: #17171a;
+  opacity: 0.1;
+}
+@media (max-width: 760px) {
+  .scene-top::before {
+    top: 76%;
+    left: 65%;
+    width: max(140vw, 72svh);
+  }
+  .scene-skills::after {
+    top: 70%;
+    left: -15%;
+    width: max(190vw, 108svh);
+  }
+}
 .hero-scene {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
@@ -362,9 +400,7 @@ ul {
 .hero-period {
   position: relative;
   display: inline-block;
-  width: 0.24em;
-  height: 0.18em;
-  margin-left: 0.025em;
+  color: var(--blue);
   vertical-align: baseline;
   border-radius: 50%;
 }
@@ -376,16 +412,18 @@ ul {
   height: max(100%, 44px);
   transform: translate(-50%, -50%);
 }
-.hero-period > span {
-  display: block;
-  width: 0.18em;
-  height: 0.18em;
-  border-radius: 50%;
-  background: var(--blue);
+.hero-period-glyph {
+  display: inline-block;
 }
-.hero-period:hover > span,
-.hero-period:focus-visible > span {
-  box-shadow: 0 0 0 4px #cbbcff55;
+.hero-period > [data-portal] {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  vertical-align: baseline;
+}
+.hero-period:hover,
+.hero-period:focus-visible {
+  color: #a58cff;
 }
 .hero-description {
   margin-top: 26px;
@@ -1533,8 +1571,9 @@ ul {
   aspect-ratio: 1;
 }
 .particle-logo canvas {
-  position: relative;
+  position: absolute;
   z-index: 1;
+  pointer-events: none;
   width: 100%;
   height: 100%;
   display: block;
