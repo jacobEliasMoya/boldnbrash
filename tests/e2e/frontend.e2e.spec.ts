@@ -25,6 +25,35 @@ test('reduced motion retains the monogram without loading the mini Jake sequence
 
 test.use({ viewport: { width: 1440, height: 900 } })
 
+test('Jake turns toward his travel direction and keeps his gait forward when scrolling reverses', async ({
+  page,
+}) => {
+  await page.goto(baseURL)
+  const avatar = page.locator('.hero-mini-jacob')
+  await expect(avatar).toHaveAttribute('data-frame', '0')
+  let previousStep = 0
+  let previousCenter = Number(await avatar.getAttribute('data-center'))
+  for (const [progress, facing] of [
+    [0.1, 'left'],
+    [0.06, 'right'],
+    [0.12, 'left'],
+    [0.5, 'right'],
+    [0.46, 'left'],
+    [0.52, 'right'],
+  ] as const) {
+    await scrollTimeline(page, progress)
+    await expect(avatar).toHaveAttribute('data-facing', facing)
+    const center = Number(await avatar.getAttribute('data-center'))
+    if (progress <= 0.12)
+      expect(facing === 'right' ? center > previousCenter : center < previousCenter).toBe(true)
+    const step = Number(await avatar.getAttribute('data-walk-step'))
+    expect(step).toBeGreaterThan(previousStep)
+    await expect(avatar).toHaveAttribute('data-source-frame', String([4, 5, 6, 5][step % 4]))
+    previousStep = step
+    previousCenter = center
+  }
+})
+
 test('large wheel bursts have a bounded queue and reverse immediately', async ({ page }) => {
   await page.goto(baseURL)
   await expect(page.locator('.hero-mini-jacob')).toHaveAttribute('data-frame', '0')
