@@ -25,6 +25,51 @@ test('reduced motion retains the monogram without loading the mini Jake sequence
 
 test.use({ viewport: { width: 1440, height: 900 } })
 
+test('large wheel bursts have a bounded queue and reverse immediately', async ({ page }) => {
+  await page.goto(baseURL)
+  await expect(page.locator('.hero-mini-jacob')).toHaveAttribute('data-frame', '0')
+  const track = page.locator('.scene-track')
+  await page.mouse.move(900, 400)
+  for (let index = 0; index < 15; index++) {
+    if (index === 7) await page.mouse.move(100, 45)
+    await page.mouse.wheel(0, 10000)
+  }
+  const queued = await track.evaluate((element) => {
+    const stage = element.firstElementChild as HTMLElement
+    const native =
+      (-element.getBoundingClientRect().top /
+        ((element as HTMLElement).offsetHeight - stage.clientHeight)) *
+      Number((element as HTMLElement).dataset.duration)
+    return { native, displayed: Number((element as HTMLElement).dataset.playbackProgress) }
+  })
+  expect(queued.native - queued.displayed).toBeLessThan(0.22)
+  expect(queued.native).toBeLessThan(0.65)
+  const before = Number(await track.getAttribute('data-playback-progress'))
+  await page.mouse.wheel(0, -10000)
+  await expect
+    .poll(async () => Number(await track.getAttribute('data-playback-progress')))
+    .toBeLessThan(before)
+})
+
+test('the shared clock caps Skills playback independently of a large scroll jump', async ({
+  page,
+}) => {
+  await page.goto(baseURL + '/#skills')
+  await expect(page.locator('#skills')).toHaveAttribute('aria-hidden', 'false')
+  const track = page.locator('.scene-track')
+  const before = Number(await track.getAttribute('data-playback-progress'))
+  await scrollTimeline(page, before + 4, false)
+  await page.waitForTimeout(500)
+  const after = Number(await track.getAttribute('data-playback-progress'))
+  expect(after - before).toBeGreaterThan(0.1)
+  expect(after - before).toBeLessThan(0.5)
+  const reversed = after
+  await scrollTimeline(page, before, false)
+  await expect
+    .poll(async () => Number(await track.getAttribute('data-playback-progress')))
+    .toBeLessThan(reversed)
+})
+
 test('fast scrolling cannot skip Jake frames or start highlighting before his entrance finishes', async ({
   page,
 }) => {
@@ -40,7 +85,7 @@ test('fast scrolling cannot skip Jake frames or start highlighting before his en
     })
     observer.observe(element, { attributes: true, attributeFilter: ['data-frame'] })
   })
-  await scrollTimeline(page, 0.9)
+  await scrollTimeline(page, 0.9, false)
   await page.waitForTimeout(120)
   await expect(page.locator('.hero-letter').first()).toHaveCSS('--letter-fill', '0%')
   await expect(page.locator('.hero-mark-animation')).toHaveAttribute('data-mode', 'gone', {
@@ -52,7 +97,7 @@ test('fast scrolling cannot skip Jake frames or start highlighting before his en
   }[]
   expect(samples[samples.length - 1].time - samples[0].time).toBeGreaterThan(1500)
   for (let index = 1; index < samples.length; index++)
-    if (samples[index - 1].frame !== 17)
+    if (samples[index - 1].frame !== 15)
       expect(Math.abs(samples[index].frame - samples[index - 1].frame)).toBeLessThanOrEqual(1)
   await expect(page.locator('.hero-letter').first()).toHaveCSS('--letter-fill', '100%')
 })
@@ -63,18 +108,18 @@ test('scroll plays the original entrance and wave then mirrors the walk out', as
   const avatar = page.locator('.hero-mini-jacob')
   const firstLetter = page.locator('.hero-letter').first()
   await expect(avatar).toHaveAttribute('data-frame', '0')
-  for (const frame of [3, 6, 9, 11, 13, 16, 17]) {
-    await scrollTimeline(page, (0.35 * frame) / 17)
+  for (const frame of [3, 6, 8, 9, 11, 14, 15]) {
+    await scrollTimeline(page, (0.35 * frame) / 15)
     await expect(avatar).toHaveAttribute('data-frame', String(frame))
     await expect(firstLetter).toHaveCSS('--letter-fill', '0%')
   }
   await expect(mark).toHaveAttribute('data-mode', 'idle')
   await scrollTimeline(page, 0.4)
   await expect(mark).toHaveAttribute('data-mode', 'idle')
-  let previousCenter = 318.5
+  let previousCenter = 289
   for (const step of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
     await scrollTimeline(page, 0.42 + ((0.65 - 0.42) * (step + 0.2)) / 10)
-    await expect(avatar).toHaveAttribute('data-frame', String(5 + (step % 5)))
+    await expect(avatar).toHaveAttribute('data-frame', String([4, 5, 6, 5][step % 4]))
     await expect(avatar).toHaveAttribute('data-direction', 'out')
     const center = Number(await avatar.getAttribute('data-center'))
     expect(center).toBeGreaterThan(previousCenter)
@@ -220,7 +265,7 @@ test('mobile retains reveals and scrollable content; reduced motion retains docu
   await expect(page.locator('#contact')).not.toHaveJSProperty('inert', true)
 })
 
-async function scrollTimeline(page: Page, value: number) {
+async function scrollTimeline(page: Page, value: number, settled = true) {
   await page.evaluate((position) => {
     const track = document.querySelector<HTMLElement>('.scene-track')!
     const stage = track.firstElementChild as HTMLElement
@@ -231,9 +276,21 @@ async function scrollTimeline(page: Page, value: number) {
         ((track.offsetHeight - stage.clientHeight) * position) / Number(track.dataset.duration),
     )
   }, value)
+  if (settled)
+    await expect
+      .poll(
+        async () =>
+          Math.abs(
+            Number(await page.locator('.scene-track').getAttribute('data-playback-progress')) -
+              value,
+          ),
+        { timeout: 90000 },
+      )
+      .toBeLessThan(0.005)
 }
 
 test('skill categories retain the card layout, stack, and scroll progression', async ({ page }) => {
+  test.setTimeout(120000)
   await page.goto(baseURL + '/#skills')
   await expect(page.locator('#skills')).toHaveAttribute('aria-hidden', 'false')
   const heading = page.locator('.skills-heading')
@@ -293,7 +350,7 @@ test('category controls and project details work by keyboard', async ({ page }) 
 test('mobile category controls stay usable and project information fits the cards', async ({
   page,
 }) => {
-  test.setTimeout(60000)
+  test.setTimeout(120000)
   for (const height of [844, 600]) {
     await page.setViewportSize({ width: 390, height })
     await page.goto(baseURL + '/#skills')
@@ -521,7 +578,7 @@ test('category pills remain operable with reduced motion', async ({ page }) => {
 })
 
 test('all skill categories are listed as matching expandable pills', async ({ page }) => {
-  test.setTimeout(60000)
+  test.setTimeout(120000)
   await page.goto(baseURL + '/#skills')
   await expect(page.locator('#skills')).toHaveAttribute('aria-hidden', 'false')
   const list = page.getByRole('list', { name: 'Skill categories' })
@@ -553,6 +610,7 @@ test('all skill categories are listed as matching expandable pills', async ({ pa
 })
 
 test('skills form a closed ring with the last above the centered first', async ({ page }) => {
+  test.setTimeout(90000)
   await page.goto(baseURL + '/#skills')
   await expect(page.locator('#skills')).toHaveAttribute('aria-hidden', 'false')
   const list = page.getByRole('list', { name: 'Skill categories' })
@@ -607,7 +665,7 @@ test('reduced motion keeps the skill list flat and fully opaque', async ({ page 
 test('the ring keeps each skill centered through project reveals on desktop and mobile', async ({
   page,
 }) => {
-  test.setTimeout(60000)
+  test.setTimeout(120000)
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
     await page.goto(baseURL + '/#skills')

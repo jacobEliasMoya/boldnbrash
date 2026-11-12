@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { useReducedMotion } from 'motion/react'
 import { ParticleMonogram } from './ParticleMonogram'
-import { drawHeroFrame, getHeroScrollPose } from './heroFrames'
+import { drawHeroFrame, getHeroScrollPose, heroFrameCount, heroStandingCenter } from './heroFrames'
 
 export function HeroMark() {
   const canvas = useRef<HTMLCanvasElement>(null)
@@ -18,28 +18,37 @@ export function HeroMark() {
     let disposed = false
     let ready = false
     let paintedPose = ''
+    let edgeCenter = 760
     let progress = Number(element.closest('.scene')?.getAttribute('data-jake-progress') ?? 0)
-    const frames = Array.from({ length: 18 }, (_, index) => {
+    const frames = Array.from({ length: heroFrameCount }, (_, index) => {
       const image = new Image()
-      image.src = `/images/mini-jacob/frame-${String(index).padStart(3, '0')}.webp?v=2`
+      image.src = `/images/mini-jacob/frame-${String(index).padStart(3, '0')}.webp?v=3`
       return image
     })
 
     function paint() {
       if (!ready || disposed) return
       const pose = getHeroScrollPose(progress)
-      const key = `${pose.frame}:${pose.mirrored}:${pose.mode}:${pose.center}`
+      const center =
+        pose.walkProgress !== undefined
+          ? edgeCenter + (heroStandingCenter - edgeCenter) * pose.walkProgress
+          : pose.mirrored && pose.center !== undefined
+            ? heroStandingCenter +
+              ((pose.center - heroStandingCenter) / 470) * (edgeCenter - heroStandingCenter)
+            : heroStandingCenter
+      const key = `${pose.frame}:${pose.sourceFrame}:${pose.mirrored}:${pose.mode}:${center}`
       if (key === paintedPose) return
       drawHeroFrame(
         context!,
-        frames[pose.frame],
-        pose.mirrored ? pose.frame : undefined,
-        pose.center,
+        frames[pose.sourceFrame ?? pose.frame],
+        pose.sourceFrame,
+        center,
+        pose.mirrored,
       )
       surface!.style.opacity = pose.mode === 'gone' ? '0' : '1'
       surface!.dataset.frame = String(pose.frame)
       surface!.dataset.direction = pose.mirrored ? 'out' : 'in'
-      surface!.dataset.center = String(pose.center ?? 318.5)
+      surface!.dataset.center = String(center)
       element!.dataset.mode = pose.mode
       paintedPose = key
     }
@@ -49,6 +58,24 @@ export function HeroMark() {
       progress = detail.progress
       paint()
     }
+    function measure() {
+      const bounds = element!.getBoundingClientRect()
+      const scale = bounds.height / 640
+      if (!scale) return
+      const left = (bounds.width - 580 * scale) / 2
+      const pageEdge = (window.innerWidth - bounds.left - left) / scale
+      edgeCenter = pageEdge + 160
+      surface!.width = Math.ceil(edgeCenter + 160)
+      surface!.style.left = `${left}px`
+      surface!.style.width = `${surface!.width * scale}px`
+      surface!.style.height = `${640 * scale}px`
+      paintedPose = ''
+      paint()
+    }
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    window.addEventListener('resize', measure)
+    measure()
     window.addEventListener('portfolio:hero-progress', updateScroll)
     Promise.all(frames.map((image) => image.decode()))
       .then(() => {
@@ -61,8 +88,10 @@ export function HeroMark() {
 
     return () => {
       disposed = true
+      observer.disconnect()
+      window.removeEventListener('resize', measure)
       window.removeEventListener('portfolio:hero-progress', updateScroll)
-      context.clearRect(0, 0, 580, 640)
+      context.clearRect(0, 0, surface.width, surface.height)
       surface.style.opacity = '0'
       element.dataset.mode = 'logo'
     }
