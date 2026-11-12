@@ -1,14 +1,11 @@
 'use client'
 
 import { Children, useEffect, useRef, useState, type ReactNode } from 'react'
-import { motion, MotionConfig, useReducedMotion, useSpring } from 'motion/react'
+import { motion, MotionConfig, useReducedMotion, useMotionValue } from 'motion/react'
 import { sceneDuration, sceneStops, skillSegments, skillStart, skillTravel } from './skillsTimeline'
 import { MobileMenu } from './MobileMenu'
-import {
-  heroAnimationTravel,
-  heroEntranceDuration,
-  heroEntranceTravel,
-} from '@/components/atoms/heroFrames'
+import { heroAnimationTravel } from '@/components/atoms/heroFrames'
+import { toPlaybackTime, fromPlaybackTime } from './scrollPlayback'
 
 const scenes = [
   { id: 'top', label: 'Home' },
@@ -29,7 +26,7 @@ const origins = [
 
 export function SceneSequence({ children }: { children: ReactNode }) {
   const reduceMotion = useReducedMotion()
-  const timeline = useSpring(0, { stiffness: 160, damping: 30, mass: 0.5 })
+  const timeline = useMotionValue(0)
   const track = useRef<HTMLDivElement>(null)
   const panels = useRef<(HTMLElement | null)[]>([])
   const [enhanced, setEnhanced] = useState(false)
@@ -44,48 +41,99 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     let frame = 0
     let current = 0
     let pendingFocus: number | null = null
-    let entranceFrame = 0
+    let playbackFrame = 0
     let displayed = 0
     let requested = 0
-    let previousEntranceTime = 0
+    let previousPlaybackTime = 0
+    let wheelDirection = 0
+
+    function normalizeWheel(event: WheelEvent) {
+      const node = track.current
+      if (!node || media.matches || event.ctrlKey || event.defaultPrevented || !event.deltaY) return
+      let target = event.target instanceof Element ? event.target : null
+      if (target?.closest('dialog, input, textarea, select, [contenteditable="true"]')) return
+      const direction = Math.sign(event.deltaY)
+      while (target && target !== node) {
+        const element = target as HTMLElement
+        const overflow = getComputedStyle(element).overflowY
+        if (
+          (overflow === 'auto' || overflow === 'scroll') &&
+          element.scrollHeight > element.clientHeight + 1
+        ) {
+          if (
+            direction > 0
+              ? element.scrollTop + element.clientHeight < element.scrollHeight - 1
+              : element.scrollTop > 1
+          )
+            return
+        }
+        target = target.parentElement
+      }
+      const start = window.scrollY + node.getBoundingClientRect().top
+      const distance =
+        node.offsetHeight - (node.firstElementChild?.clientHeight ?? window.innerHeight)
+      if (distance <= 0) return
+      event.preventDefault()
+      const nativeProgress = Math.max(
+        0,
+        Math.min(sceneDuration, ((window.scrollY - start) / distance) * sceneDuration),
+      )
+      const currentClock = toPlaybackTime(displayed)
+      const base =
+        wheelDirection && wheelDirection !== direction
+          ? currentClock
+          : toPlaybackTime(nativeProgress)
+      wheelDirection = direction
+      const pixels =
+        Math.abs(event.deltaY) *
+        (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1)
+      const desired = base + direction * Math.min(pixels, 120) * 0.0015
+      const bounded = Math.max(
+        0,
+        Math.min(
+          toPlaybackTime(sceneDuration),
+          Math.max(currentClock - 0.9, Math.min(currentClock + 0.9, desired)),
+        ),
+      )
+      window.scrollTo({
+        top: start + (distance * fromPlaybackTime(bounded)) / sceneDuration,
+        behavior: 'instant',
+      })
+      update()
+    }
 
     function render(value: number, immediate = false) {
       requested = Math.max(0, Math.min(sceneDuration, value))
       if (immediate) {
-        cancelAnimationFrame(entranceFrame)
-        entranceFrame = 0
+        cancelAnimationFrame(playbackFrame)
+        playbackFrame = 0
         displayed = requested
         renderScene(displayed)
         return
       }
-      if (requested < heroAnimationTravel && displayed > heroAnimationTravel)
-        displayed = heroAnimationTravel
-      if (displayed >= heroAnimationTravel && requested >= heroAnimationTravel) {
-        displayed = requested
-        renderScene(displayed)
-        return
-      }
-      if (!entranceFrame) {
-        previousEntranceTime = performance.now()
-        entranceFrame = requestAnimationFrame(advanceEntrance)
+      if (!playbackFrame) {
+        previousPlaybackTime = performance.now()
+        playbackFrame = requestAnimationFrame(advancePlayback)
       }
     }
 
-    function advanceEntrance(time: number) {
-      entranceFrame = 0
+    function advancePlayback(time: number) {
+      playbackFrame = 0
       if (media.matches) return
-      const delta = Math.min(50, time - previousEntranceTime)
-      previousEntranceTime = time
-      const maximumStep = (heroEntranceTravel * delta) / heroEntranceDuration
-      const target = Math.min(requested, heroAnimationTravel)
-      const difference = target - displayed
-      displayed += Math.sign(difference) * Math.min(Math.abs(difference), maximumStep)
+      const delta = Math.min(50, time - previousPlaybackTime)
+      previousPlaybackTime = time
+      const currentTime = toPlaybackTime(displayed)
+      const targetTime = toPlaybackTime(requested)
+      const difference = targetTime - currentTime
+      const step = Math.sign(difference) * Math.min(Math.abs(difference), delta / 1000)
+      displayed = fromPlaybackTime(currentTime + step)
       renderScene(displayed)
-      if (Math.abs(target - displayed) > 0.000001) {
-        entranceFrame = requestAnimationFrame(advanceEntrance)
-      } else if (requested > heroAnimationTravel) {
+      if (Math.abs(difference) > delta / 1000 + 0.000001) {
+        playbackFrame = requestAnimationFrame(advancePlayback)
+      } else {
         displayed = requested
         renderScene(displayed)
+        settleFocus()
       }
     }
     function update() {
@@ -105,6 +153,10 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     function renderScene(value: number) {
       if (media.matches) return
       const progress = Math.max(0, Math.min(sceneDuration, value))
+      if (track.current) {
+        track.current.dataset.playbackProgress = String(progress)
+        track.current.dataset.playbackTime = String(toPlaybackTime(progress))
+      }
       const jakeProgress = Math.max(0, Math.min(1, progress / heroAnimationTravel))
       if (panels.current[0]) panels.current[0].dataset.jakeProgress = String(jakeProgress)
       window.dispatchEvent(
@@ -197,8 +249,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       setEnhanced(enabled)
       if (!enabled) {
         timeline.stop()
-        cancelAnimationFrame(entranceFrame)
-        entranceFrame = 0
+        cancelAnimationFrame(playbackFrame)
+        playbackFrame = 0
         panels.current.forEach((panel) => {
           if (!panel) return
           panel.style.clipPath = ''
@@ -220,7 +272,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       goTo(index)
     }
 
-    function goTo(index: number, immediate = false) {
+    function goTo(index: number, immediate = true) {
       const node = track.current
       if (!node) return
       const start = window.scrollY + node.getBoundingClientRect().top
@@ -277,7 +329,6 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     }
 
     const stopRendering = timeline.on('change', render)
-    const stopFocus = timeline.on('animationComplete', settleFocus)
     setup()
     const initialScroll = window.scrollY
     const initial = requestAnimationFrame(() =>
@@ -288,6 +339,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       }),
     )
     window.addEventListener('scroll', schedule, { passive: true })
+    window.addEventListener('wheel', normalizeWheel, { passive: false })
     window.addEventListener('resize', schedule)
     document.addEventListener('click', navigate)
     window.addEventListener('portfolio:select-skill', selectSkill)
@@ -299,12 +351,12 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     return () => {
       history.scrollRestoration = previousScrollRestoration
       stopRendering()
-      stopFocus()
       timeline.stop()
       cancelAnimationFrame(frame)
-      cancelAnimationFrame(entranceFrame)
+      cancelAnimationFrame(playbackFrame)
       cancelAnimationFrame(initial)
       window.removeEventListener('scroll', schedule)
+      window.removeEventListener('wheel', normalizeWheel)
       window.removeEventListener('resize', schedule)
       document.removeEventListener('click', navigate)
       window.removeEventListener('portfolio:select-skill', selectSkill)
