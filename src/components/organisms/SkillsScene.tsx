@@ -1,23 +1,16 @@
 ﻿'use client'
 
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-} from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import {
   motion,
-  useAnimationFrame,
   useMotionValue,
   useReducedMotion,
   useSpring,
   useTransform,
+  type MotionValue,
 } from 'motion/react'
 import { PlatformArtwork, SystemArtwork } from '@/components/atoms/ProjectArtwork'
-import { clamp, getSkillPosition, skills } from './skillsTimeline'
+import { clamp, getSkillPosition, skillSegments, skills } from './skillsTimeline'
 
 type Project = (typeof skills)[number]['projects'][number]
 
@@ -27,6 +20,8 @@ function SkillCategoryPill({
   phase,
   animated,
   reduceMotion,
+  ringPosition,
+  radius,
   onToggle,
   onOpenProject,
 }: {
@@ -35,6 +30,8 @@ function SkillCategoryPill({
   phase: number
   animated: boolean
   reduceMotion: boolean | null
+  ringPosition: MotionValue<number>
+  radius: number
   onToggle: (index: number, expanded: boolean) => void
   onOpenProject: (project: Project, trigger: HTMLButtonElement) => void
 }) {
@@ -43,39 +40,44 @@ function SkillCategoryPill({
   const pill = useRef<HTMLDivElement>(null)
   const category = useRef<HTMLDivElement>(null)
   const growth = active && animated ? clamp(phase / 0.45) : 0
-  const reveal = active ? (animated ? clamp((phase - 0.2) / 0.35) : 1) : 0
+  const reveal = active
+    ? animated
+      ? Math.min(
+          clamp((phase - 0.2) / 0.35),
+          clamp((skillSegments[index].duration - 0.28 - phase) / 0.3),
+        )
+      : 1
+    : 0
   const cardPosition = clamp(phase - 0.55, 0, skill.projects.length - 0.001)
   const projectIndex = Math.floor(cardPosition)
   const cardTravel = Math.min(
     skill.projects.length - 1,
     projectIndex + clamp((cardPosition - projectIndex - 0.75) / 0.25),
   )
-  const expanded = reveal > 0
-  const distance = useMotionValue(0)
-  const smoothDistance = useSpring(distance, { stiffness: 220, damping: 32, mass: 0.6 })
-  const rotation = useTransform(smoothDistance, (value) => clamp(-value * 24, -62, 62))
-  const depth = useTransform(smoothDistance, (value) => -Math.min(570, Math.abs(value) * 190))
-  const fade = useTransform(smoothDistance, (value) => Math.max(0.1, 1 - Math.abs(value) * 0.3))
-  const order = useTransform(smoothDistance, (value) => 100 - Math.round(Math.abs(value) * 10))
-
-  useAnimationFrame(() => {
-    const node = pill.current
-    const browser = node?.parentElement
-    if (!animated || !node || !browser || browser.clientHeight === 0) return
-    if (browser.closest('.scene')?.getAttribute('aria-hidden') === 'true') return
-    const opened = browser.querySelector<HTMLElement>('.skills-category-pill[data-expanded]')
-    const anchor = opened
-      ? Math.min(browser.clientHeight * 0.5, opened.offsetHeight / 2 + 8)
-      : Math.min(120, browser.clientHeight * 0.25)
-    const center = node.offsetTop + node.offsetHeight / 2
-    distance.set(
-      clamp(
-        (center - browser.scrollTop - anchor) / Math.max(160, browser.clientHeight * 0.3),
-        -3,
-        3,
-      ),
-    )
+  // Every pill sits on the same closed vertical ring, including the last above the first.
+  const angle = useTransform(ringPosition, (position) => {
+    const steps =
+      ((((index - position + skills.length / 2) % skills.length) + skills.length) % skills.length) -
+      skills.length / 2
+    return steps * (360 / skills.length)
   })
+  const stepAngle = 360 / skills.length
+  const rotation = useTransform(angle, (value) => clamp((-value * 32.4) / stepAngle, -81, 81))
+  const vertical = useTransform(angle, (value) => Math.sin((value * Math.PI) / 180) * radius * 0.78)
+  const depth = useTransform(
+    angle,
+    (value) => (Math.cos((value * Math.PI) / 180) - 1) * radius * 0.85,
+  )
+  const fade = useTransform(angle, (value) =>
+    Math.pow(
+      Math.max(0, Math.cos((value * Math.PI) / 180)),
+      Math.log(0.466) / Math.log(Math.cos((stepAngle * Math.PI) / 180)),
+    ),
+  )
+  const order = useTransform(angle, (value) =>
+    Math.round(100 + Math.cos((value * Math.PI) / 180) * 50),
+  )
+
   useLayoutEffect(() => {
     const heading = category.current,
       container = pill.current
@@ -95,16 +97,6 @@ function SkillCategoryPill({
     observer.observe(heading)
     return () => observer.disconnect()
   }, [])
-  const scrollExpandedIntoView = useCallback(() => {
-    const node = pill.current,
-      browser = node?.parentElement
-    if (!expanded || !node || !browser || getComputedStyle(browser).overflowY !== 'auto') return
-    browser.scrollTo({
-      top: node.offsetTop - 8,
-      behavior: reduceMotion ? 'instant' : 'smooth',
-    })
-  }, [expanded, reduceMotion])
-  useEffect(scrollExpandedIntoView, [scrollExpandedIntoView])
   return (
     <motion.div
       ref={pill}
@@ -114,15 +106,11 @@ function SkillCategoryPill({
       data-expanded={reveal > 0 ? '' : undefined}
       initial={false}
       animate={{ '--pill-reveal': reveal }}
-      onAnimationComplete={scrollExpandedIntoView}
-      transition={
-        reduceMotion || phase === 0
-          ? { duration: 0 }
-          : { type: 'spring', duration: 0.45, bounce: 0 }
-      }
+      transition={reduceMotion ? { duration: 0 } : { type: 'spring', duration: 0.6, bounce: 0 }}
       style={
         {
           '--pill-height': `${pillHeight}px`,
+          y: animated ? vertical : 0,
           rotateX: animated ? rotation : 0,
           z: animated ? depth : 0,
           opacity: animated ? fade : 1,
@@ -201,14 +189,18 @@ function SkillCategoryPill({
                         ? 'Go / CLI'
                         : project.artwork === 'model'
                           ? 'Blender / Low-poly'
-                          : 'Ollama / Local models'}
+                          : project.artwork === 'automation'
+                            ? 'Python / Image tools'
+                            : 'Ollama / Local models'}
                     </span>
                     <strong>
                       {project.artwork === 'terminal'
-                        ? '> GitGo_'
+                        ? `> ${project.title}_`
                         : project.artwork === 'model'
                           ? '3D'
-                          : 'Local / AI'}
+                          : project.artwork === 'automation'
+                            ? 'Batch / Images'
+                            : 'Local / AI'}
                     </strong>
                   </div>
                 )}
@@ -228,11 +220,6 @@ function SkillCategoryPill({
             </article>
           ))}
         </div>
-        <div className="skills-card-progress" aria-hidden="true">
-          {skill.projects.map((project, position) => (
-            <i key={project.title} data-current={position === projectIndex ? '' : undefined} />
-          ))}
-        </div>
       </div>
     </motion.div>
   )
@@ -243,11 +230,33 @@ export function SkillsScene() {
   const [pinned, setPinned] = useState(false)
   const [openedProject, setOpenedProject] = useState<Project | null>(null)
   const [expandedIndex, setExpandedIndex] = useState<number | null>(0)
+  const browser = useRef<HTMLDivElement>(null)
   const dialog = useRef<HTMLDialogElement>(null),
     previousOverflow = useRef(''),
     trigger = useRef<HTMLButtonElement | null>(null)
   const reduceMotion = useReducedMotion()
   const animated = pinned && !reduceMotion
+  const [radius, setRadius] = useState(280)
+  const ringTarget = useMotionValue(0)
+  const ringPosition = useSpring(ringTarget, { stiffness: 110, damping: 26, mass: 0.8 })
+  useEffect(() => {
+    const segment = skillSegments[selection.index]
+    const turn = clamp((selection.phase - (segment.duration - 0.28)) / 0.28)
+    ringTarget.set(selection.index + turn)
+  }, [selection.index, selection.phase, ringTarget])
+  useLayoutEffect(() => {
+    const container = browser.current
+    if (!container || !animated) return
+    const measure = () =>
+      setRadius(
+        (container.clientHeight * 0.48 * Math.sin((72 * Math.PI) / 180)) /
+          Math.sin((2 * Math.PI) / skills.length),
+      )
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(container)
+    return () => observer.disconnect()
+  }, [animated])
   useEffect(() => {
     function update(event: Event) {
       setPinned(true)
@@ -292,7 +301,7 @@ export function SkillsScene() {
           What I build, the tools I reach for, and the work behind them.
         </p>
       </div>
-      <div className="skills-browser" role="list" aria-label="Skill categories">
+      <div ref={browser} className="skills-browser" role="list" aria-label="Skill categories">
         {skills.map((skill, index) => (
           <SkillCategoryPill
             key={skill.name}
@@ -301,6 +310,8 @@ export function SkillsScene() {
             phase={animated && selection.index === index ? selection.phase : 0}
             animated={animated}
             reduceMotion={reduceMotion}
+            ringPosition={ringPosition}
+            radius={radius}
             onToggle={toggleProjects}
             onOpenProject={(project, button) => {
               trigger.current = button
@@ -335,6 +346,16 @@ export function SkillsScene() {
                 <p key={paragraph}>{paragraph}</p>
               ))}
             </div>
+            {'sourceUrl' in openedProject && (
+              <a
+                className="project-open"
+                href={openedProject.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                View on GitHub <b aria-hidden="true">?</b>
+              </a>
+            )}
           </div>
         )}
       </dialog>

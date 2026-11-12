@@ -8,7 +8,7 @@ type Scene = { id: string; label: string }
 type Phase = 'menu' | 'closing' | 'expanding' | 'revealing'
 const colors: Record<string, string> = {
   top: '#080809',
-  skills: '#2710a8',
+  skills: '#3814ff',
   work: '#3814ff',
   about: '#efebe1',
   contact: '#3814ff',

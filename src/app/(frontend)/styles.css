@@ -402,6 +402,19 @@ ul {
   height: auto;
   display: block;
 }
+.hero-mark-animation {
+  position: relative;
+  isolation: isolate;
+}
+.hero-mini-jacob {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  z-index: 2;
+  pointer-events: none;
+}
 .skills-scene {
   display: flex;
   align-items: center;
@@ -1548,10 +1561,6 @@ ul {
 }
 
 /* Skill areas share one project sequence while the introduction stays beside it. */
-.scene-skills {
-  --skills-blue: #2710a8;
-  background-image: radial-gradient(ellipse at 72% 48%, transparent 30%, #10064e80 100%);
-}
 .skills-index {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
@@ -1565,15 +1574,14 @@ ul {
   min-width: 0;
 }
 .skills-index .skills-heading h2 {
-  font-size: clamp(36px, 4.7vw, 84px);
+  font-size: clamp(42px, 5.4vw, 96px);
   line-height: 1.02;
   margin: 27px 0 24px;
   padding-bottom: 26px;
-  border-bottom: 1px solid #cbbcff66;
 }
 .skills-index .skills-heading .skills-intro {
   max-width: 32ch;
-  font-size: clamp(20px, 1.7vw, 28px);
+  font-size: clamp(16px, 1.2vw, 20px);
   line-height: 1.5;
 }
 .skills-browser {
@@ -1599,8 +1607,15 @@ ul {
 }
 .portfolio[data-enhanced] .skills-browser {
   perspective: 1100px;
-  perspective-origin: 50% 28%;
-  padding-bottom: max(220px, calc(100svh - 290px));
+  perspective-origin: 50% 50%;
+  overflow: hidden;
+}
+.portfolio[data-enhanced] .skills-category-pill {
+  position: absolute;
+  top: 50%;
+  left: 8px;
+  width: calc(100% - 16px);
+  translate: 0 -50%;
 }
 .skills-category-pill {
   position: relative;
@@ -1614,11 +1629,11 @@ ul {
     var(--pill-height) + (max(570px, var(--pill-height) + 360px) - var(--pill-height)) *
       var(--pill-reveal)
   );
-  padding: 22px clamp(24px, 2.2vw, 32px);
+  padding: calc(36px - 14px * var(--pill-reveal)) clamp(30px, 2.6vw, 40px);
   gap: calc(18px * var(--pill-reveal));
   border: 0;
-  border-radius: calc(70px - 42px * var(--pill-reveal));
-  background: color-mix(in srgb, var(--skills-blue) 76%, var(--ink));
+  border-radius: calc(70px - 22px * var(--pill-reveal));
+  background: color-mix(in srgb, var(--skills-blue) 58%, var(--ink));
   overflow: hidden;
   transform-origin: center;
   backface-visibility: hidden;
@@ -1648,7 +1663,7 @@ ul {
   margin-bottom: 10px;
 }
 .skills-category-current h3 {
-  font-size: clamp(23px, 2vw, 32px);
+  font-size: calc(clamp(30px, 2.8vw, 44px) - clamp(7px, 0.8vw, 12px) * var(--pill-reveal));
   line-height: 1.04;
   letter-spacing: -0.035em;
   max-width: 94%;
@@ -1657,7 +1672,7 @@ ul {
 }
 .skills-technologies {
   margin-top: 12px;
-  font-size: 12px;
+  font-size: calc(14px - 2px * var(--pill-reveal));
   line-height: 1.6;
   color: var(--paper);
 }
@@ -1701,11 +1716,13 @@ ul {
 .skill-project-card {
   position: absolute;
   inset: 0;
+  border: 0;
   overflow: hidden;
   padding: 22px;
 }
 .skill-project-card .card-scoop {
   background: var(--skills-blue);
+  border: 0;
 }
 .skill-project-card > .eyebrow {
   font-size: 9px;
@@ -1736,29 +1753,15 @@ ul {
   object-fit: contain;
 }
 .skill-project-information {
-  border-top: 1px solid #efebe13b;
   padding-top: 12px;
   font-size: clamp(13px, 1.1vw, 16px);
   line-height: 1.5;
 }
 .skill-project-card .project-open {
+  border: 0;
   flex-shrink: 0;
   margin-top: 14px;
   padding: 9px 12px;
-}
-.skills-card-progress {
-  display: flex;
-  flex-shrink: 0;
-  gap: 8px;
-  margin-top: 12px;
-}
-.skills-card-progress i {
-  height: 2px;
-  flex: 1;
-  background: #cbbcff55;
-}
-.skills-card-progress i[data-current] {
-  background: var(--paper);
 }
 .skill-project-specimen {
   display: flex;
@@ -1792,10 +1795,16 @@ ul {
   opacity: var(--card-opacity, 1);
   transform-origin: center;
   backface-visibility: hidden;
+  transition:
+    transform 180ms ease-out,
+    opacity 180ms ease-out;
 }
 .portfolio[data-enhanced] .skill-project-information {
   opacity: var(--information-reveal);
   transform: translateY(calc((1 - var(--information-reveal)) * 18px));
+  transition:
+    opacity 180ms ease-out,
+    transform 180ms ease-out;
 }
 .portfolio:not([data-enhanced]) .skills-index {
   display: grid;
@@ -1830,9 +1839,6 @@ ul {
 .portfolio:not([data-enhanced]) .skill-project-card .artwork-frame {
   min-height: 140px;
 }
-.portfolio:not([data-enhanced]) .skills-card-progress {
-  display: none;
-}
 @media (max-height: 800px) and (min-width: 901px) {
   .skills-index {
     padding-top: 110px;
@@ -1848,7 +1854,7 @@ ul {
     margin-top: auto;
   }
   .skills-index .skills-heading h2 {
-    font-size: min(4.7vw, 10vh);
+    font-size: min(5.4vw, 11vh);
   }
 }
 @media (max-width: 900px), (max-height: 560px) {
@@ -1872,12 +1878,12 @@ ul {
     width: 100%;
   }
   .skills-index .skills-heading h2 {
-    font-size: clamp(36px, 8.5vw, 72px);
+    font-size: clamp(40px, 9.8vw, 88px);
     margin: 20px 0;
     padding-bottom: 20px;
   }
   .skills-index .skills-heading .skills-intro {
-    font-size: 20px;
+    font-size: 16px;
   }
   .skills-browser {
     flex-shrink: 0;
@@ -1887,7 +1893,7 @@ ul {
     overflow: visible;
   }
   .skills-category-current h3 {
-    font-size: clamp(25px, 5.7vw, 36px);
+    font-size: calc(clamp(28px, 7vw, 38px) - 3px * var(--pill-reveal));
   }
   .skill-project-card h4 {
     font-size: 25px;
@@ -1917,9 +1923,9 @@ ul {
 }
 @media (max-width: 900px), (max-height: 560px) {
   .portfolio[data-enhanced] .skills-browser {
-    height: min(620px, calc(100svh - 180px));
-    min-height: 420px;
-    overflow-y: auto;
+    height: 650px;
+    min-height: 650px;
+    overflow: hidden;
   }
 }
 .skill-project-status {

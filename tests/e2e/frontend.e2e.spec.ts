@@ -9,7 +9,87 @@ import {
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000'
 
+test('reduced motion retains the monogram without loading the mini Jake sequence', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  const frames: string[] = []
+  page.on('request', (request) => {
+    if (request.url().includes('/images/mini-jacob/')) frames.push(request.url())
+  })
+  await page.goto(baseURL)
+  await expect(page.locator('.particle-logo')).toBeVisible()
+  await expect(page.locator('.hero-mini-jacob')).toHaveCSS('opacity', '0')
+  expect(frames).toHaveLength(0)
+})
+
 test.use({ viewport: { width: 1440, height: 900 } })
+
+test('fast scrolling cannot skip Jake frames or start highlighting before his entrance finishes', async ({
+  page,
+}) => {
+  await page.goto(baseURL)
+  const avatar = page.locator('.hero-mini-jacob')
+  await expect(avatar).toHaveAttribute('data-frame', '0')
+  await avatar.evaluate((element) => {
+    const samples = [{ frame: 0, time: performance.now() }]
+    const observer = new MutationObserver(() => {
+      samples.push({ frame: Number(element.getAttribute('data-frame')), time: performance.now() })
+      ;(element as HTMLElement).dataset.frameTimes = JSON.stringify(samples)
+      if (element.getAttribute('data-direction') === 'out') observer.disconnect()
+    })
+    observer.observe(element, { attributes: true, attributeFilter: ['data-frame'] })
+  })
+  await scrollTimeline(page, 0.9)
+  await page.waitForTimeout(120)
+  await expect(page.locator('.hero-letter').first()).toHaveCSS('--letter-fill', '0%')
+  await expect(page.locator('.hero-mark-animation')).toHaveAttribute('data-mode', 'gone', {
+    timeout: 6000,
+  })
+  const samples = JSON.parse((await avatar.getAttribute('data-frame-times'))!) as {
+    frame: number
+    time: number
+  }[]
+  expect(samples[samples.length - 1].time - samples[0].time).toBeGreaterThan(1500)
+  for (let index = 1; index < samples.length; index++)
+    if (samples[index - 1].frame !== 17)
+      expect(Math.abs(samples[index].frame - samples[index - 1].frame)).toBeLessThanOrEqual(1)
+  await expect(page.locator('.hero-letter').first()).toHaveCSS('--letter-fill', '100%')
+})
+
+test('scroll plays the original entrance and wave then mirrors the walk out', async ({ page }) => {
+  await page.goto(baseURL)
+  const mark = page.locator('.hero-mark-animation')
+  const avatar = page.locator('.hero-mini-jacob')
+  const firstLetter = page.locator('.hero-letter').first()
+  await expect(avatar).toHaveAttribute('data-frame', '0')
+  for (const frame of [3, 6, 9, 11, 13, 16, 17]) {
+    await scrollTimeline(page, (0.35 * frame) / 17)
+    await expect(avatar).toHaveAttribute('data-frame', String(frame))
+    await expect(firstLetter).toHaveCSS('--letter-fill', '0%')
+  }
+  await expect(mark).toHaveAttribute('data-mode', 'idle')
+  await scrollTimeline(page, 0.4)
+  await expect(mark).toHaveAttribute('data-mode', 'idle')
+  let previousCenter = 318.5
+  for (const step of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+    await scrollTimeline(page, 0.42 + ((0.65 - 0.42) * (step + 0.2)) / 10)
+    await expect(avatar).toHaveAttribute('data-frame', String(5 + (step % 5)))
+    await expect(avatar).toHaveAttribute('data-direction', 'out')
+    const center = Number(await avatar.getAttribute('data-center'))
+    expect(center).toBeGreaterThan(previousCenter)
+    previousCenter = center
+    await expect(firstLetter).toHaveCSS('--letter-fill', '0%')
+  }
+  await scrollTimeline(page, 0.8)
+  await expect(mark).toHaveAttribute('data-mode', 'gone')
+  await expect(avatar).toHaveCSS('opacity', '0')
+  await expect(firstLetter).toHaveCSS('--letter-fill', '100%')
+  await scrollTimeline(page, 0.4)
+  await expect(mark).toHaveAttribute('data-mode', 'idle')
+  await expect(avatar).toHaveAttribute('data-direction', 'in')
+  await expect(avatar).toHaveCSS('opacity', '1')
+})
 
 test('navigation includes Home and moves one shared highlight between links', async ({ page }) => {
   await page.goto(baseURL)
@@ -213,11 +293,21 @@ test('category controls and project details work by keyboard', async ({ page }) 
 test('mobile category controls stay usable and project information fits the cards', async ({
   page,
 }) => {
+  test.setTimeout(60000)
   for (const height of [844, 600]) {
     await page.setViewportSize({ width: 390, height })
     await page.goto(baseURL + '/#skills')
     await expect(page.locator('#skills')).toHaveAttribute('aria-hidden', 'false')
     for (const skill of skills) {
+      await scrollTimeline(page, skillStart + skillSegments[skills.indexOf(skill)].start + 0.02)
+      await expect
+        .poll(() =>
+          page
+            .locator('.skills-category-pill')
+            .nth(skills.indexOf(skill))
+            .evaluate((el) => Math.abs(new DOMMatrixReadOnly(getComputedStyle(el).transform).m43)),
+        )
+        .toBeLessThan(1)
       await page
         .getByRole('button', { name: 'Show projects for ' + skill.name, exact: true })
         .click()
@@ -254,7 +344,7 @@ test('reduced motion retains category selection and shows projects in flow', asy
     .click()
   await expect(page.getByRole('article', { name: 'GitGo', exact: true })).toBeVisible()
   await expect(page.locator('.skills-category-pill[data-active] .skill-project-card')).toHaveCount(
-    1,
+    skills[2].projects.length,
   )
 })
 
@@ -278,6 +368,7 @@ test('mobile menu drops in, traps navigation, and restores focus after dismissal
   await expect(menu).not.toBeVisible()
   await expect(toggle).toBeFocused()
   await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  await page.evaluate(() => document.fonts.ready.then(() => undefined))
   await expect(page.locator('html')).not.toHaveCSS('overflow', 'hidden')
   await toggle.click()
   await menu.getByRole('button', { name: 'Close menu' }).click()
@@ -292,7 +383,7 @@ test('every mobile menu selection expands into its section and restores scrollin
   await page.goto(baseURL)
   await expect(page.locator('.portfolio')).toHaveAttribute('data-enhanced', '')
   for (const [label, id, color] of [
-    ['Skills', 'skills', 'rgb(39, 16, 168)'],
+    ['Skills', 'skills', 'rgb(56, 20, 255)'],
     ['Work', 'work', 'rgb(56, 20, 255)'],
     ['About', 'about', 'rgb(239, 235, 225)'],
     ['Contact', 'contact', 'rgb(56, 20, 255)'],
@@ -400,10 +491,13 @@ test('the category pill contains the heading and stack and expands into its proj
   await expect(toggle).toHaveAttribute('aria-expanded', 'false')
   await expect(pill.getByRole('heading', { name: 'Frontend Development' })).toBeVisible()
   await expect(pill.locator('.skills-technologies')).toBeVisible()
+  await expect
+    .poll(() => pill.evaluate((element) => (element as HTMLElement).offsetHeight))
+    .toBeLessThan(220)
   const closedHeight = await pill.evaluate((element) => (element as HTMLElement).offsetHeight)
   expect(closedHeight).toBeLessThan(220)
   await toggle.click()
-  const card = pill.getByRole('article', { name: 'Design system', exact: true })
+  const card = pill.getByRole('article', { name: skills[0].projects[0].title, exact: true })
   await expect(card).toBeInViewport()
   await expect
     .poll(() => pill.evaluate((element) => (element as HTMLElement).offsetHeight))
@@ -411,19 +505,14 @@ test('the category pill contains the heading and stack and expands into its proj
   await page.getByRole('button', { name: 'Hide projects for Frontend Development' }).click()
   await expect(card).not.toBeVisible()
   await expect
-    .poll(() =>
-      pill.evaluate(
-        (element, height) => Math.abs((element as HTMLElement).offsetHeight - height),
-        closedHeight,
-      ),
-    )
-    .toBeLessThan(2)
+    .poll(() => pill.evaluate((element) => (element as HTMLElement).offsetHeight))
+    .toBeLessThan(220)
 })
 
 test('category pills remain operable with reduced motion', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.goto(baseURL + '/#skills')
-  const card = page.getByRole('article', { name: 'Design system', exact: true })
+  const card = page.getByRole('article', { name: skills[0].projects[0].title, exact: true })
   await expect(card).toBeVisible()
   await page.getByRole('button', { name: 'Hide projects for Frontend Development' }).click()
   await expect(card).not.toBeVisible()
@@ -431,15 +520,22 @@ test('category pills remain operable with reduced motion', async ({ page }) => {
   await expect(card).toBeVisible()
 })
 
-test('all five skill categories are listed as matching expandable pills', async ({ page }) => {
+test('all skill categories are listed as matching expandable pills', async ({ page }) => {
+  test.setTimeout(60000)
   await page.goto(baseURL + '/#skills')
   await expect(page.locator('#skills')).toHaveAttribute('aria-hidden', 'false')
   const list = page.getByRole('list', { name: 'Skill categories' })
-  await expect(list.getByRole('listitem')).toHaveCount(5)
+  await expect(list.getByRole('listitem')).toHaveCount(skills.length)
   for (const skill of skills) {
+    await scrollTimeline(page, skillStart + skillSegments[skills.indexOf(skill)].start + 0.02)
     const pill = list
       .getByRole('listitem')
       .filter({ has: page.getByRole('heading', { name: skill.name, exact: true }) })
+    await expect
+      .poll(() =>
+        pill.evaluate((el) => Math.abs(new DOMMatrixReadOnly(getComputedStyle(el).transform).m43)),
+      )
+      .toBeLessThan(1)
     await expect(pill.getByRole('heading', { name: skill.name, exact: true })).toBeVisible()
     await expect(pill.locator('.skills-technologies')).toHaveText(
       skill.technologies.join(' \u00b7 '),
@@ -456,37 +552,43 @@ test('all five skill categories are listed as matching expandable pills', async 
   await expect(page.locator('.skills-index-controls')).toHaveCount(0)
 })
 
-test('skill pills rotate into depth and fade as the vertical list scrolls', async ({ page }) => {
+test('skills form a closed ring with the last above the centered first', async ({ page }) => {
   await page.goto(baseURL + '/#skills')
   await expect(page.locator('#skills')).toHaveAttribute('aria-hidden', 'false')
-  const browser = page.getByRole('list', { name: 'Skill categories' })
-  const pills = browser.getByRole('listitem')
-  await expect(browser).toHaveCSS('perspective', '1100px')
+  const list = page.getByRole('list', { name: 'Skill categories' })
+  const pills = list.getByRole('listitem')
+  await expect(list).toHaveCSS('overflow-y', 'hidden')
   await expect
-    .poll(() =>
-      pills.last().evaluate((el) => new DOMMatrixReadOnly(getComputedStyle(el).transform).m43),
-    )
-    .toBeLessThan(-250)
-  const initial = await pills.last().evaluate((el) => Number(getComputedStyle(el).opacity))
-  await browser.evaluate((el) =>
-    el.scrollTo({ top: el.scrollHeight - el.clientHeight, behavior: 'instant' }),
+    .poll(() => pills.first().evaluate((el) => Number(getComputedStyle(el).opacity)))
+    .toBeGreaterThan(0.99)
+  const geometry = await pills.evaluateAll((nodes) =>
+    nodes.map((node) => {
+      const bounds = node.getBoundingClientRect()
+      return {
+        center: bounds.top + bounds.height / 2,
+        opacity: Number(getComputedStyle(node).opacity),
+        depth: new DOMMatrixReadOnly(getComputedStyle(node).transform).m43,
+      }
+    }),
   )
+  expect(geometry[skills.length - 1].center).toBeLessThan(geometry[0].center)
+  expect(geometry[1].center).toBeGreaterThan(geometry[0].center)
+  expect(geometry[skills.length - 1].opacity).toBeLessThan(0.7)
+  expect(geometry[skills.length - 1].depth).toBeLessThan(-100)
+  await scrollTimeline(page, skillStart + skillTravel)
   await expect
-    .poll(() => pills.last().evaluate((el) => Number(getComputedStyle(el).opacity)))
-    .toBeGreaterThan(initial + 0.25)
+    .poll(() => pills.first().evaluate((el) => Number(getComputedStyle(el).opacity)))
+    .toBeGreaterThan(0.99)
   await expect
     .poll(() =>
-      pills.first().evaluate((el) => new DOMMatrixReadOnly(getComputedStyle(el).transform).m43),
+      pills
+        .first()
+        .evaluate((el) => Math.abs(new DOMMatrixReadOnly(getComputedStyle(el).transform).m43)),
     )
-    .toBeLessThan(-300)
-  await expect(browser).toHaveCSS('scrollbar-width', 'none')
-  await pills
-    .last()
-    .getByRole('button', { name: 'Show projects for AI & Agent Development', exact: true })
-    .click()
-  await expect(
-    pills.last().getByRole('article', { name: 'Offline Survival Agent', exact: true }),
-  ).toBeInViewport()
+    .toBeLessThan(1)
+  await expect(page.locator('#work')).toHaveAttribute('aria-hidden', 'true')
+  await scrollTimeline(page, sceneStops[2])
+  await expect(page.locator('#work')).toHaveAttribute('aria-hidden', 'false')
 })
 
 test('reduced motion keeps the skill list flat and fully opaque', async ({ page }) => {
@@ -499,5 +601,43 @@ test('reduced motion keeps the skill list flat and fully opaque', async ({ page 
     .all()) {
     await expect(pill).toHaveCSS('transform', 'none')
     await expect(pill).toHaveCSS('opacity', '1')
+  }
+})
+
+test('the ring keeps each skill centered through project reveals on desktop and mobile', async ({
+  page,
+}) => {
+  test.setTimeout(60000)
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
+    await page.goto(baseURL + '/#skills')
+    await expect(page.locator('#skills')).toHaveAttribute('aria-hidden', 'false')
+    const list = page.getByRole('list', { name: 'Skill categories' })
+    for (const index of [0, 1, skills.length - 1]) {
+      const pill = list.getByRole('listitem').nth(index)
+      for (const phase of [0.02, 0.95]) {
+        await scrollTimeline(page, skillStart + skillSegments[index].start + phase)
+        await expect
+          .poll(() =>
+            pill.evaluate((element) => {
+              const container = element.parentElement!
+              const bounds = element.getBoundingClientRect()
+              return Math.abs(
+                bounds.top +
+                  bounds.height / 2 -
+                  (container.getBoundingClientRect().top + container.clientHeight / 2),
+              )
+            }),
+          )
+          .toBeLessThan(2)
+        await expect
+          .poll(() =>
+            pill.evaluate((element) =>
+              Math.abs(new DOMMatrixReadOnly(getComputedStyle(element).transform).m43),
+            ),
+          )
+          .toBeLessThan(1)
+      }
+    }
   }
 })

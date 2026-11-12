@@ -5,17 +5,6 @@ export const skills = [
     note: '',
     projects: [
       {
-        title: 'Design system',
-        category: 'React / UI components',
-        description:
-          'Reusable React components with variants, themes, and consistent interaction states.',
-        details: [
-          'Built reusable React components with variants and themes.',
-          'Extended a shared section overlay across roughly 21 components, improving responsive layouts, dark mode, contrast, and interaction states.',
-        ],
-        artwork: 'system',
-      },
-      {
         title: 'Multi-state Astro platform',
         category: 'Astro / platform engineering',
         description:
@@ -59,15 +48,27 @@ export const skills = [
   {
     name: 'Backend & Developer Tools',
     technologies: ['Go (Golang)', 'Rust'],
-    note: 'Go work shown below. Rust projects will be added when ready.',
+    note: 'Independent Go and Rust tooling projects.',
     projects: [
       {
         title: 'GitGo',
+        sourceUrl: 'https://github.com/jacobEliasMoya/Git-Go',
         category: 'Go / command-line tools',
         description: 'A standalone command-line project written in Go.',
         details: [
           'GitGo is a standalone command-line project written in Go.',
-          'Rust is part of this skill area; a Rust project will get its own entry when there is work to show.',
+          'Explores Git workflows through a command-line interface.',
+        ],
+        artwork: 'terminal',
+      },
+      {
+        title: 'Nexus',
+        sourceUrl: 'https://github.com/jacobEliasMoya/nexus',
+        category: 'Rust / developer tools',
+        description: 'A Rust project focused on deterministic, AI-readable context for codebases.',
+        details: [
+          'Explores generating deterministic context that AI tools can read from a codebase.',
+          'An independent Rust developer-tool project, documented in the public repository.',
         ],
         artwork: 'terminal',
       },
@@ -100,6 +101,73 @@ export const skills = [
           'Building an offline Survival Agent with Ollama, local models, and tool calling.',
         details: ['In development. The planned stack is Ollama, local models, and tool calling.'],
         artwork: 'agent',
+      },
+    ],
+  },
+  {
+    name: 'Design Systems & Accessibility',
+    technologies: ['React', 'SCSS', 'Tailwind CSS', 'WCAG'],
+    note: '',
+    projects: [
+      {
+        title: 'Design system',
+        category: 'React / UI components',
+        description:
+          'Reusable React components with variants, themes, and consistent interaction states.',
+        details: [
+          'Built reusable React components with variants and themes.',
+          'Extended a shared section overlay across roughly 21 components, improving responsive layouts, dark mode, contrast, and interaction states.',
+        ],
+        artwork: 'system',
+      },
+    ],
+  },
+  {
+    name: 'WordPress & PHP',
+    technologies: ['WordPress', 'PHP', 'Gutenberg', 'Gravity Forms'],
+    note: '',
+    projects: [
+      {
+        title: 'Custom reviews template',
+        category: 'BIZIQ / PHP / WordPress',
+        description:
+          'Built a PHP reviews template for a proprietary WordPress theme, improving readability and usability.',
+        details: [
+          'Created a custom PHP reviews template within the proprietary WordPress theme at BIZIQ.',
+          'Part of broader work building and optimizing more than 200 WordPress sites, with attention to speed, SEO, and accessibility.',
+        ],
+        artwork: 'platform',
+      },
+      {
+        title: 'VAREP website migration',
+        category: 'VAREP National / WordPress / migration',
+        description:
+          'Helped move VAREP from Joomla to WordPress, translating wireframes into responsive pages.',
+        details: [
+          'Led the transition from Joomla to WordPress while supporting a senior developer and collaborating with designers.',
+          'Built responsive pages with Beaver Builder and supported content migration, plugin configuration, QA, and Gravity Forms.',
+        ],
+        artwork: 'platform',
+      },
+    ],
+  },
+  {
+    name: 'Python Automation',
+    technologies: ['Python', 'Pillow', 'piexif', 'WebP'],
+    note: '',
+    projects: [
+      {
+        title: 'ProductivePython',
+        sourceUrl: 'https://github.com/jacobEliasMoya/ProductivePython',
+        category: 'Python / image processing / CLI',
+        description:
+          'Batch tools for folder-based GPS tagging, image resizing, compression, and WebP conversion.',
+        details: [
+          'BulkGeoTagger writes GPS metadata using city names from image folders and a coordinate lookup.',
+          'BulkCompressor resizes images, targets a chosen file size, optionally converts to WebP, and packages the output.',
+          'Built with Python, Pillow, and piexif; the repository also documents Windows executable builds.',
+        ],
+        artwork: 'automation',
       },
     ],
   },

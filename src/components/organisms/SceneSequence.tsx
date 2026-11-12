@@ -4,6 +4,11 @@ import { Children, useEffect, useRef, useState, type ReactNode } from 'react'
 import { motion, MotionConfig, useReducedMotion, useSpring } from 'motion/react'
 import { sceneDuration, sceneStops, skillSegments, skillStart, skillTravel } from './skillsTimeline'
 import { MobileMenu } from './MobileMenu'
+import {
+  heroAnimationTravel,
+  heroEntranceDuration,
+  heroEntranceTravel,
+} from '@/components/atoms/heroFrames'
 
 const scenes = [
   { id: 'top', label: 'Home' },
@@ -39,6 +44,50 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     let frame = 0
     let current = 0
     let pendingFocus: number | null = null
+    let entranceFrame = 0
+    let displayed = 0
+    let requested = 0
+    let previousEntranceTime = 0
+
+    function render(value: number, immediate = false) {
+      requested = Math.max(0, Math.min(sceneDuration, value))
+      if (immediate) {
+        cancelAnimationFrame(entranceFrame)
+        entranceFrame = 0
+        displayed = requested
+        renderScene(displayed)
+        return
+      }
+      if (requested < heroAnimationTravel && displayed > heroAnimationTravel)
+        displayed = heroAnimationTravel
+      if (displayed >= heroAnimationTravel && requested >= heroAnimationTravel) {
+        displayed = requested
+        renderScene(displayed)
+        return
+      }
+      if (!entranceFrame) {
+        previousEntranceTime = performance.now()
+        entranceFrame = requestAnimationFrame(advanceEntrance)
+      }
+    }
+
+    function advanceEntrance(time: number) {
+      entranceFrame = 0
+      if (media.matches) return
+      const delta = Math.min(50, time - previousEntranceTime)
+      previousEntranceTime = time
+      const maximumStep = (heroEntranceTravel * delta) / heroEntranceDuration
+      const target = Math.min(requested, heroAnimationTravel)
+      const difference = target - displayed
+      displayed += Math.sign(difference) * Math.min(Math.abs(difference), maximumStep)
+      renderScene(displayed)
+      if (Math.abs(target - displayed) > 0.000001) {
+        entranceFrame = requestAnimationFrame(advanceEntrance)
+      } else if (requested > heroAnimationTravel) {
+        displayed = requested
+        renderScene(displayed)
+      }
+    }
     function update() {
       frame = 0
       const node = track.current
@@ -53,10 +102,18 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       render(timeline.get())
     }
 
-    function render(value: number) {
+    function renderScene(value: number) {
       if (media.matches) return
       const progress = Math.max(0, Math.min(sceneDuration, value))
-      const heroFill = Math.max(0, Math.min(1, progress / heroFillTravel))
+      const jakeProgress = Math.max(0, Math.min(1, progress / heroAnimationTravel))
+      if (panels.current[0]) panels.current[0].dataset.jakeProgress = String(jakeProgress)
+      window.dispatchEvent(
+        new CustomEvent('portfolio:hero-progress', { detail: { progress: jakeProgress } }),
+      )
+      const heroFill = Math.max(
+        0,
+        Math.min(1, (progress - heroAnimationTravel) / (heroFillTravel - heroAnimationTravel)),
+      )
       panels.current[0]?.querySelectorAll<HTMLElement>('.hero-letter').forEach((letter) => {
         const index = Number(letter.dataset.fillIndex ?? 0)
         const letterFill = Math.max(0, Math.min(1, heroFill * 18 - index))
@@ -140,6 +197,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       setEnhanced(enabled)
       if (!enabled) {
         timeline.stop()
+        cancelAnimationFrame(entranceFrame)
+        entranceFrame = 0
         panels.current.forEach((panel) => {
           if (!panel) return
           panel.style.clipPath = ''
@@ -175,7 +234,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       pendingFocus = index
       if (immediate) {
         timeline.jump(sceneStops[index])
-        render(sceneStops[index])
+        render(sceneStops[index], true)
       }
       update()
       if (!timeline.isAnimating()) settleFocus()
@@ -185,7 +244,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       const detail = (event as CustomEvent<number | { index: number; offset: number }>).detail
       const index = typeof detail === 'number' ? detail : detail.index
       const offset = typeof detail === 'number' ? 0.95 : detail.offset
-      if (!Number.isInteger(index) || index < 0 || index > 4 || media.matches) return
+      if (!Number.isInteger(index) || index < 0 || index >= skillSegments.length || media.matches)
+        return
       if (!Number.isFinite(offset) || offset < 0 || offset > skillSegments[index].duration) return
       const node = track.current
       if (!node) return
@@ -196,7 +256,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       const position = skillStart + skillSegments[index].start + Math.max(0.001, offset)
       window.scrollTo({ top: start + (distance * position) / sceneDuration, behavior: 'instant' })
       timeline.jump(position)
-      render(position)
+      render(position, true)
       update()
     }
 
@@ -219,7 +279,14 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     const stopRendering = timeline.on('change', render)
     const stopFocus = timeline.on('animationComplete', settleFocus)
     setup()
-    const initial = requestAnimationFrame(() => requestAnimationFrame(restoreHash))
+    const initialScroll = window.scrollY
+    const initial = requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        // A user can start scrolling before the initial two-frame setup completes.
+        if (!window.location.hash && window.scrollY !== initialScroll) return
+        restoreHash()
+      }),
+    )
     window.addEventListener('scroll', schedule, { passive: true })
     window.addEventListener('resize', schedule)
     document.addEventListener('click', navigate)
@@ -235,6 +302,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       stopFocus()
       timeline.stop()
       cancelAnimationFrame(frame)
+      cancelAnimationFrame(entranceFrame)
       cancelAnimationFrame(initial)
       window.removeEventListener('scroll', schedule)
       window.removeEventListener('resize', schedule)
