@@ -249,9 +249,14 @@ test('header controls use one liquid boundary with actual text inversion', async
         Number(await page.locator('.liquid-boundary').getAttribute('data-pull-depth')),
       )
       .toBeGreaterThan(25)
-    await expect(control.locator('..')).toHaveCSS('mix-blend-mode', 'difference')
+    await expect(control.locator('..')).toHaveCSS('mix-blend-mode', 'normal')
+    await expect(page.locator('.liquid-boundary')).toHaveCSS('mix-blend-mode', 'difference')
   }
   await expect(page.locator('.liquid-boundary path')).toHaveCount(1)
+  await page.getByRole('link', { name: 'Skills', exact: true }).click()
+  await expect(page.locator('.liquid-blended-nav')).toHaveAttribute('data-tone', 'dark')
+  await expect(page.locator('.liquid-blended-nav')).toHaveCSS('color', 'rgb(239, 235, 225)')
+  await expect(page.locator('.liquid-blended-nav')).toHaveCSS('mix-blend-mode', 'normal')
 })
 
 test('scenes open with scroll and close again in reverse', async ({ page }) => {
@@ -512,11 +517,12 @@ test('mobile menu drops in, traps navigation, and restores focus after dismissal
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto(baseURL)
+  await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 10000 })
   await expect(page.locator('.portfolio')).toHaveAttribute('data-enhanced', '')
   const toggle = page.getByRole('button', { name: 'Open menu' })
-  await expect(
-    page.getByRole('navigation', { name: 'Portfolio', includeHidden: true }),
-  ).not.toBeVisible()
+  for (const navigation of await page.locator('.desktop-navigation').all()) {
+    await expect(navigation).not.toBeVisible()
+  }
   await toggle.click()
   const menu = page.getByRole('dialog', { name: 'Mobile navigation' })
   await expect(menu).toBeVisible()
@@ -540,6 +546,7 @@ test('every mobile menu selection expands into its section and restores scrollin
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto(baseURL)
+  await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 10000 })
   await expect(page.locator('.portfolio')).toHaveAttribute('data-enhanced', '')
   for (const [label, id, color] of [
     ['Skills', 'skills', 'rgb(56, 20, 255)'],
@@ -560,6 +567,7 @@ test('every mobile menu selection expands into its section and restores scrollin
       )
       .toBeLessThan(0.05)
     const link = menu.getByRole('link', { name: label + '.', exact: true })
+    await expect(link).toHaveCSS('transform', 'none')
     const period = link.locator('.mobile-menu-period')
     await expect(period).toHaveCSS('background-color', color)
     const bounds = (await period.boundingBox())!
@@ -586,6 +594,7 @@ test('mobile menu handles reduced motion, small screens, and switching to deskto
   await page.setViewportSize({ width: 320, height: 568 })
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.goto(baseURL)
+  await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 10000 })
   const toggle = page.getByRole('button', { name: 'Open menu' })
   await toggle.click()
   const menu = page.getByRole('dialog', { name: 'Mobile navigation' })

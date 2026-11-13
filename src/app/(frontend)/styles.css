@@ -2229,21 +2229,26 @@ ul {
     width: 44px;
     height: 44px;
     flex-shrink: 0;
-    padding: 11px;
-    border: 1px solid currentColor;
-    border-radius: 50%;
+    padding: 0;
+    border: 0;
     background: transparent;
     color: inherit;
   }
   .mobile-menu-toggle > span {
-    display: grid;
-    gap: 4px;
-    width: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    width: 28px;
+    height: 28px;
+    border: 1px solid currentColor;
+    border-radius: 50%;
   }
   .mobile-menu-toggle i {
     display: block;
-    width: 100%;
-    height: 2px;
+    width: 14px;
+    height: 1.5px;
     background: currentColor;
   }
   .portfolio[data-menu-open] .scene-stage {
@@ -2360,30 +2365,30 @@ ul {
   display: flex;
   align-items: center;
   justify-content: space-around;
-  width: 70px;
-  height: 36px;
+  width: 56px;
+  height: 28px;
   border: 1px solid currentColor;
   border-radius: 999px;
   isolation: isolate;
 }
 .theme-toggle-track svg {
-  width: 17px;
-  height: 17px;
+  width: 14px;
+  height: 14px;
   z-index: 1;
 }
 .theme-toggle-thumb {
   position: absolute;
-  inset: 3px auto 3px 3px;
-  width: 28px;
+  inset: 2px auto 2px 2px;
+  width: 22px;
   border-radius: 50%;
   background: #3814ff;
-  transition: transform 350ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .theme-toggle-sun {
   color: #fff;
 }
 .theme-toggle[aria-pressed='true'] .theme-toggle-thumb {
-  transform: translateX(34px);
+  transform: translateX(28px);
   background: #a28aff;
 }
 .theme-toggle[aria-pressed='true'] .theme-toggle-sun {
@@ -2391,9 +2396,6 @@ ul {
 }
 .theme-toggle[aria-pressed='true'] .theme-toggle-moon {
   color: #101014;
-}
-.theme-toggle:hover .theme-toggle-track {
-  box-shadow: 0 0 0 3px rgb(162 138 255 / 0.25);
 }
 @media (min-width: 761px) {
   .site-header .desktop-navigation {
@@ -2482,18 +2484,20 @@ ul {
   }
 }
 
-.liquid-boundary {
+.liquid-boundary,
+.liquid-surround {
   display: none;
 }
-.portfolio[data-enhanced] .liquid-boundary {
+.portfolio[data-enhanced] .liquid-boundary,
+.portfolio .liquid-surround {
   display: block;
   position: fixed;
-  z-index: 49;
+  z-index: 69;
   inset: 0;
   width: 100%;
   height: 100%;
   overflow: hidden;
-  fill: #000;
+  fill: #fff;
   pointer-events: none;
 }
 @media (prefers-reduced-motion: reduce), (pointer: coarse) {
@@ -2517,16 +2521,15 @@ ul {
   z-index: 60;
   display: flex;
   align-items: center;
-  mix-blend-mode: difference;
-  color: #fff;
+  color: var(--ink);
 }
 .liquid-blended-nav a {
   isolation: auto;
-  color: #fff;
+  color: inherit;
   text-decoration: none;
 }
 .liquid-blended-nav .nav-label {
-  color: #fff;
+  color: inherit;
   background: none;
 }
 @media (max-width: 760px) {
@@ -2557,11 +2560,10 @@ ul {
   position: fixed;
   z-index: 60;
   display: inline-flex;
-  mix-blend-mode: difference;
-  color: #fff;
+  color: var(--ink);
 }
 .liquid-blended-logo .wordmark {
-  color: #fff;
+  color: inherit;
   min-height: 0;
   width: 100%;
   height: 100%;
@@ -2601,35 +2603,12 @@ ul {
   position: fixed;
   z-index: 60;
   display: inline-flex;
-  mix-blend-mode: difference;
-  color: #fff;
-}
-.liquid-blended-control .theme-toggle {
-  color: #fff;
-}
-.liquid-blended-control .theme-toggle-thumb {
-  background: #c7eb00;
-}
-.liquid-blended-control .theme-toggle-sun {
-  color: #000;
-}
-.liquid-blended-control .theme-toggle-moon {
-  color: #fff;
-}
-.liquid-blended-control .theme-toggle[aria-pressed='true'] .theme-toggle-thumb {
-  background: #a28aff;
-}
-.liquid-blended-control .theme-toggle[aria-pressed='true'] .theme-toggle-moon {
-  color: #000;
+  color: var(--ink);
 }
 @media (max-width: 760px) {
   .header-control-anchor {
     margin-left: auto;
   }
-}
-
-.liquid-blended-control .theme-toggle[aria-pressed='true'] .theme-toggle-sun {
-  color: #fff;
 }
 
 .header-menu-anchor {
@@ -2640,4 +2619,32 @@ ul {
     display: inline-flex;
     flex-shrink: 0;
   }
+}
+
+/* Only the liquid inverts pixels. Header controls retain their section colours. */
+.portfolio[data-enhanced] .liquid-boundary {
+  mix-blend-mode: difference;
+}
+.portfolio .liquid-surround {
+  z-index: 70;
+  fill: #000;
+}
+.liquid-blended-nav[data-tone='dark'],
+.liquid-blended-logo[data-tone='dark'],
+.liquid-blended-control[data-tone='dark'] {
+  color: var(--paper);
+}
+
+/* Only the purple selector stays above the liquid; the outline inverts naturally. */
+.theme-toggle-floating-thumb {
+  position: fixed;
+  z-index: 71;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.theme-toggle-floating-thumb svg {
+  width: 14px;
+  height: 14px;
 }

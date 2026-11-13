@@ -3,7 +3,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
-export function useBlendBounds<T extends HTMLElement>(enabled: boolean, ready: boolean) {
+export function useBlendBounds<T extends HTMLElement>(
+  enabled: boolean,
+  ready: boolean,
+  visibleOnly = false,
+) {
   const anchor = useRef<T>(null)
   const [bounds, setBounds] = useState<{
     left: number
@@ -14,26 +18,38 @@ export function useBlendBounds<T extends HTMLElement>(enabled: boolean, ready: b
   useEffect(() => {
     if (!enabled || !anchor.current) return
     const measure = () => {
+      if (
+        visibleOnly &&
+        (!anchor.current!.checkVisibility() || anchor.current!.closest('[inert]'))
+      ) {
+        setBounds(null)
+        return
+      }
       const rect = anchor.current!.getBoundingClientRect()
       setBounds({ left: rect.left, top: rect.top, width: rect.width, height: rect.height })
     }
-    const observer = new ResizeObserver(measure)
+    const observer = new ResizeObserver(followLayout)
     observer.observe(anchor.current)
     // The header finishes its entrance after its dimensions have settled.
     let frame = 0
-    const started = performance.now()
+    let started = performance.now()
     const followEntrance = () => {
       measure()
       if (performance.now() - started < 1200) frame = requestAnimationFrame(followEntrance)
     }
     frame = requestAnimationFrame(followEntrance)
-    window.addEventListener('resize', measure)
+    function followLayout() {
+      started = performance.now()
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(followEntrance)
+    }
+    window.addEventListener('resize', followLayout)
     return () => {
       observer.disconnect()
       cancelAnimationFrame(frame)
-      window.removeEventListener('resize', measure)
+      window.removeEventListener('resize', followLayout)
     }
-  }, [enabled, ready])
+  }, [enabled, ready, visibleOnly])
   return { anchor, bounds }
 }
 
@@ -41,10 +57,12 @@ export function BlendedNav({
   children,
   enabled,
   ready,
+  tone = 'paper',
 }: {
   children: ReactNode
   enabled: boolean
   ready: boolean
+  tone?: 'paper' | 'dark'
 }) {
   const { anchor, bounds } = useBlendBounds<HTMLElement>(enabled, ready)
   return (
@@ -64,6 +82,7 @@ export function BlendedNav({
         createPortal(
           <nav
             className="desktop-navigation liquid-blended-nav"
+            data-tone={tone}
             inert={!ready}
             aria-label="Portfolio"
             style={{

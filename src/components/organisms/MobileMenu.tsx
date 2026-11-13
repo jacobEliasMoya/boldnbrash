@@ -101,7 +101,13 @@ export function MobileMenu({
 
   return (
     <>
-      <BlendedLogo enabled={introReady && reduceMotion === false} ready={introReady} control menu>
+      <BlendedLogo
+        enabled={introReady && reduceMotion === false}
+        ready={introReady}
+        tone={active === 0 || active === 3 ? 'paper' : 'dark'}
+        control
+        menu
+      >
         <motion.button
           ref={toggle}
           type="button"
@@ -202,9 +208,11 @@ export function MobileMenu({
                         opacity: !selection || selection.index === index ? 1 : 0,
                         y: 0,
                         color:
-                          selection?.index === index && scene.id === 'about'
-                            ? '#080809'
-                            : '#efebe1',
+                          selection?.index === index
+                            ? scene.id === 'about'
+                              ? '#080809'
+                              : '#efebe1'
+                            : 'var(--ink)',
                       }}
                       transition={{
                         duration: reduceMotion ? 0 : 0.35,

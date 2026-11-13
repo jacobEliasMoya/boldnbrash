@@ -4,10 +4,12 @@ import { useEffect, useRef } from 'react'
 
 export function LiquidBoundary() {
   const root = useRef<SVGSVGElement>(null)
+  const surround = useRef<SVGSVGElement>(null)
 
   useEffect(() => {
     const svg = root.current
     const path = svg?.querySelector('path')
+    const surroundPath = surround.current?.querySelector('path')
     if (!svg || !path) return
     const media = window.matchMedia('(prefers-reduced-motion: reduce), (pointer: coarse)')
     let frameInset = 12
@@ -73,12 +75,17 @@ export function LiquidBoundary() {
         }
         return d + ' Z'
       }
-      // One surface owns the surround and moving edge; no second rounded mask
-      // can leave an antialiased white seam behind the pull.
-      return (
-        `M${-frameInset},${-frameInset} H${width + frameInset} V${height + frameInset} H${-frameInset} Z ` +
-        closedCurve(points)
+      const outside = `M${-frameInset},${-frameInset} H${width + frameInset} V${height + frameInset} H${-frameInset} Z `
+      // Keep the outer surround solid black in every theme. A subpixel overlap
+      // covers the antialiased join without restoring a separate outline stroke.
+      surroundPath?.setAttribute(
+        'd',
+        outside +
+          closedCurve(
+            basePoints.map((base) => ({ x: base.x + base.nx * 0.75, y: base.y + base.ny * 0.75 })),
+          ),
       )
+      return outside + closedCurve(points)
     }
     function paint(time: number) {
       const dt = previous ? Math.min(time - previous, 50) : 16
@@ -105,13 +112,14 @@ export function LiquidBoundary() {
       if (!frame) frame = requestAnimationFrame(paint)
     }
     function measure() {
-      const bounds = svg!.getBoundingClientRect()
+      const bounds = (surround.current ?? svg!).getBoundingClientRect()
       frameInset =
         parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--frame-inset')) ||
         12
       width = Math.max(1, bounds.width - 2 * frameInset)
       height = Math.max(1, bounds.height - 2 * frameInset)
       path!.setAttribute('transform', `translate(${frameInset} ${frameInset})`)
+      surroundPath?.setAttribute('transform', `translate(${frameInset} ${frameInset})`)
       corner = Math.min(25, width / 2, height / 2)
       const quarter = (Math.PI * corner) / 2
       segments = [
@@ -226,6 +234,7 @@ export function LiquidBoundary() {
     }
     const observer = new ResizeObserver(measure)
     observer.observe(svg)
+    if (surround.current) observer.observe(surround.current)
     measure()
     window.addEventListener('pointermove', move, { passive: true })
     document.documentElement.addEventListener('pointerleave', reset)
@@ -246,8 +255,13 @@ export function LiquidBoundary() {
   }, [])
 
   return (
-    <svg ref={root} className="liquid-boundary" aria-hidden="true" focusable="false">
-      <path fillRule="evenodd" />
-    </svg>
+    <>
+      <svg ref={root} className="liquid-boundary" aria-hidden="true" focusable="false">
+        <path fillRule="evenodd" />
+      </svg>
+      <svg ref={surround} className="liquid-surround" aria-hidden="true" focusable="false">
+        <path fillRule="evenodd" />
+      </svg>
+    </>
   )
 }
