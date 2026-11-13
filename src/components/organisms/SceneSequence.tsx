@@ -7,6 +7,7 @@ import { MobileMenu } from './MobileMenu'
 import { heroAnimationTravel } from '@/components/atoms/heroFrames'
 import { getPortalBounds } from '@/components/atoms/portalBounds'
 import { toPlaybackTime, fromPlaybackTime } from './scrollPlayback'
+import { useIntroReady } from '@/hooks/useIntroReady'
 
 const scenes = [
   { id: 'top', label: 'Home' },
@@ -27,6 +28,7 @@ const origins = [
 
 export function SceneSequence({ children }: { children: ReactNode }) {
   const reduceMotion = useReducedMotion()
+  const introReady = useIntroReady()
   const timeline = useMotionValue(0)
   const track = useRef<HTMLDivElement>(null)
   const panels = useRef<(HTMLElement | null)[]>([])
@@ -456,12 +458,23 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         <motion.header
           className={`site-header tone-${active === 3 ? 'paper' : 'dark'}`}
           initial={reduceMotion ? false : { opacity: 0, y: -24 }}
-          animate={{ opacity: 1, y: 0 }}
+          animate={introReady ? { opacity: 1, y: 0 } : { opacity: 0, y: -24 }}
           transition={{ duration: reduceMotion ? 0 : 0.7, ease: [0.22, 1, 0.36, 1] }}
         >
-          <a className="wordmark" href="#top" aria-label="Jacob Moya home">
+          <motion.a
+            className="wordmark"
+            href="#top"
+            aria-label="Jacob Moya home"
+            initial={reduceMotion ? false : { opacity: 0, y: -14 }}
+            animate={introReady ? { opacity: 1, y: 0 } : { opacity: 0, y: -14 }}
+            transition={{
+              duration: reduceMotion ? 0 : 0.5,
+              delay: reduceMotion ? 0 : 0.08,
+              ease: [0.22, 1, 0.36, 1],
+            }}
+          >
             <span className="header-monogram" aria-hidden="true" />
-          </a>
+          </motion.a>
           <nav
             className="desktop-navigation"
             aria-label="Portfolio"
@@ -477,7 +490,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
                 onFocus={() => setHoveredNav(scene.id)}
                 onBlur={() => setHoveredNav(null)}
                 initial={reduceMotion ? false : { opacity: 0, y: -12 }}
-                animate={{ opacity: 1, y: 0 }}
+                animate={introReady ? { opacity: 1, y: 0 } : { opacity: 0, y: -12 }}
                 transition={{
                   duration: reduceMotion ? 0 : 0.55,
                   delay: reduceMotion ? 0 : 0.12 + index * 0.07,
@@ -511,6 +524,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           <MobileMenu
             scenes={scenes}
             active={active}
+            introReady={introReady}
             onOpenChange={setMenuOpen}
             onNavigate={(index) => {
               const handled = !window.dispatchEvent(

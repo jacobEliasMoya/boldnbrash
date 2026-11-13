@@ -2,6 +2,7 @@
 
 import { HeroMark } from '@/components/atoms/HeroMark'
 import { motion, useReducedMotion } from 'motion/react'
+import { useIntroReady } from '@/hooks/useIntroReady'
 
 const entrance = { opacity: 0, y: 10 }
 const entered = { opacity: 1, y: 0 }
@@ -21,11 +22,13 @@ function AnimatedWord({
   wordIndex,
   start,
   reduceMotion,
+  introReady,
 }: {
   word: string
   wordIndex: number
   start: number
   reduceMotion: boolean | null
+  introReady: boolean
 }) {
   return (
     <span className="hero-line" aria-hidden="true">
@@ -35,7 +38,7 @@ function AnimatedWord({
           data-fill-index={wordIndex * 6 + index}
           key={`${letter}-${index}`}
           initial={reduceMotion ? false : entrance}
-          animate={entered}
+          animate={introReady ? entered : entrance}
           transition={entranceTransition(start + index * letterStep, reduceMotion)}
         >
           {letter}
@@ -47,6 +50,7 @@ function AnimatedWord({
 
 export function PortfolioHero() {
   const reduceMotion = useReducedMotion()
+  const introReady = useIntroReady()
 
   return (
     <div className="hero-scene scene-content">
@@ -54,14 +58,26 @@ export function PortfolioHero() {
         <motion.p
           className="eyebrow hero-greeting"
           initial={reduceMotion ? false : entrance}
-          animate={entered}
+          animate={introReady ? entered : entrance}
           transition={entranceTransition(0.82, reduceMotion)}
         >
           Hi, I’m <span className="name-pill">Jake</span>
         </motion.p>
         <h1 aria-label="Build. Break. Repeat.">
-          <AnimatedWord word="Build." wordIndex={0} start={0.98} reduceMotion={reduceMotion} />
-          <AnimatedWord word="Break." wordIndex={1} start={1.31} reduceMotion={reduceMotion} />
+          <AnimatedWord
+            word="Build."
+            wordIndex={0}
+            start={0.98}
+            reduceMotion={reduceMotion}
+            introReady={introReady}
+          />
+          <AnimatedWord
+            word="Break."
+            wordIndex={1}
+            start={1.31}
+            reduceMotion={reduceMotion}
+            introReady={introReady}
+          />
           <span className="hero-line">
             <span aria-hidden="true">
               {[...'Repeat'].map((letter, index) => (
@@ -70,7 +86,7 @@ export function PortfolioHero() {
                   data-fill-index={12 + index}
                   key={`${letter}-${index}`}
                   initial={reduceMotion ? false : entrance}
-                  animate={entered}
+                  animate={introReady ? entered : entrance}
                   transition={entranceTransition(1.64 + index * letterStep, reduceMotion)}
                 >
                   {letter}
@@ -82,9 +98,10 @@ export function PortfolioHero() {
               href="#skills"
               aria-label="Explore my skills"
               initial={reduceMotion ? false : entrance}
-              animate={entered}
+              animate={introReady ? entered : entrance}
               transition={entranceTransition(1.64 + 6 * letterStep, reduceMotion)}
               onAnimationComplete={() => {
+                if (!introReady) return
                 const hero = document.querySelector<HTMLElement>('.scene-top')
                 if (hero) hero.dataset.periodReady = 'true'
               }}
@@ -97,7 +114,7 @@ export function PortfolioHero() {
         <motion.p
           className="hero-description w-full"
           initial={reduceMotion ? false : entrance}
-          animate={entered}
+          animate={introReady ? entered : entrance}
           transition={entranceTransition(2.18, reduceMotion)}
         >
           I build for the web. Half the fun is finding out why it broke.

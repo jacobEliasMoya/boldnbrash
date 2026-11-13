@@ -17,11 +17,13 @@ const colors: Record<string, string> = {
 export function MobileMenu({
   scenes,
   active,
+  introReady,
   onNavigate,
   onOpenChange,
 }: {
   scenes: readonly Scene[]
   active: number
+  introReady: boolean
   onNavigate: (index: number) => void
   onOpenChange: (open: boolean) => void
 }) {
@@ -98,7 +100,7 @@ export function MobileMenu({
 
   return (
     <>
-      <button
+      <motion.button
         ref={toggle}
         type="button"
         className="mobile-menu-toggle"
@@ -106,6 +108,13 @@ export function MobileMenu({
         aria-haspopup="dialog"
         aria-controls="mobile-menu"
         aria-expanded={open}
+        initial={reduceMotion ? false : { opacity: 0, y: -14 }}
+        animate={introReady ? { opacity: 1, y: 0 } : { opacity: 0, y: -14 }}
+        transition={{
+          duration: reduceMotion ? 0 : 0.5,
+          delay: reduceMotion ? 0 : 0.22,
+          ease: [0.22, 1, 0.36, 1],
+        }}
         onClick={() => {
           setPhase('menu')
           setSelection(null)
@@ -118,7 +127,7 @@ export function MobileMenu({
           <i />
           <i />
         </span>
-      </button>
+      </motion.button>
       {open &&
         createPortal(
           <dialog
