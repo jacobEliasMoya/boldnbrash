@@ -467,7 +467,11 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           animate={introReady ? { opacity: 1, y: 0 } : { opacity: 0, y: -24 }}
           transition={{ duration: reduceMotion ? 0 : 0.7, ease: [0.22, 1, 0.36, 1] }}
         >
-          <BlendedLogo enabled={enhanced} ready={introReady}>
+          <BlendedLogo
+            enabled={enhanced}
+            ready={introReady}
+            tone={active === 0 || active === 3 ? 'paper' : 'dark'}
+          >
             <motion.a
               className="wordmark"
               data-liquid-header
@@ -484,7 +488,11 @@ export function SceneSequence({ children }: { children: ReactNode }) {
               <span aria-hidden="true">JacobMoya</span>
             </motion.a>
           </BlendedLogo>
-          <BlendedNav enabled={enhanced} ready={introReady}>
+          <BlendedNav
+            enabled={enhanced}
+            ready={introReady}
+            tone={active === 0 || active === 3 ? 'paper' : 'dark'}
+          >
             {scenes.map((scene, index) => (
               <motion.a
                 key={scene.id}
@@ -512,7 +520,12 @@ export function SceneSequence({ children }: { children: ReactNode }) {
               </motion.a>
             ))}
           </BlendedNav>
-          <BlendedLogo enabled={enhanced} ready={introReady} control>
+          <BlendedLogo
+            enabled={enhanced}
+            ready={introReady}
+            tone={active === 0 || active === 3 ? 'paper' : 'dark'}
+            control
+          >
             <ThemeToggle />
           </BlendedLogo>
           <MobileMenu

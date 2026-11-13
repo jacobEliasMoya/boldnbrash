@@ -8,12 +8,14 @@ export function BlendedLogo({
   children,
   enabled,
   ready,
+  tone = 'paper',
   control = false,
   menu = false,
 }: {
   children: ReactNode
   enabled: boolean
   ready: boolean
+  tone?: 'paper' | 'dark'
   control?: boolean
   menu?: boolean
 }) {
@@ -34,6 +36,7 @@ export function BlendedLogo({
         createPortal(
           <div
             className={control ? 'liquid-blended-control' : 'liquid-blended-logo'}
+            data-tone={tone}
             inert={!ready}
             style={{
               left: bounds.left,
