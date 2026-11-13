@@ -3,6 +3,7 @@
 import { motion, useMotionValue, useReducedMotion } from 'motion/react'
 import { useEffect, useRef, useState } from 'react'
 import { heroFrameCount } from '@/components/atoms/heroFrames'
+import { introCompleteEvent } from '@/hooks/useIntroReady'
 
 const seenKey = 'portfolio:intro-seen'
 const frameDurations = [
@@ -14,9 +15,11 @@ const frameStarts = frameDurations.map((_, index) =>
 )
 const catchSettledAt = frameStarts[33]
 const sequenceDuration = frameDurations.reduce((total, duration) => total + duration, 0)
-const readingHoldDuration = 1200
+const readingHoldDuration = 400
+const readyDelayReduction = 333
+const fadeDuration = 300
 const introLines = ['hey', 'I am', 'Jacob']
-const copyStartsAt = frameStarts[13] + 450
+const copyStartsAt = frameStarts[13] + 300
 
 export function PortfolioLoader({ playOnce = false }: { playOnce?: boolean }) {
   const [visible, setVisible] = useState(true)
@@ -25,15 +28,22 @@ export function PortfolioLoader({ playOnce = false }: { playOnce?: boolean }) {
   const [isReady, setIsReady] = useState(false)
   const layer = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
-  const finish = useRef<() => void>(() => {})
   const overlayOpacity = useMotionValue(1)
   const reduceMotion = useReducedMotion()
 
   useEffect(() => {
     if (reduceMotion === null) return
+    const documentRoot = document.documentElement
+    function signalIntroComplete() {
+      documentRoot.dataset.introComplete = 'true'
+      window.dispatchEvent(new Event(introCompleteEvent))
+    }
     try {
       if (playOnce && sessionStorage.getItem(seenKey)) {
-        const skip = requestAnimationFrame(() => setVisible(false))
+        const skip = requestAnimationFrame(() => {
+          signalIntroComplete()
+          setVisible(false)
+        })
         return () => cancelAnimationFrame(skip)
       }
     } catch {
@@ -49,7 +59,7 @@ export function PortfolioLoader({ playOnce = false }: { playOnce?: boolean }) {
     let assetsReady = false
     let assetsReadyAt = Number.POSITIVE_INFINITY
     let completedAssets = 0
-    const documentRoot = document.documentElement
+    delete documentRoot.dataset.introComplete
     const portfolio = document.querySelector<HTMLElement>('.portfolio')
     const previousOverflow = documentRoot.style.overflow
     const previousInert = portfolio?.inert ?? false
@@ -64,6 +74,7 @@ export function PortfolioLoader({ playOnce = false }: { playOnce?: boolean }) {
       clearTimeout(timeout)
       documentRoot.style.overflow = previousOverflow
       delete documentRoot.dataset.introLoading
+      signalIntroComplete()
       if (portfolio) portfolio.inert = previousInert
       const restoreFocus = layer.current?.contains(document.activeElement)
       try {
@@ -77,7 +88,6 @@ export function PortfolioLoader({ playOnce = false }: { playOnce?: boolean }) {
           ?.querySelector<HTMLElement>('.scene[aria-hidden="false"]')
           ?.focus({ preventScroll: true })
     }
-    finish.current = release
     timeout = window.setTimeout(release, 8000)
 
     const frames = reduceMotion
@@ -157,12 +167,12 @@ export function PortfolioLoader({ playOnce = false }: { playOnce?: boolean }) {
         if (layer.current)
           layer.current.dataset.phase =
             elapsed < copyStartsAt ? 'avatar' : elapsed < catchSettledAt ? 'copy' : 'catch'
-        const fadeStartsAt = sequenceDuration + readingHoldDuration
+        const fadeStartsAt = sequenceDuration + readingHoldDuration - readyDelayReduction
         const readinessFadeStartsAt = Math.max(fadeStartsAt, assetsReadyAt)
         if (elapsed > readinessFadeStartsAt) {
-          overlayOpacity.set(Math.max(0, 1 - (elapsed - readinessFadeStartsAt) / 400))
+          overlayOpacity.set(Math.max(0, 1 - (elapsed - readinessFadeStartsAt) / fadeDuration))
         }
-        if (assetsReady && elapsed >= readinessFadeStartsAt + 400) release()
+        if (assetsReady && elapsed >= readinessFadeStartsAt + fadeDuration) release()
       }
       if (!disposed) request = requestAnimationFrame(tick)
     }
@@ -206,9 +216,16 @@ export function PortfolioLoader({ playOnce = false }: { playOnce?: boolean }) {
       <span role="status" className="sr-only">
         Loading Jacob Moya’s portfolio
       </span>
-      <span className="portfolio-loader-progress" aria-hidden="true">
-        {loadProgress < 100 ? `Loading ${loadProgress}%` : 'Ready'}
-      </span>
+      <div
+        className="portfolio-loader-progress"
+        role="progressbar"
+        aria-label="Loading portfolio assets"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={loadProgress}
+      >
+        <span style={{ width: `${loadProgress}%` }} />
+      </div>
       <canvas
         ref={canvas}
         className="portfolio-loader-avatar"
@@ -236,7 +253,7 @@ export function PortfolioLoader({ playOnce = false }: { playOnce?: boolean }) {
                 duration: 0.56,
                 times: [0, 0.44, 0.62, 1],
                 ease: [0.45, 0, 0.55, 1],
-                delay: (introLines.length - 1 - lineIndex) * 0.07,
+                delay: (introLines.length - 1 - lineIndex) * 0.24,
               }}
             >
               {line}
@@ -244,9 +261,6 @@ export function PortfolioLoader({ playOnce = false }: { playOnce?: boolean }) {
           ))}
         </div>
       </div>
-      <button type="button" className="portfolio-loader-skip" onClick={() => finish.current()}>
-        Skip intro ↗
-      </button>
     </motion.div>
   )
 }

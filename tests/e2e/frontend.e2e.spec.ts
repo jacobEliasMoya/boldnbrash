@@ -248,7 +248,7 @@ test('scenes open with scroll and close again in reverse', async ({ page }) => {
   await page.goto(baseURL)
   await expect(page).toHaveTitle(/Jacob Moya/)
   await expect(page.locator('.portfolio')).toHaveAttribute('data-enhanced', '')
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Build.Break.Repeat')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Build.Break.Repeat.')
   await expect(page.locator('#top')).toHaveAttribute('aria-hidden', 'false')
   await page.evaluate(() => window.scrollTo(0, window.innerHeight * 2.2))
   await expect(page.locator('#skills')).toHaveAttribute('aria-hidden', 'false')
