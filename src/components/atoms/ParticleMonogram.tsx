@@ -25,7 +25,7 @@ type Particle = {
   color: string
   alpha: number
 }
-const palette = ['#cbbcff', '#a58cff', '#8467ff', '#6546ff', '#4c2cff', '#3814ff', '#2710a8']
+const palette = ['#a58aee', '#8b67e8', '#7045df', '#5930d4', '#4520c4', '#3512ac', '#271080']
 
 function noise(seed: number) {
   const value = Math.sin(seed * 127.1 + 311.7) * 43758.5453
@@ -233,7 +233,7 @@ export function ParticleMonogram({ ripples }: { ripples?: RefObject<WalkRipple[]
             vx: 0,
             vy: 0,
             phase: noise(seed + 5) * Math.PI * 2,
-            size: 0.65 + noise(seed + 6) * 0.85,
+            size: 0.78 + noise(seed + 6) * 1.02,
             color: palette[shade],
             alpha: 0.55 + noise(seed + 7) * 0.45,
           })

@@ -27,8 +27,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   const fontSource = font ? `url('/fonts/${font[0]}') format('${font[1]}')` : null
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{document.documentElement.dataset.theme=localStorage.getItem('portfolio-theme')==='dark'?'dark':'light'}catch{};window.addEventListener('storage',function(e){if(e.key==='portfolio-theme'){document.documentElement.dataset.theme=e.newValue==='dark'?'dark':'light';window.dispatchEvent(new Event('portfolio:theme'))}})`,
+          }}
+        />
         {fontSource && (
           <style>{`@font-face{font-family:'Fedro';src:${fontSource};font-weight:900;font-style:normal;font-display:swap;}`}</style>
         )}

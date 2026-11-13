@@ -1,5 +1,7 @@
 // Walk in and wave, pause at JM, then mirror the walk back out before letters fill.
 export const heroFrameCount = 16
+// Preserve both halves of the stride rather than ping-ponging one passing pose.
+export const heroWalkFrames = [4, 5, 6, 7] as const
 export const heroStandingCenter = 289
 
 export const heroEntranceTravel = 0.35
@@ -14,7 +16,7 @@ export function getHeroScrollPose(progress: number) {
     return {
       frame,
       sourceFrame:
-        frame < 8 ? [4, 5, 6, 5][Math.floor((position / heroEntranceTravel) * 15) % 4] : undefined,
+        frame < 8 ? heroWalkFrames[Math.floor((position / heroEntranceTravel) * 15) % heroWalkFrames.length] : undefined,
       walkProgress:
         frame < 8 ? Math.min(1, ((position / heroEntranceTravel) * 15) / 7.5) : undefined,
       mirrored: false,
@@ -32,7 +34,7 @@ export function getHeroScrollPose(progress: number) {
       mode: 'idle',
     }
   const exit = (position - heroExitStart) / (heroAnimationTravel - heroExitStart)
-  const frame = [4, 5, 6, 5][Math.min(9, Math.floor(exit * 10)) % 4]
+  const frame = heroWalkFrames[Math.min(9, Math.floor(exit * 10)) % heroWalkFrames.length]
   return {
     frame,
     sourceFrame: frame,
@@ -44,7 +46,7 @@ export function getHeroScrollPose(progress: number) {
 }
 
 // Centers measured from the opaque character in the supplied walk-in frames.
-const walkingCenters = [0, 0, 538.5, 532.5, 465.5, 451, 333.5]
+const walkingCenters = [0, 0, 538.5, 532.5, 465.5, 451, 333.5, 295]
 
 export function drawHeroFrame(
   context: CanvasRenderingContext2D,

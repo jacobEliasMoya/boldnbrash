@@ -13,7 +13,16 @@ function entranceTransition(delay: number, reduceMotion: boolean | null) {
     type: 'spring' as const,
     duration: reduceMotion ? 0 : 0.65,
     bounce: reduceMotion ? 0 : 0.12,
-    delay: reduceMotion ? 0 : delay,
+    delay: reduceMotion
+      ? 0
+      : Math.max(
+          0,
+          delay -
+            (typeof document !== 'undefined' &&
+            document.documentElement.dataset.introReveal === 'ring'
+              ? 0.75
+              : 0),
+        ),
   }
 }
 
@@ -106,7 +115,9 @@ export function PortfolioHero() {
                 if (hero) hero.dataset.periodReady = 'true'
               }}
             >
-              <span className="hero-period-glyph" aria-hidden="true">.</span>
+              <span className="hero-period-glyph" aria-hidden="true">
+                .
+              </span>
               <span data-portal="skills" aria-hidden="true" />
             </motion.a>
           </span>

@@ -3,6 +3,10 @@
 import { Children, useEffect, useRef, useState, type ReactNode } from 'react'
 import { motion, MotionConfig, useReducedMotion, useMotionValue } from 'motion/react'
 import { sceneDuration, sceneStops, skillSegments, skillStart, skillTravel } from './skillsTimeline'
+import { BlendedLogo } from '@/components/atoms/BlendedLogo'
+import { BlendedNav } from '@/components/atoms/BlendedNav'
+import { LiquidBoundary } from '@/components/atoms/LiquidBoundary'
+import { ThemeToggle } from '@/components/atoms/ThemeToggle'
 import { MobileMenu } from './MobileMenu'
 import { heroAnimationTravel } from '@/components/atoms/heroFrames'
 import { getPortalBounds } from '@/components/atoms/portalBounds'
@@ -34,7 +38,6 @@ export function SceneSequence({ children }: { children: ReactNode }) {
   const panels = useRef<(HTMLElement | null)[]>([])
   const [enhanced, setEnhanced] = useState(false)
   const [active, setActive] = useState(0)
-  const [hoveredNav, setHoveredNav] = useState<string | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
@@ -75,8 +78,10 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     function move(event: PointerEvent) {
       if (media.matches || event.pointerType !== 'mouse' || document.hidden) return
       // A distant layer moves against the pointer, with much less travel than the logo.
-      update((0.5 - event.clientX / window.innerWidth) * 28,
-        (0.5 - event.clientY / window.innerHeight) * 20)
+      update(
+        (0.5 - event.clientX / window.innerWidth) * 28,
+        (0.5 - event.clientY / window.innerHeight) * 20,
+      )
     }
     function preferenceChanged() {
       if (!media.matches) return
@@ -452,43 +457,41 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         data-enhanced={enhanced ? '' : undefined}
         data-menu-open={menuOpen ? '' : undefined}
       >
+        <LiquidBoundary />
         <a className="skip-link" href="#work">
           Skip to selected work
         </a>
         <motion.header
-          className={`site-header tone-${active === 3 ? 'paper' : 'dark'}`}
+          className={`site-header tone-${active === 0 || active === 3 ? 'paper' : 'dark'}`}
           initial={reduceMotion ? false : { opacity: 0, y: -24 }}
           animate={introReady ? { opacity: 1, y: 0 } : { opacity: 0, y: -24 }}
           transition={{ duration: reduceMotion ? 0 : 0.7, ease: [0.22, 1, 0.36, 1] }}
         >
-          <motion.a
-            className="wordmark"
-            href="#top"
-            aria-label="Jacob Moya home"
-            initial={reduceMotion ? false : { opacity: 0, y: -14 }}
-            animate={introReady ? { opacity: 1, y: 0 } : { opacity: 0, y: -14 }}
-            transition={{
-              duration: reduceMotion ? 0 : 0.5,
-              delay: reduceMotion ? 0 : 0.08,
-              ease: [0.22, 1, 0.36, 1],
-            }}
-          >
-            <span className="header-monogram" aria-hidden="true" />
-          </motion.a>
-          <nav
-            className="desktop-navigation"
-            aria-label="Portfolio"
-            onMouseLeave={() => setHoveredNav(null)}
-          >
+          <BlendedLogo enabled={enhanced} ready={introReady}>
+            <motion.a
+              className="wordmark"
+              data-liquid-header
+              href="#top"
+              aria-label="Jacob Moya home"
+              initial={reduceMotion ? false : { opacity: 0, y: -14 }}
+              animate={introReady ? { opacity: 1, y: 0 } : { opacity: 0, y: -14 }}
+              transition={{
+                duration: reduceMotion ? 0 : 0.5,
+                delay: reduceMotion ? 0 : 0.08,
+                ease: [0.22, 1, 0.36, 1],
+              }}
+            >
+              <span aria-hidden="true">JacobMoya</span>
+            </motion.a>
+          </BlendedLogo>
+          <BlendedNav enabled={enhanced} ready={introReady}>
             {scenes.map((scene, index) => (
               <motion.a
                 key={scene.id}
                 href={`#${scene.id}`}
+                data-liquid-header
                 aria-current={active === index ? 'location' : undefined}
                 aria-label={scene.id === 'top' ? 'Home' : undefined}
-                onHoverStart={() => setHoveredNav(scene.id)}
-                onFocus={() => setHoveredNav(scene.id)}
-                onBlur={() => setHoveredNav(null)}
                 initial={reduceMotion ? false : { opacity: 0, y: -12 }}
                 animate={introReady ? { opacity: 1, y: 0 } : { opacity: 0, y: -12 }}
                 transition={{
@@ -497,18 +500,6 @@ export function SceneSequence({ children }: { children: ReactNode }) {
                   ease: [0.22, 1, 0.36, 1],
                 }}
               >
-                {(hoveredNav ?? scenes[active].id) === scene.id && (
-                  <motion.span
-                    className="nav-highlight"
-                    layoutId="nav-highlight"
-                    transition={
-                      reduceMotion
-                        ? { duration: 0 }
-                        : { type: 'spring', stiffness: 420, damping: 34 }
-                    }
-                    aria-hidden="true"
-                  />
-                )}
                 <span className="nav-label">
                   {scene.id === 'top' ? (
                     <svg className="nav-home-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -520,7 +511,10 @@ export function SceneSequence({ children }: { children: ReactNode }) {
                 </span>
               </motion.a>
             ))}
-          </nav>
+          </BlendedNav>
+          <BlendedLogo enabled={enhanced} ready={introReady} control>
+            <ThemeToggle />
+          </BlendedLogo>
           <MobileMenu
             scenes={scenes}
             active={active}

@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { useReducedMotion } from 'motion/react'
 import { ParticleMonogram, type WalkRipple } from './ParticleMonogram'
-import { drawHeroFrame, getHeroScrollPose, heroFrameCount, heroStandingCenter } from './heroFrames'
+import { drawHeroFrame, getHeroScrollPose, heroFrameCount, heroStandingCenter, heroWalkFrames } from './heroFrames'
 
 export function HeroMark() {
   const canvas = useRef<HTMLCanvasElement>(null)
@@ -22,6 +22,8 @@ export function HeroMark() {
     let edgeCenter = 760
     let lastCenter: number | null = null
     let facingRight = false
+    let directionAnchor: number | null = null
+    let reversalThreshold = 18
     let walkingDistance = 0
     let lastRippleStep = -1
     let progress = Number(element.closest('.scene')?.getAttribute('data-jake-progress') ?? 0)
@@ -44,12 +46,31 @@ export function HeroMark() {
       const walking = pose.sourceFrame !== undefined
       if (walking && lastCenter !== null) {
         const movement = center - lastCenter
-        if (Math.abs(movement) > 0.01) facingRight = movement > 0
+        if (directionAnchor === null) directionAnchor = lastCenter
+        // Keep the furthest point in the current direction. Tiny backscrolls
+        // cannot turn the character; a sustained reversal can accumulate naturally.
+        const reverseDistance = facingRight ? directionAnchor - center : center - directionAnchor
+        if (reverseDistance >= reversalThreshold) {
+          facingRight = !facingRight
+          directionAnchor = center
+        } else {
+          directionAnchor = facingRight
+            ? Math.max(directionAnchor, center)
+            : Math.min(directionAnchor, center)
+        }
         walkingDistance += Math.abs(movement)
+      } else {
+        directionAnchor = null
+        if (walking) facingRight = pose.mirrored
       }
-      lastCenter = center
+      lastCenter = walking ? center : null
       // Advance the gait forward by distance, even when the scroll timeline reverses.
-      const walkingStep = Math.floor(walkingDistance / 50)
+      // A full left/right cycle spans 340 sprite pixels (previously 200).
+      // Hold the two extended-leg contacts longer than the passing poses.
+      const cycle = walkingDistance / 340
+      const phase = cycle % 1
+      const poseIndex = phase < 0.3 ? 0 : phase < 0.5 ? 1 : phase < 0.8 ? 2 : 3
+      const walkingStep = Math.floor(cycle) * heroWalkFrames.length + poseIndex
       if (
         walking &&
         walkingStep !== lastRippleStep &&
@@ -67,7 +88,7 @@ export function HeroMark() {
         ]
         lastRippleStep = walkingStep
       }
-      const sourceFrame = walking ? [4, 5, 6, 5][walkingStep % 4] : undefined
+      const sourceFrame = walking ? heroWalkFrames[walkingStep % heroWalkFrames.length] : undefined
       const mirrored = walking ? facingRight : pose.mirrored
       const key = `${pose.frame}:${sourceFrame}:${mirrored}:${pose.mode}:${center}`
       if (key === paintedPose) return
@@ -95,6 +116,10 @@ export function HeroMark() {
       const left = (bounds.width - 580 * scale) / 2
       const pageEdge = (window.innerWidth - bounds.left - left) / scale
       edgeCenter = pageEdge + 160
+      // Require 12 visible pixels of reverse travel at every viewport size.
+      reversalThreshold = 12 / scale
+      lastCenter = null
+      directionAnchor = null
       surface!.width = Math.ceil(edgeCenter + 160)
       surface!.style.left = `${left}px`
       surface!.style.width = `${surface!.width * scale}px`

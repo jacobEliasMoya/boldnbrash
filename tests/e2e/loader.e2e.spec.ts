@@ -11,34 +11,33 @@ for (const width of [1440, 390]) {
     const loader = page.locator('.portfolio-loader')
     await expect(loader).toBeVisible()
     await expect(page.locator('.site-header')).toHaveCSS('opacity', '0')
-    await expect(page.locator('.wordmark')).toHaveCSS('opacity', '0')
+    await expect(page.locator('.site-header .wordmark')).toHaveCSS('opacity', '0')
     if (width === 390)
       await expect(page.getByRole('button', { name: 'Open menu' })).toHaveCSS('opacity', '0')
     await expect(page.locator('.hero-letter').first()).toHaveCSS('opacity', '0')
     await expect(loader).toHaveAttribute('data-play-once', 'false')
-    await expect(loader, 'the loader should be plain black without an inset frame').toHaveCSS(
+    await expect(loader, 'the light-mode loader should be white without an inset frame').toHaveCSS(
       'background-color',
-      'rgb(8, 8, 9)',
+      'rgb(255, 255, 255)',
     )
-    expect(
-      await loader.evaluate((element) => getComputedStyle(element, '::after').content),
-    ).toBe('none')
+    expect(await loader.evaluate((element) => getComputedStyle(element, '::after').content)).toBe(
+      'none',
+    )
     await expect(page.locator('.portfolio')).toHaveJSProperty('inert', true)
     const copyLines = page.locator('.portfolio-loader-copy-line')
-    await expect(copyLines).toHaveText(['hey', 'I am', 'Jacob'])
+    await expect(copyLines).toHaveText(['hey', 'I’m', 'Jake'])
     await expect(copyLines.last()).toHaveCSS('opacity', '0')
     await expect(loader).toHaveAttribute('data-phase', 'copy', { timeout: 7000 })
     await expect(copyLines.last()).toHaveCSS('opacity', '1')
     await expect(loader).toHaveAttribute('data-phase', 'catch')
     await expect(loader).toHaveAttribute('data-assets-ready', 'true')
     await expect(loader).toHaveAttribute('data-load-progress', '100')
-    await expect(page.getByRole('progressbar', { name: 'Loading portfolio assets' })).toHaveAttribute(
-      'aria-valuenow',
-      '100',
-    )
+    await expect(
+      page.getByRole('progressbar', { name: 'Loading portfolio assets' }),
+    ).toHaveAttribute('aria-valuenow', '100')
     await expect(loader).toHaveCount(0)
     await expect(page.locator('.site-header')).toHaveCSS('opacity', '1')
-    await expect(page.locator('.wordmark')).toHaveCSS('opacity', '1')
+    await expect(page.locator('.site-header .wordmark')).toHaveCSS('opacity', '1')
     if (width === 390)
       await expect(page.getByRole('button', { name: 'Open menu' })).toHaveCSS('opacity', '1')
     await expect(page.locator('.hero-letter').first()).toHaveCSS('opacity', '1')
