@@ -16,7 +16,9 @@ export function getHeroScrollPose(progress: number) {
     return {
       frame,
       sourceFrame:
-        frame < 8 ? heroWalkFrames[Math.floor((position / heroEntranceTravel) * 15) % heroWalkFrames.length] : undefined,
+        frame < 8
+          ? heroWalkFrames[Math.floor((position / heroEntranceTravel) * 15) % heroWalkFrames.length]
+          : undefined,
       walkProgress:
         frame < 8 ? Math.min(1, ((position / heroEntranceTravel) * 15) / 7.5) : undefined,
       mirrored: false,
@@ -54,8 +56,20 @@ export function drawHeroFrame(
   positionedFrame?: number,
   center = heroStandingCenter,
   mirrored = true,
+  dark = false,
 ) {
   context.clearRect(0, 0, context.canvas.width, context.canvas.height)
+  // Paint in stage coordinates before flipping the sprite, so the ground
+  // shadow follows the character without mirroring or shifting between frames.
+  const passing = positionedFrame === 5 || positionedFrame === 7
+  context.save()
+  context.globalAlpha = passing ? 0.22 : 0.28
+  context.fillStyle = dark ? '#9072ce' : '#21123d'
+  context.filter = 'blur(5px)'
+  context.beginPath()
+  context.ellipse(center, 546, passing ? 54 : 62, passing ? 8 : 10, 0, 0, Math.PI * 2)
+  context.fill()
+  context.restore()
   context.save()
   if (positionedFrame !== undefined) {
     const origin = walkingCenters[positionedFrame]

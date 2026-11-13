@@ -113,3 +113,27 @@ test('pinch gestures and modal content do not drive the scene clock', async ({ p
   expect((await swipe(page, '#touch-dialog-test p', 600, 350)).some(Boolean)).toBe(false)
   expect(await page.evaluate(() => scrollY)).toBe(0)
 })
+
+test('the mobile hero fits short portrait and landscape viewports', async ({ page }) => {
+  for (const [width, height] of [
+    [390, 844],
+    [375, 667],
+    [320, 568],
+    [667, 375],
+    [568, 320],
+    [844, 390],
+  ]) {
+    await page.setViewportSize({ width, height })
+    await expect
+      .poll(() =>
+        page
+          .locator('.scene-top')
+          .evaluate((element) => element.scrollHeight - element.clientHeight),
+      )
+      .toBeLessThanOrEqual(1)
+    const bounds = await page.locator('.hero-copy').boundingBox()
+    const visibleHeight = await page.evaluate(() => window.visualViewport?.height ?? innerHeight)
+    expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(visibleHeight - 12)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width)
+  }
+})

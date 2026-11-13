@@ -3,7 +3,13 @@
 import { useEffect, useRef } from 'react'
 import { useReducedMotion } from 'motion/react'
 import { ParticleMonogram, type WalkRipple } from './ParticleMonogram'
-import { drawHeroFrame, getHeroScrollPose, heroFrameCount, heroStandingCenter, heroWalkFrames } from './heroFrames'
+import {
+  drawHeroFrame,
+  getHeroScrollPose,
+  heroFrameCount,
+  heroStandingCenter,
+  heroWalkFrames,
+} from './heroFrames'
 
 export function HeroMark() {
   const canvas = useRef<HTMLCanvasElement>(null)
@@ -90,9 +96,17 @@ export function HeroMark() {
       }
       const sourceFrame = walking ? heroWalkFrames[walkingStep % heroWalkFrames.length] : undefined
       const mirrored = walking ? facingRight : pose.mirrored
-      const key = `${pose.frame}:${sourceFrame}:${mirrored}:${pose.mode}:${center}`
+      const theme = document.documentElement.dataset.theme
+      const key = `${theme}:${pose.frame}:${sourceFrame}:${mirrored}:${pose.mode}:${center}`
       if (key === paintedPose) return
-      drawHeroFrame(context!, frames[sourceFrame ?? pose.frame], sourceFrame, center, mirrored)
+      drawHeroFrame(
+        context!,
+        frames[sourceFrame ?? pose.frame],
+        sourceFrame,
+        center,
+        mirrored,
+        document.documentElement.dataset.theme === 'dark',
+      )
       surface!.style.opacity = pose.mode === 'gone' ? '0' : '1'
       surface!.dataset.frame = String(pose.frame)
       surface!.dataset.direction = pose.mirrored ? 'out' : 'in'
@@ -127,6 +141,11 @@ export function HeroMark() {
       paintedPose = ''
       paint()
     }
+    const themeObserver = new MutationObserver(paint)
+    themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    })
     const observer = new ResizeObserver(measure)
     observer.observe(element)
     window.addEventListener('resize', measure)
@@ -145,6 +164,7 @@ export function HeroMark() {
       disposed = true
       ripples.current = []
       observer.disconnect()
+      themeObserver.disconnect()
       window.removeEventListener('resize', measure)
       window.removeEventListener('portfolio:hero-progress', updateScroll)
       context.clearRect(0, 0, surface.width, surface.height)

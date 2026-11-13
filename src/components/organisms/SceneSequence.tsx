@@ -613,7 +613,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           ref={track}
           className="scene-track"
           data-duration={sceneDuration}
-          style={enhanced ? { height: `${100 + sceneDuration * 160}dvh` } : undefined}
+          style={enhanced ? { height: `calc(100svh * ${1 + sceneDuration * 1.6})` } : undefined}
         >
           <div className="scene-stage">
             {Children.map(children, (child, index) => (

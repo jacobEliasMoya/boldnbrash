@@ -329,8 +329,8 @@ ul {
   top: 50%;
   left: 68%;
   width: max(88vw, 132svh);
-  background: #f0f0f3;
-  opacity: 0.35;
+  background: #d9d9e0;
+  opacity: 0.45;
 }
 .scene-skills::after {
   top: 58%;
@@ -2658,5 +2658,121 @@ ul {
 @media (pointer: coarse) {
   .portfolio[data-enhanced] .scene {
     overscroll-behavior-y: contain;
+  }
+}
+
+/* Fit the mobile hero to the visible viewport instead of adding a second scroll. */
+@media (max-width: 760px), (pointer: coarse) and (max-height: 560px) {
+  .portfolio[data-enhanced] .hero-scene {
+    height: 100%;
+    min-height: 0;
+    grid-template-rows: minmax(0, min(52vw, 24svh, 220px)) auto;
+    align-content: center;
+    gap: clamp(12px, 2svh, 24px);
+    padding-top: max(90px, calc(env(safe-area-inset-top) + 76px));
+    padding-bottom: max(46px, calc(env(safe-area-inset-bottom) + 30px));
+  }
+  .portfolio[data-enhanced] .hero-mark {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+  }
+  .portfolio[data-enhanced] .hero-mark-animation {
+    width: auto;
+    height: 100%;
+    aspect-ratio: 1;
+    max-height: min(52vw, 24svh, 220px);
+    max-width: 100%;
+  }
+  .portfolio[data-enhanced] .hero-copy {
+    padding-bottom: 0;
+    min-width: 0;
+    width: 100%;
+    container-type: inline-size;
+  }
+  .portfolio[data-enhanced] .hero-copy h1 {
+    font-size: 22cqw;
+    white-space: nowrap;
+  }
+  .portfolio[data-enhanced] .hero-copy .eyebrow {
+    margin-bottom: clamp(12px, 2svh, 20px);
+  }
+  .portfolio[data-enhanced] .hero-copy .hero-description {
+    font-size: clamp(12px, 3.6vw, 16px);
+    margin-top: clamp(12px, 2svh, 20px);
+  }
+  .portfolio[data-enhanced] .skills-browser {
+    height: clamp(570px, 70svh, 650px);
+    min-height: clamp(570px, 70svh, 650px);
+  }
+}
+
+@media (max-width: 760px) and (orientation: landscape),
+  (pointer: coarse) and (max-height: 560px) and (orientation: landscape) {
+  .portfolio[data-enhanced] .hero-scene {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
+    grid-template-rows: minmax(0, 1fr);
+    padding-top: 80px;
+    padding-bottom: 32px;
+    gap: 20px;
+  }
+  .portfolio[data-enhanced] .hero-copy {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: center;
+  }
+  .portfolio[data-enhanced] .hero-mark {
+    grid-column: 2;
+    grid-row: 1;
+    max-height: min(36svh, 180px);
+  }
+  .portfolio[data-enhanced] .hero-mark-animation {
+    max-height: min(36svh, 180px);
+  }
+  .portfolio[data-enhanced] .hero-copy h1 {
+    font-size: min(22cqw, 12svh);
+  }
+  .portfolio[data-enhanced] .hero-copy .eyebrow {
+    margin-bottom: 10px;
+  }
+  .portfolio[data-enhanced] .hero-copy .hero-description {
+    font-size: 12px;
+    line-height: 1.5;
+    margin-top: 10px;
+  }
+}
+
+/* Oversized decorative boxes must not enlarge a mobile scene's scroll area. */
+@media (max-width: 760px), (pointer: coarse) and (max-height: 560px) {
+  .scene-top::before {
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
+    transform: none;
+    translate: none;
+    -webkit-mask-size: min(224vw, 960px);
+    mask-size: min(224vw, 960px);
+    -webkit-mask-position: calc(50% + var(--background-x, 0px))
+      calc(32dvh - min(112vw, 480px) + var(--background-y, 0px));
+    mask-position: calc(50% + var(--background-x, 0px))
+      calc(32dvh - min(112vw, 480px) + var(--background-y, 0px));
+  }
+  .scene-skills::after {
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
+    transform: none;
+    translate: none;
+    -webkit-mask-size: max(190vw, 108svh);
+    mask-size: max(190vw, 108svh);
+    -webkit-mask-position: calc(-15vw - max(95vw, 54svh) + var(--background-x, 0px))
+      calc(70dvh - max(95vw, 54svh) + var(--background-y, 0px));
+    mask-position: calc(-15vw - max(95vw, 54svh) + var(--background-x, 0px))
+      calc(70dvh - max(95vw, 54svh) + var(--background-y, 0px));
   }
 }

@@ -40,17 +40,17 @@ export function LiquidBoundary() {
         if (
           media.matches ||
           document.hidden ||
-          !document.hasFocus() ||
           document.documentElement.dataset.introLoading === 'true' ||
           document.querySelector('dialog[open]') ||
-          document.activeElement?.matches('[data-liquid-header]:focus-visible')
+          (document.hasFocus() &&
+            document.activeElement?.matches('[data-liquid-header]:focus-visible'))
         )
           return
         idle = true
         targetPosition = position
         svg!.dataset.mode = 'idle'
         schedule()
-      }, 3500)
+      }, 2500)
     }
     function activity() {
       idle = false
@@ -122,8 +122,8 @@ export function LiquidBoundary() {
       const ease = 1 - Math.exp(-dt / 160)
       if (idle) {
         // A quiet clockwise lap, starting exactly where the pointer left the pull.
-        targetPosition = wrap(targetPosition + (perimeter * dt) / 60000)
-        targetDepth = 10 + Math.sin(time / 2200) * 1.5
+        targetPosition = wrap(targetPosition + (perimeter * dt) / 36000)
+        targetDepth = 18 + Math.sin(time / 2200) * 2
         targetRadius = 130
         targetPower = 2
       }
@@ -275,6 +275,14 @@ export function LiquidBoundary() {
       )
       schedule()
     }
+    function releasePointer() {
+      reset()
+      armIdle()
+    }
+    function preferenceChanged() {
+      reset()
+      if (!media.matches) armIdle()
+    }
     function visibilityChanged() {
       if (document.hidden) reset()
       else armIdle()
@@ -285,8 +293,8 @@ export function LiquidBoundary() {
     measure()
     armIdle()
     window.addEventListener('pointermove', move, { passive: true })
-    document.documentElement.addEventListener('pointerleave', reset)
-    window.addEventListener('blur', reset)
+    document.documentElement.addEventListener('pointerleave', releasePointer)
+    window.addEventListener('blur', releasePointer)
     window.addEventListener('focus', armIdle)
     window.addEventListener('wheel', activity, { passive: true })
     document.addEventListener('keydown', activity)
@@ -294,14 +302,14 @@ export function LiquidBoundary() {
     window.addEventListener(introCompleteEvent, armIdle)
     document.addEventListener('focusin', focus)
     document.addEventListener('focusout', unfocus)
-    media.addEventListener('change', reset)
+    media.addEventListener('change', preferenceChanged)
     return () => {
       cancelAnimationFrame(frame)
       window.clearTimeout(idleTimer)
       observer.disconnect()
       window.removeEventListener('pointermove', move)
-      document.documentElement.removeEventListener('pointerleave', reset)
-      window.removeEventListener('blur', reset)
+      document.documentElement.removeEventListener('pointerleave', releasePointer)
+      window.removeEventListener('blur', releasePointer)
       window.removeEventListener('focus', armIdle)
       window.removeEventListener('wheel', activity)
       document.removeEventListener('keydown', activity)
@@ -309,7 +317,7 @@ export function LiquidBoundary() {
       window.removeEventListener(introCompleteEvent, armIdle)
       document.removeEventListener('focusin', focus)
       document.removeEventListener('focusout', unfocus)
-      media.removeEventListener('change', reset)
+      media.removeEventListener('change', preferenceChanged)
     }
   }, [])
 
