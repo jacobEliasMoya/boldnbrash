@@ -592,7 +592,7 @@ test('mobile menu handles reduced motion, small screens, and switching to deskto
   await expect(page.locator('html')).not.toHaveCSS('overflow', 'hidden')
 })
 
-test('mobile header stays transparent and the menu falls into place along the Z axis', async ({
+test('mobile header stays transparent and the menu settles without depth jitter', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
@@ -617,7 +617,7 @@ test('mobile header stays transparent and the menu falls into place along the Z 
   )
   await page.getByRole('button', { name: 'Open menu' }).click()
   const depths = await samples
-  expect(depths.some((value) => value > 50)).toBe(true)
+  expect(depths.every((value) => Math.abs(value) < 0.5)).toBe(true)
   const panel = page.locator('.mobile-menu-panel')
   await expect
     .poll(() =>
@@ -626,7 +626,7 @@ test('mobile header stays transparent and the menu falls into place along the Z 
       ),
     )
     .toBeLessThan(0.5)
-  await expect(panel).toHaveCSS('background-color', 'rgba(8, 8, 9, 0.92)')
+  await expect(panel).toHaveCSS('background-color', 'rgba(8, 8, 9, 0.98)')
   await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog', { name: 'Mobile navigation' })).not.toBeVisible()
 })

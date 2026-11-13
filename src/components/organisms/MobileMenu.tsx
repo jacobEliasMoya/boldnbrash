@@ -143,13 +143,13 @@ export function MobileMenu({
             {open && (
               <motion.div
                 className="mobile-menu-panel"
-                initial={reduceMotion ? false : { z: 650, y: -40, rotateX: 14, opacity: 0 }}
+                initial={reduceMotion ? false : { opacity: 0 }}
                 animate={
                   phase === 'closing'
-                    ? { z: 250, y: -24, rotateX: 6, opacity: 0 }
+                    ? { opacity: 0 }
                     : phase === 'revealing'
-                      ? { z: 0, y: 0, rotateX: 0, opacity: 0 }
-                      : { z: 0, y: 0, rotateX: 0, opacity: 1 }
+                      ? { opacity: 0 }
+                      : { opacity: 1 }
                 }
                 transition={
                   reduceMotion
@@ -159,10 +159,8 @@ export function MobileMenu({
                       : phase === 'closing'
                         ? { duration: 0.3, ease: 'easeOut' }
                         : {
-                            type: 'spring',
-                            duration: 0.75,
-                            bounce: 0.14,
-                            opacity: { duration: 0.2 },
+                            duration: 0.24,
+                            ease: 'easeOut',
                           }
                 }
                 onAnimationComplete={() => {
