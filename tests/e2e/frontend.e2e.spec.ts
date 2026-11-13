@@ -230,18 +230,28 @@ test('scroll plays the original entrance and wave then mirrors the walk out', as
   await expect(avatar).toHaveCSS('opacity', '1')
 })
 
-test('navigation includes Home and moves one shared highlight between links', async ({ page }) => {
+test('header controls use one liquid boundary with actual text inversion', async ({ page }) => {
   await page.goto(baseURL)
-  const home = page.getByRole('navigation', { name: 'Portfolio' }).getByRole('link', {
-    name: 'Home',
-  })
+  await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 10000 })
+  const home = page
+    .getByRole('navigation', { name: 'Portfolio' })
+    .getByRole('link', { name: 'Home' })
   await expect(home.locator('.nav-home-icon')).toBeVisible()
-  await expect(home.locator('.nav-highlight')).toHaveCount(1)
-  const work = page.getByRole('link', { name: 'Work', exact: true })
-  await expect(work).toHaveCSS('transform', 'none')
-  await work.hover()
-  await expect(work.locator('.nav-highlight')).toHaveCount(1)
-  await expect(page.locator('.site-header .nav-highlight')).toHaveCount(1)
+  await expect(page.locator('.nav-highlight')).toHaveCount(0)
+  for (const control of [
+    page.getByRole('link', { name: 'Work', exact: true }),
+    page.getByRole('link', { name: 'Jacob Moya home' }),
+    page.getByRole('button', { name: 'Night mode' }),
+  ]) {
+    await control.hover()
+    await expect
+      .poll(async () =>
+        Number(await page.locator('.liquid-boundary').getAttribute('data-pull-depth')),
+      )
+      .toBeGreaterThan(25)
+    await expect(control.locator('..')).toHaveCSS('mix-blend-mode', 'difference')
+  }
+  await expect(page.locator('.liquid-boundary path')).toHaveCount(1)
 })
 
 test('scenes open with scroll and close again in reverse', async ({ page }) => {

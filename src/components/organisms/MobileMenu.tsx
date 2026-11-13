@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import { createPortal } from 'react-dom'
+import { BlendedLogo } from '@/components/atoms/BlendedLogo'
 
 type Scene = { id: string; label: string }
 type Phase = 'menu' | 'closing' | 'expanding' | 'revealing'
@@ -100,34 +101,37 @@ export function MobileMenu({
 
   return (
     <>
-      <motion.button
-        ref={toggle}
-        type="button"
-        className="mobile-menu-toggle"
-        aria-label="Open menu"
-        aria-haspopup="dialog"
-        aria-controls="mobile-menu"
-        aria-expanded={open}
-        initial={reduceMotion ? false : { opacity: 0, y: -14 }}
-        animate={introReady ? { opacity: 1, y: 0 } : { opacity: 0, y: -14 }}
-        transition={{
-          duration: reduceMotion ? 0 : 0.5,
-          delay: reduceMotion ? 0 : 0.22,
-          ease: [0.22, 1, 0.36, 1],
-        }}
-        onClick={() => {
-          setPhase('menu')
-          setSelection(null)
-          setOpen(true)
-          onOpenChange(true)
-        }}
-      >
-        <span aria-hidden="true">
-          <i />
-          <i />
-          <i />
-        </span>
-      </motion.button>
+      <BlendedLogo enabled={introReady && reduceMotion === false} ready={introReady} control menu>
+        <motion.button
+          ref={toggle}
+          type="button"
+          className="mobile-menu-toggle"
+          data-liquid-header
+          aria-label="Open menu"
+          aria-haspopup="dialog"
+          aria-controls="mobile-menu"
+          aria-expanded={open}
+          initial={reduceMotion ? false : { opacity: 0, y: -14 }}
+          animate={introReady ? { opacity: 1, y: 0 } : { opacity: 0, y: -14 }}
+          transition={{
+            duration: reduceMotion ? 0 : 0.5,
+            delay: reduceMotion ? 0 : 0.22,
+            ease: [0.22, 1, 0.36, 1],
+          }}
+          onClick={() => {
+            setPhase('menu')
+            setSelection(null)
+            setOpen(true)
+            onOpenChange(true)
+          }}
+        >
+          <span aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+        </motion.button>
+      </BlendedLogo>
       {open &&
         createPortal(
           <dialog
