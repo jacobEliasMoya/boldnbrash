@@ -2635,6 +2635,9 @@ ul {
   z-index: 70;
   fill: #000;
 }
+:root[data-theme='dark'] .portfolio .liquid-surround {
+  fill: #fff;
+}
 .liquid-blended-nav[data-tone='dark'],
 .liquid-blended-logo[data-tone='dark'],
 .liquid-blended-control[data-tone='dark'] {

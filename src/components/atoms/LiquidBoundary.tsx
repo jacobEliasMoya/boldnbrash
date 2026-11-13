@@ -105,7 +105,7 @@ export function LiquidBoundary() {
         return d + ' Z'
       }
       const outside = `M${-frameInset},${-frameInset} H${width + frameInset} V${height + frameInset} H${-frameInset} Z `
-      // Keep the outer surround solid black in every theme. A subpixel overlap
+      // Keep the outer surround solid in the theme colour. A subpixel overlap
       // covers the antialiased join without restoring a separate outline stroke.
       surroundPath?.setAttribute(
         'd',
