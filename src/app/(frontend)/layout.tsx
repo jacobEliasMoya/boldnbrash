@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import type { Metadata } from 'next'
+import Script from 'next/script'
 import type { ReactNode } from 'react'
 import './styles.css'
 
@@ -38,7 +39,28 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <style>{`@font-face{font-family:'Fedro';src:${fontSource};font-weight:900;font-style:normal;font-display:swap;}`}</style>
         )}
       </head>
-      <body>{children}</body>
+      <body>
+        <noscript>
+          <iframe
+            src="https://www.googletagmanager.com/ns.html?id=GTM-W2VC5HG9"
+            title="Google Tag Manager"
+            height="0"
+            width="0"
+            style={{ display: 'none', visibility: 'hidden' }}
+          />
+        </noscript>
+        {children}
+        <Script id="gtm-init" strategy="afterInteractive">
+          {`window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());`}
+        </Script>
+        <Script
+          id="gtm-container"
+          src="https://www.googletagmanager.com/gtm.js?id=GTM-W2VC5HG9"
+          strategy="afterInteractive"
+        />
+      </body>
     </html>
   )
 }

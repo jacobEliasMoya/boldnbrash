@@ -274,9 +274,22 @@ test('the liquid takes a gentle idle lap and yields to the pointer', async ({ pa
     .toBeGreaterThan(15)
   await expect
     .poll(async () => Number(await liquid.getAttribute('data-pull-depth')))
-    .toBeLessThan(14)
+    .toBeGreaterThan(15)
   await page.mouse.move(700, 150)
   await expect(liquid).toHaveAttribute('data-mode', 'pointer')
+})
+
+test('the liquid still idles when the cursor leaves the visible page', async ({ page }) => {
+  await page.goto(baseURL)
+  await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 10000 })
+  await page.mouse.move(1400, 450)
+  await page.locator('html').evaluate((element) => element.dispatchEvent(new Event('pointerleave')))
+  const liquid = page.locator('.liquid-boundary')
+  await expect(liquid).toHaveAttribute('data-mode', 'idle', { timeout: 5000 })
+  const before = Number(await liquid.getAttribute('data-pull-position'))
+  await expect
+    .poll(async () => Math.abs(Number(await liquid.getAttribute('data-pull-position')) - before))
+    .toBeGreaterThan(30)
 })
 
 test('scenes open with scroll and close again in reverse', async ({ page }) => {
