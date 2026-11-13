@@ -111,13 +111,13 @@ export function PortfolioLoader({ playOnce = false }: { playOnce?: boolean }) {
           image.src = source
           return image
         })
-    let resolvePageReady = () => {}
+    let pageLoadHandler: (() => void) | undefined
     const pageReady =
       document.readyState === 'complete'
         ? Promise.resolve()
         : new Promise<void>((resolve) => {
-            resolvePageReady = resolve
-            window.addEventListener('load', resolve, { once: true })
+            pageLoadHandler = () => resolve()
+            window.addEventListener('load', pageLoadHandler, { once: true })
           })
     const totalAssets = frames.length + heroAssets.length + 2
     function track(task: Promise<unknown>) {
@@ -150,10 +150,12 @@ export function PortfolioLoader({ playOnce = false }: { playOnce?: boolean }) {
         }
         if (elapsed >= 300 && assetsReady) release()
       } else {
-        const frame = Math.max(
-          0,
-          frameStarts.findLastIndex((start) => elapsed >= start),
-        )
+        let frame = 0
+        for (let index = frameStarts.length - 1; index >= 0; index -= 1) {
+          if (elapsed < frameStarts[index]) continue
+          frame = index
+          break
+        }
         if (context && frame !== paintedFrame) {
           context.clearRect(0, 0, 1280, 720)
           context.drawImage(frames[frame], 0, 0)
@@ -195,7 +197,7 @@ export function PortfolioLoader({ playOnce = false }: { playOnce?: boolean }) {
       disposed = true
       cancelAnimationFrame(request)
       clearTimeout(timeout)
-      window.removeEventListener('load', resolvePageReady)
+      if (pageLoadHandler) window.removeEventListener('load', pageLoadHandler)
       documentRoot.style.overflow = previousOverflow
       delete documentRoot.dataset.introLoading
       if (portfolio) portfolio.inert = previousInert
