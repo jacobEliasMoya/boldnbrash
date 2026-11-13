@@ -1,0 +1,144 @@
+{
+  "width": 1280,
+  "height": 720,
+  "durationMs": 2360,
+  "frames": [
+    {
+      "frame": "frame-000.webp",
+      "durationMs": 20
+    },
+    {
+      "frame": "frame-001.webp",
+      "durationMs": 20
+    },
+    {
+      "frame": "frame-002.webp",
+      "durationMs": 20
+    },
+    {
+      "frame": "frame-003.webp",
+      "durationMs": 20
+    },
+    {
+      "frame": "frame-004.webp",
+      "durationMs": 20
+    },
+    {
+      "frame": "frame-005.webp",
+      "durationMs": 20
+    },
+    {
+      "frame": "frame-006.webp",
+      "durationMs": 20
+    },
+    {
+      "frame": "frame-007.webp",
+      "durationMs": 20
+    },
+    {
+      "frame": "frame-008.webp",
+      "durationMs": 20
+    },
+    {
+      "frame": "frame-009.webp",
+      "durationMs": 20
+    },
+    {
+      "frame": "frame-010.webp",
+      "durationMs": 20
+    },
+    {
+      "frame": "frame-011.webp",
+      "durationMs": 20
+    },
+    {
+      "frame": "frame-012.webp",
+      "durationMs": 20
+    },
+    {
+      "frame": "frame-013.webp",
+      "durationMs": 20
+    },
+    {
+      "frame": "frame-014.webp",
+      "durationMs": 20
+    },
+    {
+      "frame": "frame-015.webp",
+      "durationMs": 20
+    },
+    {
+      "frame": "frame-016.webp",
+      "durationMs": 20
+    },
+    {
+      "frame": "frame-017.webp",
+      "durationMs": 20
+    },
+    {
+      "frame": "frame-018.webp",
+      "durationMs": 20
+    },
+    {
+      "frame": "frame-019.webp",
+      "durationMs": 20
+    },
+    {
+      "frame": "frame-020.webp",
+      "durationMs": 20
+    },
+    {
+      "frame": "frame-021.webp",
+      "durationMs": 20
+    },
+    {
+      "frame": "frame-022.webp",
+      "durationMs": 20
+    },
+    {
+      "frame": "frame-023.webp",
+      "durationMs": 50
+    },
+    {
+      "frame": "frame-024.webp",
+      "durationMs": 80
+    },
+    {
+      "frame": "frame-025.webp",
+      "durationMs": 60
+    },
+    {
+      "frame": "frame-026.webp",
+      "durationMs": 110
+    },
+    {
+      "frame": "frame-027.webp",
+      "durationMs": 80
+    },
+    {
+      "frame": "frame-028.webp",
+      "durationMs": 70
+    },
+    {
+      "frame": "frame-029.webp",
+      "durationMs": 60
+    },
+    {
+      "frame": "frame-030.webp",
+      "durationMs": 50
+    },
+    {
+      "frame": "frame-031.webp",
+      "durationMs": 80
+    },
+    {
+      "frame": "frame-032.webp",
+      "durationMs": 80
+    },
+    {
+      "frame": "frame-033.webp",
+      "durationMs": 1180
+    }
+  ],
+  "stableHoldFrame": "frame-033.webp"
+}
