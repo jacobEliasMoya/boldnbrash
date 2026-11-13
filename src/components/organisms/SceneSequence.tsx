@@ -118,18 +118,13 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     let displayed = 0
     let requested = 0
     let previousPlaybackTime = 0
-    let wheelDirection = 0
+    let inputDirection = 0
 
-    function normalizeWheel(event: WheelEvent) {
-      if (document.documentElement.dataset.introLoading === 'true') {
-        event.preventDefault()
-        return
-      }
+    function advanceInput(pixels: number, target: Element | null) {
       const node = track.current
-      if (!node || media.matches || event.ctrlKey || event.defaultPrevented || !event.deltaY) return
-      let target = event.target instanceof Element ? event.target : null
-      if (target?.closest('dialog, input, textarea, select, [contenteditable="true"]')) return
-      const direction = Math.sign(event.deltaY)
+      if (!node || media.matches || !pixels) return false
+      if (target?.closest('dialog, input, textarea, select, [contenteditable="true"]')) return false
+      const direction = Math.sign(pixels)
       while (target && target !== node) {
         const element = target as HTMLElement
         const overflow = getComputedStyle(element).overflowY
@@ -142,29 +137,25 @@ export function SceneSequence({ children }: { children: ReactNode }) {
               ? element.scrollTop + element.clientHeight < element.scrollHeight - 1
               : element.scrollTop > 1
           )
-            return
+            return false
         }
         target = target.parentElement
       }
       const start = window.scrollY + node.getBoundingClientRect().top
       const distance =
         node.offsetHeight - (node.firstElementChild?.clientHeight ?? window.innerHeight)
-      if (distance <= 0) return
-      event.preventDefault()
+      if (distance <= 0) return false
       const nativeProgress = Math.max(
         0,
         Math.min(sceneDuration, ((window.scrollY - start) / distance) * sceneDuration),
       )
       const currentClock = toPlaybackTime(displayed)
       const base =
-        wheelDirection && wheelDirection !== direction
+        inputDirection && inputDirection !== direction
           ? currentClock
           : toPlaybackTime(nativeProgress)
-      wheelDirection = direction
-      const pixels =
-        Math.abs(event.deltaY) *
-        (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1)
-      const desired = base + direction * Math.min(pixels, 120) * 0.0015
+      inputDirection = direction
+      const desired = base + direction * Math.min(Math.abs(pixels), 120) * 0.0015
       const bounded = Math.max(
         0,
         Math.min(
@@ -177,6 +168,72 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         behavior: 'instant',
       })
       update()
+      return true
+    }
+
+    function normalizeWheel(event: WheelEvent) {
+      if (document.documentElement.dataset.introLoading === 'true') {
+        event.preventDefault()
+        return
+      }
+      if (event.ctrlKey || event.defaultPrevented) return
+      const pixels =
+        event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1)
+      if (advanceInput(pixels, event.target instanceof Element ? event.target : null))
+        event.preventDefault()
+    }
+
+    let touch: {
+      x: number
+      y: number
+      lastY: number
+      axis: 'vertical' | 'horizontal' | null
+      target: Element | null
+    } | null = null
+    function startTouch(event: TouchEvent) {
+      if (event.touches.length !== 1 || media.matches) {
+        touch = null
+        return
+      }
+      const point = event.touches[0]
+      touch = {
+        x: point.clientX,
+        y: point.clientY,
+        lastY: point.clientY,
+        axis: null,
+        target: event.target instanceof Element ? event.target : null,
+      }
+    }
+    function moveTouch(event: TouchEvent) {
+      if (event.touches.length !== 1 || media.matches) {
+        touch = null
+        return
+      }
+      if (document.documentElement.dataset.introLoading === 'true') {
+        if (event.cancelable) event.preventDefault()
+        return
+      }
+      if (!touch || event.defaultPrevented || !event.cancelable) return
+      // These surfaces own their gestures; pinch zoom and form controls stay native.
+      if (
+        touch.target?.closest(
+          'dialog, input, textarea, select, [contenteditable="true"], .skills-browser',
+        )
+      )
+        return
+      const point = event.touches[0]
+      if (!touch.axis) {
+        const dx = Math.abs(point.clientX - touch.x)
+        const dy = Math.abs(point.clientY - touch.y)
+        if (Math.max(dx, dy) < 6) return
+        touch.axis = dy >= dx ? 'vertical' : 'horizontal'
+      }
+      const pixels = touch.lastY - point.clientY
+      touch.lastY = point.clientY
+      if (touch.axis === 'vertical' && advanceInput(pixels, touch.target)) event.preventDefault()
+    }
+    function endTouch() {
+      touch = null
     }
 
     function render(value: number, immediate = false) {
@@ -418,6 +475,10 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     )
     window.addEventListener('scroll', schedule, { passive: true })
     window.addEventListener('wheel', normalizeWheel, { passive: false })
+    document.addEventListener('touchstart', startTouch, { passive: true })
+    document.addEventListener('touchmove', moveTouch, { passive: false })
+    document.addEventListener('touchend', endTouch, { passive: true })
+    document.addEventListener('touchcancel', endTouch, { passive: true })
     window.addEventListener('resize', schedule)
     document.addEventListener('click', navigate)
     window.addEventListener('portfolio:select-skill', selectSkill)
@@ -435,6 +496,10 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       cancelAnimationFrame(initial)
       window.removeEventListener('scroll', schedule)
       window.removeEventListener('wheel', normalizeWheel)
+      document.removeEventListener('touchstart', startTouch)
+      document.removeEventListener('touchmove', moveTouch)
+      document.removeEventListener('touchend', endTouch)
+      document.removeEventListener('touchcancel', endTouch)
       window.removeEventListener('resize', schedule)
       document.removeEventListener('click', navigate)
       window.removeEventListener('portfolio:select-skill', selectSkill)

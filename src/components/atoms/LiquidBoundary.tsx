@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import { introCompleteEvent } from '@/hooks/useIntroReady'
 
 export function LiquidBoundary() {
   const root = useRef<SVGSVGElement>(null)
@@ -28,6 +29,34 @@ export function LiquidBoundary() {
     let targetPower = 2
     let frame = 0
     let previous = 0
+    let idle = false
+    let idleTimer = 0
+    svg.dataset.mode = media.matches ? 'static' : 'pointer'
+
+    function armIdle() {
+      window.clearTimeout(idleTimer)
+      if (media.matches || document.hidden) return
+      idleTimer = window.setTimeout(() => {
+        if (
+          media.matches ||
+          document.hidden ||
+          !document.hasFocus() ||
+          document.documentElement.dataset.introLoading === 'true' ||
+          document.querySelector('dialog[open]') ||
+          document.activeElement?.matches('[data-liquid-header]:focus-visible')
+        )
+          return
+        idle = true
+        targetPosition = position
+        svg!.dataset.mode = 'idle'
+        schedule()
+      }, 3500)
+    }
+    function activity() {
+      idle = false
+      svg!.dataset.mode = media.matches ? 'static' : 'pointer'
+      armIdle()
+    }
 
     const wrap = (value: number) => ((value % perimeter) + perimeter) % perimeter
     const arcDelta = (from: number, to: number) => wrap(to - from + perimeter / 2) - perimeter / 2
@@ -91,6 +120,13 @@ export function LiquidBoundary() {
       const dt = previous ? Math.min(time - previous, 50) : 16
       previous = time
       const ease = 1 - Math.exp(-dt / 160)
+      if (idle) {
+        // A quiet clockwise lap, starting exactly where the pointer left the pull.
+        targetPosition = wrap(targetPosition + (perimeter * dt) / 60000)
+        targetDepth = 10 + Math.sin(time / 2200) * 1.5
+        targetRadius = 130
+        targetPower = 2
+      }
       // One mass travels the shortest route around the perimeter, including corners.
       position = wrap(position + arcDelta(position, targetPosition) * ease)
       depth += (targetDepth - depth) * ease
@@ -99,14 +135,15 @@ export function LiquidBoundary() {
       path!.setAttribute('d', contour())
       svg!.dataset.edge = pointAt(position).edge
       svg!.dataset.pullDepth = depth.toFixed(2)
+      svg!.dataset.pullPosition = position.toFixed(2)
       const settled =
         Math.abs(arcDelta(position, targetPosition)) +
           Math.abs(depth - targetDepth) +
           Math.abs(radius - targetRadius) +
           Math.abs(power - targetPower) <
         0.01
-      frame = settled ? 0 : requestAnimationFrame(paint)
-      if (settled) previous = 0
+      frame = settled && !idle ? 0 : requestAnimationFrame(paint)
+      if (settled && !idle) previous = 0
     }
     function schedule() {
       if (!frame) frame = requestAnimationFrame(paint)
@@ -159,6 +196,7 @@ export function LiquidBoundary() {
     }
     function move(event: PointerEvent) {
       if (media.matches || event.pointerType !== 'mouse') return
+      activity()
       const bounds = svg!.getBoundingClientRect()
       const x = Math.max(0, Math.min(width, event.clientX - bounds.left - frameInset))
       const y = Math.max(0, Math.min(height, event.clientY - bounds.top - frameInset))
@@ -211,6 +249,7 @@ export function LiquidBoundary() {
     }
     function focus(event: FocusEvent) {
       if (media.matches) return
+      activity()
       targetDepth = 0
       if (
         connect(
@@ -220,10 +259,14 @@ export function LiquidBoundary() {
         schedule()
     }
     function reset() {
+      idle = false
+      window.clearTimeout(idleTimer)
+      svg!.dataset.mode = media.matches ? 'static' : 'pointer'
       targetDepth = 0
       schedule()
     }
     function unfocus(event: FocusEvent) {
+      activity()
       targetDepth = 0
       connect(
         (event.relatedTarget as Element | null)?.closest<HTMLElement>(
@@ -232,22 +275,38 @@ export function LiquidBoundary() {
       )
       schedule()
     }
+    function visibilityChanged() {
+      if (document.hidden) reset()
+      else armIdle()
+    }
     const observer = new ResizeObserver(measure)
     observer.observe(svg)
     if (surround.current) observer.observe(surround.current)
     measure()
+    armIdle()
     window.addEventListener('pointermove', move, { passive: true })
     document.documentElement.addEventListener('pointerleave', reset)
     window.addEventListener('blur', reset)
+    window.addEventListener('focus', armIdle)
+    window.addEventListener('wheel', activity, { passive: true })
+    document.addEventListener('keydown', activity)
+    document.addEventListener('visibilitychange', visibilityChanged)
+    window.addEventListener(introCompleteEvent, armIdle)
     document.addEventListener('focusin', focus)
     document.addEventListener('focusout', unfocus)
     media.addEventListener('change', reset)
     return () => {
       cancelAnimationFrame(frame)
+      window.clearTimeout(idleTimer)
       observer.disconnect()
       window.removeEventListener('pointermove', move)
       document.documentElement.removeEventListener('pointerleave', reset)
       window.removeEventListener('blur', reset)
+      window.removeEventListener('focus', armIdle)
+      window.removeEventListener('wheel', activity)
+      document.removeEventListener('keydown', activity)
+      document.removeEventListener('visibilitychange', visibilityChanged)
+      window.removeEventListener(introCompleteEvent, armIdle)
       document.removeEventListener('focusin', focus)
       document.removeEventListener('focusout', unfocus)
       media.removeEventListener('change', reset)

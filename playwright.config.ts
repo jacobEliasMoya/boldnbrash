@@ -30,7 +30,13 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
+      testIgnore: '**/touch.webkit.e2e.spec.ts',
       use: { ...devices['Desktop Chrome'], channel: process.env.PLAYWRIGHT_CHANNEL || 'chromium' },
+    },
+    {
+      name: 'webkit-touch',
+      testMatch: '**/touch.webkit.e2e.spec.ts',
+      use: { ...devices['iPhone 13'], browserName: 'webkit' },
     },
   ],
   webServer: {
