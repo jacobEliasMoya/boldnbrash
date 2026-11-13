@@ -39,6 +39,12 @@
 }
 html {
   scroll-behavior: auto;
+  overscroll-behavior: none;
+  overflow-x: clip;
+}
+body {
+  overscroll-behavior-y: none;
+  touch-action: pan-y pinch-zoom;
 }
 body {
   margin: 0;
@@ -141,7 +147,7 @@ ul {
 :is(.site-header nav, .liquid-blended-nav) {
   display: flex;
   align-items: center;
-  gap: clamp(18px, 2.6vw, 42px);
+  gap: clamp(10px, 1.2vw, 20px);
 }
 :is(.site-header nav, .liquid-blended-nav) a {
   position: relative;
@@ -1739,7 +1745,7 @@ ul {
 }
 .portfolio[data-enhanced] .skills-browser {
   cursor: grab;
-  touch-action: pan-x;
+  touch-action: pan-x pinch-zoom;
   user-select: none;
   perspective: 1100px;
   perspective-origin: 50% 50%;
@@ -2647,4 +2653,10 @@ ul {
 .theme-toggle-floating-thumb svg {
   width: 14px;
   height: 14px;
+}
+
+@media (pointer: coarse) {
+  .portfolio[data-enhanced] .scene {
+    overscroll-behavior-y: contain;
+  }
 }

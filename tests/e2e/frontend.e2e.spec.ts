@@ -121,6 +121,7 @@ test('Jake turns toward his travel direction and keeps his gait forward when scr
 
 test('large wheel bursts have a bounded queue and reverse immediately', async ({ page }) => {
   await page.goto(baseURL)
+  await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 10000 })
   await expect(page.locator('.hero-mini-jacob')).toHaveAttribute('data-frame', '0')
   const track = page.locator('.scene-track')
   await page.mouse.move(900, 400)
@@ -149,6 +150,7 @@ test('the shared clock caps Skills playback independently of a large scroll jump
   page,
 }) => {
   await page.goto(baseURL + '/#skills')
+  await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 10000 })
   await expect(page.locator('#skills')).toHaveAttribute('aria-hidden', 'false')
   const track = page.locator('.scene-track')
   const before = Number(await track.getAttribute('data-playback-progress'))
@@ -257,6 +259,24 @@ test('header controls use one liquid boundary with actual text inversion', async
   await expect(page.locator('.liquid-blended-nav')).toHaveAttribute('data-tone', 'dark')
   await expect(page.locator('.liquid-blended-nav')).toHaveCSS('color', 'rgb(239, 235, 225)')
   await expect(page.locator('.liquid-blended-nav')).toHaveCSS('mix-blend-mode', 'normal')
+})
+
+test('the liquid takes a gentle idle lap and yields to the pointer', async ({ page }) => {
+  await page.goto(baseURL)
+  await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 10000 })
+  const liquid = page.locator('.liquid-boundary')
+  await page.mouse.move(1400, 450)
+  await expect(liquid).toHaveAttribute('data-mode', 'pointer')
+  await expect(liquid).toHaveAttribute('data-mode', 'idle', { timeout: 6000 })
+  const start = Number(await liquid.getAttribute('data-pull-position'))
+  await expect
+    .poll(async () => Math.abs(Number(await liquid.getAttribute('data-pull-position')) - start))
+    .toBeGreaterThan(15)
+  await expect
+    .poll(async () => Number(await liquid.getAttribute('data-pull-depth')))
+    .toBeLessThan(14)
+  await page.mouse.move(700, 150)
+  await expect(liquid).toHaveAttribute('data-mode', 'pointer')
 })
 
 test('scenes open with scroll and close again in reverse', async ({ page }) => {
