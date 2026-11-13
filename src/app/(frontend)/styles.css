@@ -386,9 +386,8 @@ ul {
 .hero-greeting > .name-pill {
   display: inline-block;
   padding: 0.3em 0.9em;
-  border: 2px solid var(--paper);
   border-radius: 8px;
-  background: var(--ink);
+  background: var(--blue);
   color: var(--paper);
 }
 .hero-copy h1 {
