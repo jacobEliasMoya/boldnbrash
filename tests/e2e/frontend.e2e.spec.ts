@@ -597,6 +597,7 @@ test('mobile header stays transparent and the menu falls into place along the Z 
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto(baseURL + '/#skills')
+  await expect(page.locator('.portfolio-loader')).toHaveCount(0)
   await expect(page.locator('#skills')).toHaveAttribute('aria-hidden', 'false')
   await expect(page.locator('.site-header')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
   await expect(page.locator('.site-header')).toHaveCSS('box-shadow', 'none')

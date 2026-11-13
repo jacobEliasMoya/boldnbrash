@@ -7,12 +7,14 @@ import { Correspondence } from '@/components/organisms/Correspondence'
 import { PortfolioLoader } from '@/components/organisms/PortfolioLoader'
 
 export default function HomePage() {
+  const playLoaderOnce = process.env.PORTFOLIO_LOADER_PLAY_ONCE === 'true'
+
   return (
     <>
       <noscript>
         <style>{'.portfolio-loader{display:none}'}</style>
       </noscript>
-      <PortfolioLoader />
+      <PortfolioLoader playOnce={playLoaderOnce} />
       <SceneSequence>
         <PortfolioHero />
         <SkillsScene />
