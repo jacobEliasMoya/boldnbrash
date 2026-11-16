@@ -22,8 +22,8 @@ import { useIntroReady } from '@/hooks/useIntroReady'
 
 const scenes = [
   { id: 'top', label: 'Home' },
-  { id: 'skills', label: 'Skills' },
-  { id: 'work', label: 'Work' },
+  { id: 'skills', label: 'Skills & Work' },
+  { id: 'approach', label: 'Approach' },
   { id: 'about', label: 'About' },
   { id: 'contact', label: 'Contact' },
 ]
@@ -38,6 +38,15 @@ const origins = [
 ]
 
 export function SceneSequence({ children }: { children: ReactNode }) {
+  const [skillsCanvas, setSkillsCanvas] = useState(false)
+  useEffect(() => {
+    const update = (event: Event) => {
+      const { intro } = (event as CustomEvent<{ intro: number }>).detail
+      setSkillsCanvas(intro >= 0.95)
+    }
+    window.addEventListener('portfolio:skills-progress', update)
+    return () => window.removeEventListener('portfolio:skills-progress', update)
+  }, [])
   const reduceMotion = useReducedMotion()
   const introReady = useIntroReady()
   const timeline = useMotionValue(0)
@@ -159,18 +168,20 @@ export function SceneSequence({ children }: { children: ReactNode }) {
             : best,
         )
         const target = skillStart + nearest.position
-        // Proximity only: leave the wheel where the visitor put it between resting points.
-        if (Math.abs(target - displayed) > 0.18 || Math.abs(target - displayed) < 0.003) return
+        // Every pause lands on a complete project, including between skill categories.
+        if (Math.abs(target - displayed) < 0.003) return
         const start = scrollY
         const trackTop = scrollY + node.getBoundingClientRect().top
         const distance = node.offsetHeight - (node.firstElementChild?.clientHeight ?? innerHeight)
         const destination = trackTop + (distance * target) / sceneDuration
+        const duration = 480 + Math.min(1, Math.abs(target - displayed)) * 260
         const began = performance.now()
         snapping = true
         node.dataset.snapping = 'true'
         function settle(time: number) {
-          const t = Math.min(1, (time - began) / 240)
-          const eased = 1 - (1 - t) ** 3
+          const t = Math.min(1, (time - began) / duration)
+          // Start and finish at rest, without the abrupt kick of an ease-out snap.
+          const eased = t * t * t * (t * (t * 6 - 15) + 10)
           window.scrollTo({ top: start + (destination - start) * eased, behavior: 'instant' })
           snapExpectedY = window.scrollY
           update()
@@ -182,7 +193,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           }
         }
         snapFrame = requestAnimationFrame(settle)
-      }, 180)
+      }, 280)
     }
 
     function advanceInput(pixels: number, target: Element | null) {
@@ -247,7 +258,32 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       if (event.ctrlKey || event.defaultPrevented) return
       const pixels =
         event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1)
-      if (advanceInput(pixels, event.target instanceof Element ? event.target : null))
+      const target = event.target instanceof Element ? event.target : null
+      if (
+        current === 1 && !media.matches && pixels && track.current &&
+        displayed >= skillStart && displayed <= skillStart + skillTravel &&
+        !target?.closest('dialog, input, textarea, select, [contenteditable="true"]')
+      ) {
+        const node = track.current
+        const position = displayed - skillStart
+        const next = projectStops.findIndex((stop) => stop.position > position + 0.01)
+        const interval = pixels > 0
+          ? Math.max(1, next < 0 ? projectStops.length - 1 : next)
+          : Math.max(1, projectStops.reduce((last, stop, index) => stop.position < position - 0.01 ? index + 1 : last, 0))
+        const gap = projectStops[interval].position - projectStops[interval - 1].position
+        // A normal wheel notch crosses the halfway point, even between categories.
+        const travel = Math.sign(pixels) * gap * Math.min(Math.abs(pixels) / 150, 0.85)
+        const top = scrollY + node.getBoundingClientRect().top
+        const distance = node.offsetHeight - (node.firstElementChild?.clientHeight ?? innerHeight)
+        event.preventDefault()
+        window.scrollTo({
+          top: top + distance * Math.max(0, Math.min(sceneDuration, displayed + travel)) / sceneDuration,
+          behavior: 'instant',
+        })
+        update()
+        return
+      }
+      if (advanceInput(pixels, target))
         event.preventDefault()
     }
 
@@ -604,11 +640,11 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         data-menu-open={menuOpen ? '' : undefined}
       >
         <LiquidBoundary />
-        <a className="skip-link" href="#work">
+        <a className="skip-link" href="#skills">
           Skip to selected work
         </a>
         <motion.header
-          className={`site-header tone-${active === 0 || active === 3 ? 'paper' : 'dark'}`}
+          className={`site-header tone-${active === 0 || active === 3 || (active === 1 && skillsCanvas) ? 'paper' : 'dark'}`}
           initial={reduceMotion ? false : { opacity: 0, y: -24 }}
           animate={introReady ? { opacity: 1, y: 0 } : { opacity: 0, y: -24 }}
           transition={{ duration: reduceMotion ? 0 : 0.7, ease: [0.22, 1, 0.36, 1] }}
@@ -616,7 +652,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           <BlendedLogo
             enabled={enhanced}
             ready={introReady}
-            tone={active === 0 || active === 3 ? 'paper' : 'dark'}
+            tone={active === 0 || active === 3 || (active === 1 && skillsCanvas) ? 'paper' : 'dark'}
           >
             <motion.a
               className="wordmark"
@@ -637,7 +673,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           <BlendedNav
             enabled={enhanced}
             ready={introReady}
-            tone={active === 0 || active === 3 ? 'paper' : 'dark'}
+            tone={active === 0 || active === 3 || (active === 1 && skillsCanvas) ? 'paper' : 'dark'}
           >
             {scenes.map((scene, index) => (
               <motion.a
@@ -669,7 +705,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           <BlendedLogo
             enabled={enhanced}
             ready={introReady}
-            tone={active === 0 || active === 3 ? 'paper' : 'dark'}
+            tone={active === 0 || active === 3 || (active === 1 && skillsCanvas) ? 'paper' : 'dark'}
             control
           >
             <ThemeToggle />

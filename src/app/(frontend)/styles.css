@@ -199,13 +199,13 @@ ul {
   background: var(--paper);
   color: var(--ink);
 }
-.scene-work,
+.scene-approach,
 .scene-contact {
   background: var(--blue);
   color: var(--paper);
 }
 .scene-skills::before,
-.scene-work::before,
+.scene-approach::before,
 .scene-contact::before {
   content: '';
   position: absolute;
@@ -727,24 +727,24 @@ ul {
   background: #4826ff;
 }
 
-.work-scene {
+.approach-scene {
   display: grid;
   grid-template-columns: 0.75fr 2fr;
   gap: 3vw;
   align-items: center;
   padding-bottom: 105px;
 }
-.work-heading {
+.approach-heading {
   align-self: start;
   padding-top: 8vh;
 }
-.work-heading h2 {
+.approach-heading h2 {
   font-size: clamp(48px, 5.5vw, 85px);
   line-height: 0.94;
   letter-spacing: -0.04em;
   margin: 25px 0;
 }
-.work-heading > p:last-child {
+.approach-heading > p:last-child {
   font: 13px/1.7 var(--mono);
   opacity: 0.75;
 }
@@ -853,7 +853,7 @@ ul {
   font-size: 25px;
   font-weight: 400;
 }
-.work-scene .scene-footnote {
+.approach-scene .scene-footnote {
   max-width: 65%;
   left: 30%;
 }
@@ -1242,7 +1242,7 @@ ul {
   .hero-description {
     margin-top: 20px;
   }
-  .work-heading {
+  .approach-heading {
     padding-top: 4vh;
   }
   .scene-project {
@@ -1272,25 +1272,25 @@ ul {
 }
 
 @media (max-width: 1000px) and (min-width: 761px) {
-  .work-scene {
+  .approach-scene {
     grid-template-columns: 1fr;
     gap: 20px;
     align-content: center;
   }
-  .work-heading {
+  .approach-heading {
     padding-top: 0;
     display: flex;
     align-items: center;
     gap: 30px;
   }
-  .work-heading h2 {
+  .approach-heading h2 {
     font-size: 45px;
     margin: 0;
   }
-  .work-heading h2 br {
+  .approach-heading h2 br {
     display: none;
   }
-  .work-heading > p:last-child {
+  .approach-heading > p:last-child {
     display: none;
   }
   .scene-projects {
@@ -1309,7 +1309,7 @@ ul {
     width: 70px;
     height: 100px;
   }
-  .work-scene .scene-footnote {
+  .approach-scene .scene-footnote {
     left: 18%;
   }
 }
@@ -1394,18 +1394,18 @@ ul {
     width: 120px;
     font-size: 10px;
   }
-  .work-scene {
+  .approach-scene {
     display: block;
   }
-  .work-heading {
+  .approach-heading {
     padding: 0;
     margin-bottom: 35px;
   }
-  .work-heading h2 {
+  .approach-heading h2 {
     font-size: 60px;
     margin: 20px 0;
   }
-  .work-heading > p:last-child {
+  .approach-heading > p:last-child {
     display: none;
   }
   .scene-projects {
@@ -1441,7 +1441,7 @@ ul {
     width: 100px;
     height: 120px;
   }
-  .work-scene .scene-footnote {
+  .approach-scene .scene-footnote {
     display: none;
   }
   .about-scene {
@@ -2321,7 +2321,7 @@ ul {
   background: #1b1b22;
   color: var(--ink);
 }
-:root[data-theme='dark'] .scene-work,
+:root[data-theme='dark'] .scene-approach,
 :root[data-theme='dark'] .scene-contact {
   background: #23115e;
 }
@@ -2791,7 +2791,7 @@ ul {
       calc(70dvh - max(95vw, 54svh) + var(--background-y, 0px));
   }
 }
-/* Scroll-led duet: the introduction recedes before skills and projects enter separately. */
+/* The title period opens a canvas for the skills and projects. */
 .skills-duet.skills-index {
   display: block;
 }
@@ -2831,9 +2831,7 @@ ul {
   top: 50%;
   width: calc(100% - 2 * var(--gutter));
   translate: -50% -50%;
-  opacity: calc(1 - var(--skills-intro-fade));
-  transform: scale(calc(1 - var(--skills-intro-fade) * 0.16));
-  filter: blur(calc(var(--skills-intro-fade) * 5px));
+  opacity: 1;
   pointer-events: none;
 }
 .skills-performance {
@@ -2844,8 +2842,7 @@ ul {
   height: 100%;
   min-height: 0;
   align-items: center;
-  opacity: var(--skills-entrance);
-  transform: translateY(calc((1 - var(--skills-entrance)) * 70px));
+
 }
 .portfolio[data-enhanced] .skills-duet .skills-browser {
   grid-column: 1;
@@ -3080,11 +3077,12 @@ ul {
   }
 }
 
-/* The old project fades back while the new one drops straight onto the reading plane. */
+/* Each incoming project opens from the corner scoop over a stationary card. */
 .portfolio[data-enhanced] .skills-duet .skill-project-card {
-  transform: perspective(1100px) translateZ(var(--card-depth));
-  filter: blur(var(--card-blur, 0px));
-  transform-origin: 50% 50%;
+  transform: none;
+  filter: none;
+  opacity: 1;
+  clip-path: circle(var(--card-reveal, 150%) at 100% 0%);
   transition: none;
 }
 .skills-duet .skills-project-deck[data-visible='true'],
@@ -3116,26 +3114,6 @@ ul {
 .skills-title-line {
   display: block;
   white-space: nowrap;
-}
-.skills-title-letter {
-  display: inline-block;
-  padding-inline: 0.045em;
-  margin-inline: -0.045em;
-}
-.skills-duet[data-playing] .skills-title-letter {
-  color: transparent;
-  background: linear-gradient(
-    90deg,
-    var(--paper) 0 var(--letter-fill, 0%),
-    var(--skills-highlight) var(--letter-fill, 0%) 100%
-  );
-  background-clip: text;
-  -webkit-background-clip: text;
-  will-change: transform;
-}
-.skills-duet[data-playing] .skills-heading {
-  transform: perspective(1000px) translateZ(calc(var(--skills-intro-fade) * -850px));
-  filter: none;
 }
 .skills-duet .skills-heading .skills-intro {
   font-size: clamp(16px, 1.65vw, 24px);
@@ -3173,4 +3151,142 @@ ul {
 :root[data-theme='dark'] [data-liquid-covered='true'] .nav-home-icon,
 :root[data-theme='dark'] [data-liquid-covered='true'] .theme-toggle-track {
   filter: drop-shadow(0 0 1px #fff);
+}
+
+
+.approach-steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  align-self: center;
+}
+.approach-steps li {
+  display: grid;
+  grid-template-columns: 3rem 1fr;
+  gap: clamp(16px, 3vw, 48px);
+  padding: clamp(20px, 3vh, 36px) 0;
+  border-top: 1px solid currentColor;
+}
+.approach-step-number {
+  font: 13px/1.7 var(--mono);
+  opacity: 0.65;
+}
+.approach-steps h3 {
+  margin: 0 0 12px;
+  font-size: clamp(24px, 3vw, 44px);
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+}
+.approach-steps p {
+  max-width: 52ch;
+  margin: 0;
+  font-size: clamp(14px, 1.2vw, 18px);
+  line-height: 1.65;
+  opacity: 0.8;
+}
+@media (max-width: 760px) {
+  .approach-scene { grid-template-columns: 1fr; }
+  .approach-steps li { grid-template-columns: 2rem 1fr; }
+}
+
+
+.skills-title-period {
+  display: inline-block;
+  width: 0.19em;
+  height: 0.19em;
+  margin-left: 0.045em;
+  border-radius: 50%;
+  background: var(--canvas);
+}
+.skills-reveal {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  padding: inherit;
+  display: grid;
+  align-items: center;
+  background: var(--canvas);
+  color: var(--ink);
+  clip-path: circle(var(--skills-portal-radius, 0px) at var(--skills-portal-x, 50%) var(--skills-portal-y, 50%));
+}
+.skills-reveal .skills-category-pill {
+  color: var(--paper);
+}
+.skills-reveal .skills-project-caption {
+  color: var(--ink);
+}
+
+
+/* Carry the hero silhouette through the period reveal. */
+.skills-reveal::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: #d9d9e0;
+  opacity: 0.45;
+  -webkit-mask: url('/jm-symbol.svg') 68% 50% / max(88vw, 132svh) no-repeat;
+  mask: url('/jm-symbol.svg') 68% 50% / max(88vw, 132svh) no-repeat;
+  translate: var(--background-x, 0px) var(--background-y, 0px);
+}
+.skills-reveal {
+  isolation: isolate;
+}
+.portfolio[data-enhanced] .skills-duet .skills-browser {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+.skills-duet .skill-project-card {
+  background: #0c0c0e;
+  color: #efebe1;
+  border: 1px solid #ffffff26;
+}
+.skills-duet .skill-project-card .card-scoop {
+  background: var(--canvas);
+}
+.skills-duet .skill-project-card .project-open {
+  color: #efebe1;
+  border-color: #ffffff40;
+}
+.skills-duet .skill-project-card .project-open:hover {
+  background: #ffffff14;
+}
+@media (max-width: 760px) {
+  .skills-reveal::before {
+    -webkit-mask-position: 50% 32%;
+    mask-position: 50% 32%;
+    -webkit-mask-size: min(224vw, 960px);
+    mask-size: min(224vw, 960px);
+  }
+}
+:root[data-theme='dark'] .skills-reveal::before {
+  background: #202027;
+}
+
+
+/* The introduction uses a softer violet; the lettering fills before the portal opens. */
+.scene-skills {
+  background: #7555c9;
+  --skills-title-ink: #30204f;
+  --skills-title-base: #ffffff;
+}
+.skills-duet .skills-heading {
+  color: var(--skills-title-base);
+}
+.skills-duet .skills-heading .skills-intro,
+.skills-duet .skills-heading .eyebrow > span {
+  color: var(--skills-title-base);
+}
+.skills-title-fill {
+  color: transparent;
+  background: linear-gradient(90deg,
+    var(--skills-title-ink) 0 var(--title-fill, 0%),
+    var(--skills-title-base) var(--title-fill, 0%) 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+}
+:root[data-theme='dark'] .scene-skills {
+  background: #23115e;
+  --skills-title-ink: #bca2f2;
 }

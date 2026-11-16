@@ -52,15 +52,14 @@ test('native wheel input stays in sync and small movements rotate immediately', 
   expect(syncError).toBeLessThan(0.01)
 })
 
-test('only nearby resting points settle and further input interrupts settling', async ({
+test('every resting position snaps to an item and further input interrupts settling', async ({
   page,
 }) => {
   const stop = skillStart + projectStops[2].position
   await moveTo(page, stop - 0.12)
   await expect.poll(() => progress(page)).toBeCloseTo(stop, 2)
   await moveTo(page, stop - 0.4)
-  await page.waitForTimeout(550)
-  expect(await progress(page)).toBeCloseTo(stop - 0.4, 2)
+  await expect.poll(() => progress(page)).toBeCloseTo(stop, 2)
   await moveTo(page, stop - 0.15)
   await expect(page.locator('.scene-track')).toHaveAttribute('data-snapping', 'true')
   await page.mouse.wheel(0, -180)
@@ -68,47 +67,28 @@ test('only nearby resting points settle and further input interrupts settling', 
   await expect.poll(() => progress(page)).toBeLessThan(stop - 0.18)
 })
 
-test('project cards enter from depth and reverse with scroll', async ({ page }) => {
-  const midpoint = skillStart + (projectStops[0].position + projectStops[1].position) / 2
-  await moveTo(page, midpoint)
-  const cards = page.locator('.skills-project-deck').first().locator('.skill-project-card')
-  const geometry = await cards.evaluateAll((nodes) =>
-    nodes.map((el) => {
-      const style = getComputedStyle(el)
-      const matrix = new DOMMatrixReadOnly(style.transform)
-      return {
-        z: matrix.m43,
-        x: matrix.m41,
-        y: matrix.m42,
-        rotation: matrix.m12,
-        opacity: Number(style.opacity),
-        visible: style.visibility,
-      }
-    }),
-  )
-  expect(
-    geometry.every(
-      (card) =>
-        card.x === 0 &&
-        card.y === 0 &&
-        card.rotation === 0 &&
-        card.opacity > 0 &&
-        card.visible === 'visible',
-    ),
-  ).toBe(true)
-  expect(geometry[0].z).toBeLessThan(-100)
-  expect(geometry[1].z).toBeGreaterThan(100)
-  expect(geometry[1].opacity).toBeGreaterThan(geometry[0].opacity)
-  await page.screenshot({ path: 'test-results/project-depth-midpoint.png' })
-  await moveTo(page, skillStart + projectStops[0].position)
-  await expect
-    .poll(() =>
-      cards
-        .first()
-        .evaluate((el) => Math.abs(new DOMMatrixReadOnly(getComputedStyle(el).transform).m43)),
-    )
-    .toBeLessThan(1)
-  await expect
-    .poll(() => cards.first().evaluate((el) => Number(getComputedStyle(el).opacity)))
-    .toBeGreaterThan(0.99)
+test('project cards stay fixed during a circular reveal and settle completely', async ({ page }) => {
+  const stop = skillStart + projectStops[1].position
+  await moveTo(page, stop - 0.4)
+  const incoming = page.locator('.skill-project-card[aria-label="This portfolio"]')
+  await expect(incoming).toHaveCSS('transform', 'none')
+  await expect(incoming).toHaveCSS('opacity', '1')
+  await expect.poll(() => progress(page)).toBeCloseTo(stop, 2)
+  const radius = await incoming.evaluate((el) => parseFloat(getComputedStyle(el).clipPath.slice(7)))
+  expect(radius).toBeGreaterThan(149)
+  await moveTo(page, skillStart + projectStops[0].position + 0.3)
+  await expect.poll(() => progress(page)).toBeCloseTo(skillStart + projectStops[0].position, 2)
+  await expect(page.getByRole('article', { name: 'Multi-state Astro platform', exact: true })).toBeVisible()
+})
+
+
+test('one deliberate wheel notch advances a project and crosses skill boundaries', async ({ page }) => {
+  for (const index of [0, 1]) {
+    await moveTo(page, skillStart + projectStops[index].position)
+    await page.mouse.move(300, 380)
+    await page.mouse.wheel(0, 100)
+    await expect.poll(() => progress(page)).toBeCloseTo(skillStart + projectStops[index + 1].position, 2)
+    await page.mouse.wheel(0, -100)
+    await expect.poll(() => progress(page)).toBeCloseTo(skillStart + projectStops[index].position, 2)
+  }
 })

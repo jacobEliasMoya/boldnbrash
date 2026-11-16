@@ -31,7 +31,7 @@ for (const viewport of [
 ]) {
   test.describe(`paired scroll ${viewport.width}`, () => {
     test.use({ viewport })
-    test('intro recedes into separate, synchronized skill and project wheels', async ({ page }) => {
+    test('period expands into the canvas behind synchronized skill and project wheels', async ({ page }) => {
       test.setTimeout(60000)
       await page.addInitScript(() => sessionStorage.setItem('portfolio:intro-seen', '1'))
       await page.goto('http://localhost:3000/#skills')
@@ -40,33 +40,32 @@ for (const viewport of [
       await expect(intro).toHaveCSS('opacity', '1')
       const bounds = (await intro.boundingBox())!
       expect(Math.abs(bounds.x + bounds.width / 2 - viewport.width / 2)).toBeLessThan(3)
-      await expect(page.locator('.skills-performance')).toHaveAttribute('inert', '')
+      await expect(page.locator('.skills-reveal')).toHaveAttribute('inert', '')
       await page.screenshot({ path: `test-results/duet-intro-${viewport.width}.png` })
       await expect(page.locator('.skills-scroll-cue')).toHaveCount(0)
       await expect(page.getByRole('heading', { name: 'What I use. What I build.' })).toBeVisible()
       await scrollToPhase(page, 1.4 + (skillStart - 1.4) * 0.46)
       await expect(intro).toHaveCSS('opacity', '1')
-      for (const letter of await page.locator('.skills-title-letter').all()) {
-        await expect(letter).toHaveCSS('--letter-fill', '100%')
-      }
-      await page.screenshot({ path: 'test-results/intro-filled-' + viewport.width + '.png' })
+      await expect(page.locator('.skills-title-letter')).toHaveCount(0)
+      const initialRadius = Number(await page.locator('.skills-scene').evaluate(
+        (el) => parseFloat(getComputedStyle(el).getPropertyValue('--skills-portal-radius')),
+      ))
       await scrollToPhase(page, 1.4 + (skillStart - 1.4) * 0.8)
-      await page.screenshot({ path: 'test-results/intro-falling-' + viewport.width + '.png' })
-      const drop = await page
-        .locator('.skills-title-letter')
-        .first()
-        .evaluate((el) => new DOMMatrixReadOnly(getComputedStyle(el).transform).m42)
-      expect(drop).toBeGreaterThan(20)
-      const faded = Number(await intro.evaluate((el) => getComputedStyle(el).opacity))
-      expect(faded).toBeGreaterThan(0)
-      expect(faded).toBeLessThan(0.65)
+      await page.screenshot({ path: 'test-results/intro-expanding-' + viewport.width + '.png' })
+      const expandedRadius = Number(await page.locator('.skills-scene').evaluate(
+        (el) => parseFloat(getComputedStyle(el).getPropertyValue('--skills-portal-radius')),
+      ))
+      expect(expandedRadius).toBeGreaterThan(initialRadius)
+      await expect(intro).toHaveCSS('opacity', '1')
+      await expect(intro).toHaveCSS('transform', 'none')
+      await expect(page.locator('.skills-reveal')).toHaveCSS('background-color', 'rgb(255, 255, 255)')
       await expect(page.locator('.skills-project-deck').first()).toHaveAttribute(
         'aria-hidden',
         'false',
       )
       await expect(page.locator('.skills-performance')).not.toHaveCSS('opacity', '0')
       await scrollToPhase(page, skillStart + 1.1)
-      await expect(intro).toHaveCSS('opacity', '0')
+      await expect(intro).toHaveAttribute('aria-hidden', 'true')
       const currentSkill = page.locator('.skills-category-pill[data-active]')
       await expect(currentSkill).toContainText('Frontend Development')
       await expect(page.locator('.skills-category-pill .skill-project-card')).toHaveCount(0)
@@ -80,6 +79,20 @@ for (const viewport of [
       if (viewport.width > 900) expect(right.x).toBeGreaterThan(left.x + left.width)
       else expect(right.y).toBeGreaterThan(left.y + left.height)
       await page.screenshot({ path: `test-results/duet-project-${viewport.width}.png` })
+      await scrollToPhase(page, skillStart + 1.45)
+      const incomingCard = page.locator('.skill-project-card[aria-label="This portfolio"]')
+      await expect(incomingCard).toHaveCSS('transform', 'none')
+      await expect(incomingCard).toHaveCSS('opacity', '1')
+      await expect(incomingCard).toHaveCSS('filter', 'none')
+      const incomingBounds = (await incomingCard.boundingBox())!
+      const outgoingBounds = (await page.locator('.skill-project-card[aria-label="Multi-state Astro platform"]').boundingBox())!
+      for (const key of ['x', 'y', 'width', 'height'] as const) {
+        expect(Math.abs(incomingBounds[key] - outgoingBounds[key])).toBeLessThan(1)
+      }
+      const clip = await incomingCard.evaluate((el) => getComputedStyle(el).clipPath)
+      expect(clip).toMatch(/at 100% 0%/)
+      expect(Math.abs(parseFloat(clip.slice(7)) - 75)).toBeLessThan(1)
+      await page.screenshot({ path: `test-results/card-circle-${viewport.width}.png` })
       await scrollToPhase(page, skillStart + 2.1)
       await expect(currentSkill).toContainText('Frontend Development')
       const second = page.getByRole('article', { name: 'This portfolio', exact: true })

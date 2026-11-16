@@ -40,8 +40,8 @@ function SkillCategoryPill({
   const rotation = useTransform(distance, (value) => clamp(-value * 38, -81, 81))
   const vertical = useTransform(distance, (value) => Math.sin((value * Math.PI) / 4) * radius)
   const depth = useTransform(distance, (value) => (Math.cos((value * Math.PI) / 4) - 1) * radius)
+  const visibility = useTransform(distance, (value) => Math.abs(value) < 1.75 ? 'visible' : 'hidden')
 
-  const fade = useTransform(distance, (value) => clamp(1 - Math.abs(value) * 0.42))
   const order = useTransform(distance, (value) => 20 - Math.round(Math.abs(value) * 4))
   return (
     <motion.div
@@ -52,7 +52,7 @@ function SkillCategoryPill({
         rotateX: animated ? rotation : 0,
         y: animated ? vertical : 0,
         z: animated ? depth : 0,
-        opacity: animated ? fade : 1,
+        visibility: animated ? visibility : 'visible',
         zIndex: animated ? order : 1,
       }}
     >
@@ -96,7 +96,10 @@ function SkillProjects({
   const first = projectStops.findIndex((stop) => stop.skillIndex === index)
   const localPosition = projectPosition - first
   const projectIndex = Math.round(clamp(localPosition, 0, skill.projects.length - 1))
-  const visible = !animated || (localPosition > -1 && localPosition < skill.projects.length)
+  const outgoing = Math.floor(projectPosition)
+  const incoming = Math.ceil(projectPosition)
+  const reveal = projectPosition - outgoing
+  const visible = !animated || (first <= incoming && first + skill.projects.length - 1 >= outgoing)
   return (
     <div
       id={`skills-projects-${index}`}
@@ -123,20 +126,12 @@ function SkillProjects({
             key={`${skill.name}-${project.title}`}
             className="scene-project skill-project-card"
             aria-label={project.title}
-            data-visible={!animated || Math.abs(position - localPosition) < 1 ? 'true' : undefined}
+            data-visible={!animated || first + position === outgoing || first + position === incoming ? 'true' : undefined}
             aria-hidden={animated && (!active || position !== projectIndex)}
             inert={animated && (!active || position !== projectIndex)}
             style={
               {
-                '--card-depth':
-                  (position >= localPosition
-                    ? (position - localPosition) * 520
-                    : (position - localPosition) * 320) + 'px',
-                '--card-opacity':
-                  position >= localPosition
-                    ? 1 - (1 - clamp((0.8 - (position - localPosition)) / 0.8)) ** 3
-                    : clamp(1 - (localPosition - position) / 0.7) ** 2,
-                '--card-blur': Math.max(0, localPosition - position) * 5 + 'px',
+                '--card-reveal': `${first + position === incoming && incoming !== outgoing ? reveal * 150 : 150}%`,
                 '--information-reveal': 1,
                 zIndex: 100 + position,
               } as CSSProperties
@@ -215,8 +210,32 @@ export function SkillsScene() {
     observer.observe(element)
     return () => observer.disconnect()
   }, [animated])
-  const introFade = animated ? clamp((selection.intro - 0.5) / 0.5) : 0
-  const entrance = animated ? clamp((selection.intro - 0.7) / 0.3) : 1
+  const scene = useRef<HTMLDivElement>(null)
+  const period = useRef<HTMLSpanElement>(null)
+  const [portal, setPortal] = useState({ x: 0, y: 0, radius: 0, dot: 0 })
+  const expansion = animated ? clamp((selection.intro - 0.4) / 0.6) : 1
+  const entrance = expansion === 1 ? 1 : 0
+  useLayoutEffect(() => {
+    const element = scene.current
+    const dot = period.current
+    if (!element || !dot) return
+    const measure = () => {
+      const bounds = element.getBoundingClientRect()
+      const point = dot.getBoundingClientRect()
+      const x = point.left + point.width / 2 - bounds.left
+      const y = point.top + point.height / 2 - bounds.top
+      setPortal({
+        x, y, dot: point.width / 2,
+        radius: Math.hypot(Math.max(x, bounds.width - x), Math.max(y, bounds.height - y)) + 2,
+      })
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    observer.observe(dot)
+    document.fonts.ready.then(measure)
+    return () => observer.disconnect()
+  }, [animated])
   useLayoutEffect(() => {
     ringPosition.set(selection.ringPosition)
   }, [selection.ringPosition, ringPosition])
@@ -252,54 +271,32 @@ export function SkillsScene() {
   }
   return (
     <div
+      ref={scene}
       className="skills-scene skills-index skills-duet scene-content"
       data-playing={animated ? '' : undefined}
-      style={{ '--skills-intro-fade': introFade, '--skills-entrance': entrance } as CSSProperties}
+      style={{
+        '--skills-portal-x': `${portal.x}px`,
+        '--skills-portal-y': `${portal.y}px`,
+        '--skills-portal-radius': `${expansion > 0 ? portal.dot + (portal.radius - portal.dot) * expansion * expansion : 0}px`,
+      } as CSSProperties}
     >
-      <div className="skills-heading" aria-hidden={animated && introFade === 1}>
+      <div className="skills-heading" aria-hidden={animated && expansion === 1}>
         <p className="eyebrow">
-          <span>02 &mdash;</span> Skills
+          <span>02 &mdash;</span> Skills &amp; Work
         </p>
         <h2 aria-label="What I use. What I build.">
-          {['What I use.', 'What I build.'].map((line, lineIndex) => (
-            <span className="skills-title-line" aria-hidden="true" key={line}>
-              {Array.from(line).map((letter, letterIndex) => {
-                const index = (lineIndex === 0 ? 0 : 11) + letterIndex
-                const fill = animated ? clamp((selection.intro / 0.44) * 26 - index) : 1
-                const fall = animated
-                  ? clamp((selection.intro - 0.58 - (index / 24) * 0.14) / 0.26)
-                  : 0
-                return (
-                  <span
-                    className="skills-title-letter"
-                    key={letterIndex}
-                    style={
-                      {
-                        '--letter-fill': fill * 100 + '%',
-                        transform:
-                          'translate3d(' +
-                          ((index % 3) - 1) * 3 * fall +
-                          'px, ' +
-                          (80 + (index % 3) * 8) * fall * fall +
-                          'px, ' +
-                          -80 * fall +
-                          'px) rotate(' +
-                          (index % 2 ? -1 : 1) * (3 + (index % 3)) * fall +
-                          'deg)',
-                      } as CSSProperties
-                    }
-                  >
-                    {letter === ' ' ? '\u00a0' : letter}
-                  </span>
-                )
-              })}
-            </span>
-          ))}
+          <span className="skills-title-line" aria-hidden="true">
+            <span className="skills-title-fill" style={{ '--title-fill': `${animated ? clamp(selection.intro / 0.18) * 100 : 0}%` } as CSSProperties}>What I use.</span>
+          </span>
+          <span className="skills-title-line" aria-hidden="true">
+            <span className="skills-title-fill" style={{ '--title-fill': `${animated ? clamp((selection.intro - 0.18) / 0.18) * 100 : 0}%` } as CSSProperties}>What I build</span><span ref={period} className="skills-title-period" />
+          </span>
         </h2>
         <p className="skills-intro">Check out how I use my tech!</p>
       </div>
       {animated ? (
-        <div className="skills-performance" inert={entrance < 0.5} aria-hidden={entrance < 0.5}>
+        <div className="skills-reveal" inert={entrance < 1} aria-hidden={entrance < 1}>
+        <div className="skills-performance">
           <div ref={wheel} className="skills-browser" role="list" aria-label="Skill categories">
             {skills.map((skill, index) => (
               <SkillCategoryPill
@@ -326,6 +323,7 @@ export function SkillsScene() {
             ))}
           </div>
         </div>
+        </div>
       ) : (
         <div className="skills-fallback">
           {skills.map((skill, index) => (
@@ -349,7 +347,7 @@ export function SkillsScene() {
           ))}
         </div>
       )}
-      <span className="skills-index-portal" data-portal="work" aria-hidden="true" />
+      <span className="skills-index-portal" data-portal="approach" aria-hidden="true" />
       <dialog
         ref={dialog}
         className="project-dialog"
@@ -367,7 +365,7 @@ export function SkillsScene() {
             <button className="dialog-close" autoFocus onClick={() => dialog.current?.close()}>
               Close <span aria-hidden="true">×</span>
             </button>
-            <p className="eyebrow">Skills</p>
+            <p className="eyebrow">Skills &amp; Work</p>
             <h2>{openedProject.title}</h2>
             <p className="project-category">{openedProject.category}</p>
             <div className="project-story">
