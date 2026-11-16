@@ -179,7 +179,8 @@ export const skillSegments = skills.map((skill, index) => ({
   duration: skill.projects.length + 0.8,
 }))
 export const skillTravel = skillSegments.reduce((sum, segment) => sum + segment.duration, 0)
-export const skillStart = 1.4
+// Leave a full scroll beat for the centered introduction before the paired wheels arrive.
+export const skillStart = 3.2
 export const sceneStops = [
   0,
   1.4,
@@ -196,4 +197,32 @@ export function getSkillPosition(progress: number) {
   let index = skillSegments.findIndex((segment) => position < segment.start + segment.duration)
   if (index < 0) index = skills.length - 1
   return { index, phase: position - skillSegments[index].start }
+}
+
+// Each project is a resting point. Between them, both wheels use the same fractional position.
+export const projectStops = skills.flatMap((skill, skillIndex) =>
+  skill.projects.map((_, projectIndex) => ({
+    skillIndex,
+    projectIndex,
+    position: skillSegments[skillIndex].start + projectIndex + 0.95,
+  })),
+)
+
+export function getSkillFrame(progress: number) {
+  const position = clamp(progress) * skillTravel
+  let next = projectStops.findIndex((stop) => stop.position >= position)
+  if (next < 0) next = projectStops.length - 1
+  const previous = Math.max(0, next - 1)
+  const from = projectStops[previous]
+  const to = projectStops[next]
+  const fraction =
+    next === previous ? 0 : clamp((position - from.position) / (to.position - from.position))
+  const projectPosition = previous + fraction
+  const active = projectStops[Math.round(projectPosition)]
+  return {
+    index: active.skillIndex,
+    projectIndex: active.projectIndex,
+    projectPosition,
+    ringPosition: from.skillIndex + (to.skillIndex - from.skillIndex) * fraction,
+  }
 }

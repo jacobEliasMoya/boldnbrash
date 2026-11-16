@@ -46,50 +46,6 @@ test('Jake footsteps ripple the JM particles and settle when he stops', async ({
   await expect(monogram).toHaveAttribute('data-ripples', '0', { timeout: 3500 })
 })
 
-test('clicking selects a closed skill and wheel scrolling opens that selection', async ({
-  page,
-}) => {
-  await page.goto(baseURL + '/#skills')
-  const select = page.getByRole('button', { name: 'Select Headless CMS', exact: true })
-  await select.click()
-  await expect(select).toHaveAttribute('aria-pressed', 'true')
-  await expect(select).toHaveAttribute('aria-expanded', 'false')
-  const list = page.getByRole('list', { name: 'Skill categories' })
-  await expect(list.locator('[data-expanded]')).toHaveCount(0)
-  const bounds = (await list.boundingBox())!
-  await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)
-  for (let index = 0; index < 6; index++) await page.mouse.wheel(0, 120)
-  await expect(select).toHaveAttribute('aria-expanded', 'true')
-  await expect(select).toHaveAttribute('aria-pressed', 'true')
-  await expect(
-    page.locator('.skills-category-pill[data-active] .skills-project-stage'),
-  ).toHaveAttribute('data-skill', 'Headless CMS')
-})
-
-test('dragging rotates and wraps the wheel without opening projects, then scroll resumes there', async ({
-  page,
-}) => {
-  await page.goto(baseURL + '/#skills')
-  await expect(page.locator('#skills')).toHaveAttribute('aria-hidden', 'false')
-  const list = page.getByRole('list', { name: 'Skill categories' })
-  const bounds = (await list.boundingBox())!
-  const x = bounds.x + bounds.width / 2
-  const y = bounds.y + bounds.height / 2
-  await page.mouse.move(x, y)
-  await page.mouse.down()
-  await page.mouse.move(x, y + 180, { steps: 18 })
-  await page.mouse.up()
-  const select = page.getByRole('button', { name: 'Select Python Automation', exact: true })
-  await expect(select).toHaveAttribute('aria-pressed', 'true')
-  await expect(select).toHaveAttribute('aria-expanded', 'false')
-  await expect(list.locator('[data-expanded]')).toHaveCount(0)
-  await scrollTimeline(page, skillStart + skillSegments[7].start + 0.95)
-  await expect(select).toHaveAttribute('aria-expanded', 'true')
-  await expect(
-    page.getByRole('article', { name: 'ProductivePython', exact: true }),
-  ).toBeInViewport()
-})
-
 test('Jake turns toward his travel direction and keeps his gait forward when scrolling reverses', async ({
   page,
 }) => {
@@ -144,26 +100,6 @@ test('large wheel bursts have a bounded queue and reverse immediately', async ({
   await expect
     .poll(async () => Number(await track.getAttribute('data-playback-progress')))
     .toBeLessThan(before)
-})
-
-test('the shared clock caps Skills playback independently of a large scroll jump', async ({
-  page,
-}) => {
-  await page.goto(baseURL + '/#skills')
-  await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 10000 })
-  await expect(page.locator('#skills')).toHaveAttribute('aria-hidden', 'false')
-  const track = page.locator('.scene-track')
-  const before = Number(await track.getAttribute('data-playback-progress'))
-  await scrollTimeline(page, before + 4, false)
-  await page.waitForTimeout(500)
-  const after = Number(await track.getAttribute('data-playback-progress'))
-  expect(after - before).toBeGreaterThan(0.1)
-  expect(after - before).toBeLessThan(0.5)
-  const reversed = after
-  await scrollTimeline(page, before, false)
-  await expect
-    .poll(async () => Number(await track.getAttribute('data-playback-progress')))
-    .toBeLessThan(reversed)
 })
 
 test('fast scrolling cannot skip Jake frames or start highlighting before his entrance finishes', async ({
@@ -232,7 +168,7 @@ test('scroll plays the original entrance and wave then mirrors the walk out', as
   await expect(avatar).toHaveCSS('opacity', '1')
 })
 
-test('header controls use one liquid boundary with actual text inversion', async ({ page }) => {
+test('header controls stay readable over a solid liquid boundary', async ({ page }) => {
   await page.goto(baseURL)
   await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 10000 })
   const home = page
@@ -251,8 +187,9 @@ test('header controls use one liquid boundary with actual text inversion', async
         Number(await page.locator('.liquid-boundary').getAttribute('data-pull-depth')),
       )
       .toBeGreaterThan(25)
+    await expect(control).toHaveCSS('color', 'rgb(255, 255, 255)')
     await expect(control.locator('..')).toHaveCSS('mix-blend-mode', 'normal')
-    await expect(page.locator('.liquid-boundary')).toHaveCSS('mix-blend-mode', 'difference')
+    await expect(page.locator('.liquid-boundary')).toHaveCSS('mix-blend-mode', 'normal')
   }
   await expect(page.locator('.liquid-boundary path')).toHaveCount(1)
   await page.getByRole('link', { name: 'Skills', exact: true }).click()
@@ -379,10 +316,12 @@ test('mobile retains reveals and scrollable content; reduced motion retains docu
   await expect(page.locator('#skills')).toHaveJSProperty('inert', true)
   await page.getByRole('link', { name: 'Explore my skills' }).click()
   await expect(page.locator('#skills')).toHaveAttribute('aria-hidden', 'false')
+  await scrollTimeline(page, skillStart + skillSegments[1].start + 0.95)
   await page.getByRole('button', { name: 'Select Headless CMS', exact: true }).click()
-  await expect(
-    page.locator('.skills-category-pill[data-active] .skills-project-stage'),
-  ).toHaveAttribute('data-skill', 'Headless CMS')
+  await expect(page.locator('.skills-project-deck[aria-hidden="false"]')).toHaveAttribute(
+    'data-skill',
+    'Headless CMS',
+  )
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await page.getByRole('button', { name: 'Open menu' }).click()
   await page
@@ -409,6 +348,7 @@ test('mobile retains reveals and scrollable content; reduced motion retains docu
 
 async function scrollTimeline(page: Page, value: number, settled = true) {
   await page.evaluate((position) => {
+    window.dispatchEvent(new Event('pointerdown'))
     const track = document.querySelector<HTMLElement>('.scene-track')!
     const stage = track.firstElementChild as HTMLElement
     const start = scrollY + track.getBoundingClientRect().top
@@ -435,8 +375,6 @@ test('skill categories retain the card layout, stack, and scroll progression', a
   test.setTimeout(120000)
   await page.goto(baseURL + '/#skills')
   await expect(page.locator('#skills')).toHaveAttribute('aria-hidden', 'false')
-  const heading = page.locator('.skills-heading')
-  const origin = (await heading.boundingBox())!
   for (const [index, skill] of skills.entries()) {
     for (const [position, project] of skill.projects.entries()) {
       await scrollTimeline(page, skillStart + skillSegments[index].start + position + 1.1)
@@ -449,7 +387,6 @@ test('skill categories retain the card layout, stack, and scroll progression', a
       const card = page.getByRole('article', { name: project.title, exact: true })
       await expect(card).toBeInViewport()
       await expect(card.locator('.skill-project-information')).toHaveCSS('opacity', '1')
-      expect(Math.abs((await heading.boundingBox())!.y - origin.y)).toBeLessThan(1)
       await expect(page.locator('#work')).toHaveJSProperty('inert', true)
     }
   }
@@ -461,14 +398,16 @@ test('skill categories retain the card layout, stack, and scroll progression', a
   await expect(
     page.locator('.skills-category-pill[data-active] .skills-category-current h3').last(),
   ).toHaveText('Frontend Development')
-  await expect(
-    page.locator('.skills-category-pill[data-active] .skills-project-stage'),
-  ).toHaveAttribute('data-project', '0')
+  await expect(page.locator('.skills-project-deck[aria-hidden="false"]')).toHaveAttribute(
+    'data-project',
+    '0',
+  )
 })
 
 test('category controls and project details work by keyboard', async ({ page }) => {
   await page.goto(baseURL + '/#skills')
   await expect(page.locator('#skills')).toHaveAttribute('aria-hidden', 'false')
+  await scrollTimeline(page, skillStart + skillSegments[1].start + 0.95)
   const cms = page.getByRole('button', { name: 'Select Headless CMS', exact: true })
   await cms.focus()
   await cms.press('Enter')
@@ -496,9 +435,10 @@ test('mobile category controls stay usable and project information fits the card
   for (const height of [844, 600]) {
     await page.setViewportSize({ width: 390, height })
     await page.goto(baseURL + '/#skills')
+    await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 15000 })
     await expect(page.locator('#skills')).toHaveAttribute('aria-hidden', 'false')
     for (const skill of skills) {
-      await scrollTimeline(page, skillStart + skillSegments[skills.indexOf(skill)].start + 0.02)
+      await scrollTimeline(page, skillStart + skillSegments[skills.indexOf(skill)].start + 0.95)
       await expect
         .poll(() =>
           page
@@ -528,21 +468,6 @@ test('mobile category controls stay usable and project information fits the card
         .toBe(true)
     }
   }
-})
-
-test('reduced motion retains category selection and shows projects in flow', async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' })
-  await page.goto(baseURL + '/#skills')
-  await expect(page.locator('.portfolio')).not.toHaveAttribute('data-enhanced')
-  for (const project of skills[0].projects)
-    await expect(page.getByRole('article', { name: project.title, exact: true })).toBeVisible()
-  await page
-    .getByRole('button', { name: 'Show projects for Backend & Developer Tools', exact: true })
-    .click()
-  await expect(page.getByRole('article', { name: 'GitGo', exact: true })).toBeVisible()
-  await expect(page.locator('.skills-category-pill[data-active] .skill-project-card')).toHaveCount(
-    skills[2].projects.length,
-  )
 })
 
 test('mobile menu drops in, traps navigation, and restores focus after dismissal', async ({
@@ -683,133 +608,6 @@ test('mobile header stays transparent and the menu settles without depth jitter'
   await expect(page.getByRole('dialog', { name: 'Mobile navigation' })).not.toBeVisible()
 })
 
-test('the category pill contains the heading and stack and expands into its projects', async ({
-  page,
-}) => {
-  await page.goto(baseURL + '/#skills')
-  await expect(page.locator('#skills')).toHaveAttribute('aria-hidden', 'false')
-  const pill = page.locator('.skills-category-pill[data-active]')
-  const toggle = page.getByRole('button', { name: 'Select Frontend Development' })
-  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
-  await expect(pill.getByRole('heading', { name: 'Frontend Development' })).toBeVisible()
-  await expect(pill.locator('.skills-technologies')).toBeVisible()
-  await expect
-    .poll(() => pill.evaluate((element) => (element as HTMLElement).offsetHeight))
-    .toBeLessThan(220)
-  const closedHeight = await pill.evaluate((element) => (element as HTMLElement).offsetHeight)
-  expect(closedHeight).toBeLessThan(220)
-  await toggle.click()
-  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
-  await scrollTimeline(page, skillStart + 0.95)
-  const card = pill.getByRole('article', { name: skills[0].projects[0].title, exact: true })
-  await expect(card).toBeInViewport()
-  await expect
-    .poll(() => pill.evaluate((element) => (element as HTMLElement).offsetHeight))
-    .toBeGreaterThan(closedHeight * 2)
-  await page.getByRole('button', { name: 'Select Frontend Development' }).click()
-  await expect(card).not.toBeVisible()
-  await expect
-    .poll(() => pill.evaluate((element) => (element as HTMLElement).offsetHeight))
-    .toBeLessThan(220)
-})
-
-test('category pills remain operable with reduced motion', async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' })
-  await page.goto(baseURL + '/#skills')
-  const card = page.getByRole('article', { name: skills[0].projects[0].title, exact: true })
-  await expect(card).toBeVisible()
-  await page.getByRole('button', { name: 'Hide projects for Frontend Development' }).click()
-  await expect(card).not.toBeVisible()
-  await page.getByRole('button', { name: 'Show projects for Frontend Development' }).click()
-  await expect(card).toBeVisible()
-})
-
-test('all skill categories are listed as matching expandable pills', async ({ page }) => {
-  test.setTimeout(120000)
-  await page.goto(baseURL + '/#skills')
-  await expect(page.locator('#skills')).toHaveAttribute('aria-hidden', 'false')
-  const list = page.getByRole('list', { name: 'Skill categories' })
-  await expect(list.getByRole('listitem')).toHaveCount(skills.length)
-  for (const skill of skills) {
-    await scrollTimeline(page, skillStart + skillSegments[skills.indexOf(skill)].start + 0.02)
-    const pill = list
-      .getByRole('listitem')
-      .filter({ has: page.getByRole('heading', { name: skill.name, exact: true }) })
-    await expect
-      .poll(() =>
-        pill.evaluate((el) => Math.abs(new DOMMatrixReadOnly(getComputedStyle(el).transform).m43)),
-      )
-      .toBeLessThan(1)
-    await expect(pill.getByRole('heading', { name: skill.name, exact: true })).toBeVisible()
-    await expect(pill.locator('.skills-technologies')).toHaveText(
-      skill.technologies.join(' \u00b7 '),
-    )
-    await pill.getByRole('button', { name: 'Select ' + skill.name, exact: true }).click()
-    await scrollTimeline(page, skillStart + skillSegments[skills.indexOf(skill)].start + 0.95)
-    await expect(
-      pill.getByRole('button', { name: 'Select ' + skill.name, exact: true }),
-    ).toHaveAttribute('aria-expanded', 'true')
-    await expect(
-      pill.getByRole('article', { name: skill.projects[0].title, exact: true }),
-    ).toBeVisible()
-    await expect(list.locator('.skills-category-pill[data-expanded]')).toHaveCount(1)
-  }
-  await expect(page.locator('.skills-index-controls')).toHaveCount(0)
-})
-
-test('skills form a closed ring with the last above the centered first', async ({ page }) => {
-  test.setTimeout(90000)
-  await page.goto(baseURL + '/#skills')
-  await expect(page.locator('#skills')).toHaveAttribute('aria-hidden', 'false')
-  const list = page.getByRole('list', { name: 'Skill categories' })
-  const pills = list.getByRole('listitem')
-  await expect(list).toHaveCSS('overflow-y', 'hidden')
-  await expect
-    .poll(() => pills.first().evaluate((el) => Number(getComputedStyle(el).opacity)))
-    .toBeGreaterThan(0.99)
-  const geometry = await pills.evaluateAll((nodes) =>
-    nodes.map((node) => {
-      const bounds = node.getBoundingClientRect()
-      return {
-        center: bounds.top + bounds.height / 2,
-        opacity: Number(getComputedStyle(node).opacity),
-        depth: new DOMMatrixReadOnly(getComputedStyle(node).transform).m43,
-      }
-    }),
-  )
-  expect(geometry[skills.length - 1].center).toBeLessThan(geometry[0].center)
-  expect(geometry[1].center).toBeGreaterThan(geometry[0].center)
-  expect(geometry[skills.length - 1].opacity).toBeLessThan(0.7)
-  expect(geometry[skills.length - 1].depth).toBeLessThan(-100)
-  await scrollTimeline(page, skillStart + skillTravel)
-  await expect
-    .poll(() => pills.first().evaluate((el) => Number(getComputedStyle(el).opacity)))
-    .toBeGreaterThan(0.99)
-  await expect
-    .poll(() =>
-      pills
-        .first()
-        .evaluate((el) => Math.abs(new DOMMatrixReadOnly(getComputedStyle(el).transform).m43)),
-    )
-    .toBeLessThan(1)
-  await expect(page.locator('#work')).toHaveAttribute('aria-hidden', 'true')
-  await scrollTimeline(page, sceneStops[2])
-  await expect(page.locator('#work')).toHaveAttribute('aria-hidden', 'false')
-})
-
-test('reduced motion keeps the skill list flat and fully opaque', async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' })
-  await page.goto(baseURL + '/#skills')
-  await expect(page.locator('.portfolio')).not.toHaveAttribute('data-enhanced')
-  for (const pill of await page
-    .getByRole('list', { name: 'Skill categories' })
-    .getByRole('listitem')
-    .all()) {
-    await expect(pill).toHaveCSS('transform', 'none')
-    await expect(pill).toHaveCSS('opacity', '1')
-  }
-})
-
 test('the ring keeps each skill centered through project reveals on desktop and mobile', async ({
   page,
 }) => {
@@ -821,7 +619,7 @@ test('the ring keeps each skill centered through project reveals on desktop and 
     const list = page.getByRole('list', { name: 'Skill categories' })
     for (const index of [0, 1, skills.length - 1]) {
       const pill = list.getByRole('listitem').nth(index)
-      for (const phase of [0.02, 0.95]) {
+      for (const phase of [0.95]) {
         await scrollTimeline(page, skillStart + skillSegments[index].start + phase)
         await expect
           .poll(() =>

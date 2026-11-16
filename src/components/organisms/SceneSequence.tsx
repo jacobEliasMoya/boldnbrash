@@ -2,7 +2,14 @@
 
 import { Children, useEffect, useRef, useState, type ReactNode } from 'react'
 import { motion, MotionConfig, useReducedMotion, useMotionValue } from 'motion/react'
-import { sceneDuration, sceneStops, skillSegments, skillStart, skillTravel } from './skillsTimeline'
+import {
+  sceneDuration,
+  sceneStops,
+  skillSegments,
+  skillStart,
+  skillTravel,
+  projectStops,
+} from './skillsTimeline'
 import { BlendedLogo } from '@/components/atoms/BlendedLogo'
 import { BlendedNav } from '@/components/atoms/BlendedNav'
 import { LiquidBoundary } from '@/components/atoms/LiquidBoundary'
@@ -119,11 +126,71 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     let requested = 0
     let previousPlaybackTime = 0
     let inputDirection = 0
+    let snapTimer = 0
+    let snapFrame = 0
+    let snapping = false
+    let snapExpectedY = 0
+
+    function cancelSnap() {
+      window.clearTimeout(snapTimer)
+      cancelAnimationFrame(snapFrame)
+      snapFrame = 0
+      snapping = false
+      track.current?.removeAttribute('data-snapping')
+    }
+    function armSnap() {
+      window.clearTimeout(snapTimer)
+      if (snapping || media.matches) return
+      snapTimer = window.setTimeout(() => {
+        const node = track.current
+        if (
+          !node ||
+          touch ||
+          document.hidden ||
+          document.querySelector('dialog[open]') ||
+          node.closest('[data-menu-open]')
+        )
+          return
+        if (displayed < skillStart || displayed > skillStart + skillTravel) return
+        const nearest = projectStops.reduce((best, stop) =>
+          Math.abs(skillStart + stop.position - displayed) <
+          Math.abs(skillStart + best.position - displayed)
+            ? stop
+            : best,
+        )
+        const target = skillStart + nearest.position
+        // Proximity only: leave the wheel where the visitor put it between resting points.
+        if (Math.abs(target - displayed) > 0.18 || Math.abs(target - displayed) < 0.003) return
+        const start = scrollY
+        const trackTop = scrollY + node.getBoundingClientRect().top
+        const distance = node.offsetHeight - (node.firstElementChild?.clientHeight ?? innerHeight)
+        const destination = trackTop + (distance * target) / sceneDuration
+        const began = performance.now()
+        snapping = true
+        node.dataset.snapping = 'true'
+        function settle(time: number) {
+          const t = Math.min(1, (time - began) / 240)
+          const eased = 1 - (1 - t) ** 3
+          window.scrollTo({ top: start + (destination - start) * eased, behavior: 'instant' })
+          snapExpectedY = window.scrollY
+          update()
+          if (t < 1) snapFrame = requestAnimationFrame(settle)
+          else {
+            snapping = false
+            snapFrame = 0
+            node!.removeAttribute('data-snapping')
+          }
+        }
+        snapFrame = requestAnimationFrame(settle)
+      }, 180)
+    }
 
     function advanceInput(pixels: number, target: Element | null) {
       const node = track.current
       if (!node || media.matches || !pixels) return false
       if (target?.closest('dialog, input, textarea, select, [contenteditable="true"]')) return false
+      // Inside Skills, native wheel/touch travel is the animation's position, without a queue.
+      if (current === 1) return false
       const direction = Math.sign(pixels)
       while (target && target !== node) {
         const element = target as HTMLElement
@@ -172,6 +239,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     }
 
     function normalizeWheel(event: WheelEvent) {
+      cancelSnap()
       if (document.documentElement.dataset.introLoading === 'true') {
         event.preventDefault()
         return
@@ -191,6 +259,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       target: Element | null
     } | null = null
     function startTouch(event: TouchEvent) {
+      cancelSnap()
       if (event.touches.length !== 1 || media.matches) {
         touch = null
         return
@@ -215,12 +284,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       }
       if (!touch || event.defaultPrevented || !event.cancelable) return
       // These surfaces own their gestures; pinch zoom and form controls stay native.
-      if (
-        touch.target?.closest(
-          'dialog, input, textarea, select, [contenteditable="true"], .skills-browser',
-        )
-      )
-        return
+      if (touch.target?.closest('dialog, input, textarea, select, [contenteditable="true"]')) return
       const point = event.touches[0]
       if (!touch.axis) {
         const dx = Math.abs(point.clientX - touch.x)
@@ -234,11 +298,13 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     }
     function endTouch() {
       touch = null
+      armSnap()
     }
 
     function render(value: number, immediate = false) {
       requested = Math.max(0, Math.min(sceneDuration, value))
-      if (immediate) {
+      const liveSkills = current === 1
+      if (immediate || liveSkills) {
         cancelAnimationFrame(playbackFrame)
         playbackFrame = 0
         displayed = requested
@@ -311,7 +377,10 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         new CustomEvent('portfolio:skills-progress', {
           detail: {
             progress: skillProgress,
-            intro: Math.max(0, Math.min(1, progress - sceneStops[1])),
+            intro: Math.max(
+              0,
+              Math.min(1, (progress - sceneStops[1]) / (skillStart - sceneStops[1])),
+            ),
           },
         }),
       )
@@ -375,10 +444,13 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     }
 
     function schedule() {
+      if (snapping && Math.abs(window.scrollY - snapExpectedY) > 2) cancelSnap()
+      armSnap()
       if (!frame) frame = window.requestAnimationFrame(update)
     }
 
     function setup() {
+      cancelSnap()
       const enabled = !media.matches
       history.scrollRestoration = enabled ? 'manual' : previousScrollRestoration
       setEnhanced(enabled)
@@ -408,6 +480,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     }
 
     function goTo(index: number, immediate = true) {
+      cancelSnap()
       const node = track.current
       if (!node) return
       const start = window.scrollY + node.getBoundingClientRect().top
@@ -428,6 +501,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     }
 
     function selectSkill(event: Event) {
+      cancelSnap()
       const detail = (event as CustomEvent<number | { index: number; offset: number }>).detail
       const index = typeof detail === 'number' ? detail : detail.index
       const offset = typeof detail === 'number' ? 0.95 : detail.offset
@@ -474,6 +548,9 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       }),
     )
     window.addEventListener('scroll', schedule, { passive: true })
+    window.addEventListener('pointerdown', cancelSnap, { passive: true })
+    window.addEventListener('keydown', cancelSnap)
+    window.addEventListener('blur', cancelSnap)
     window.addEventListener('wheel', normalizeWheel, { passive: false })
     document.addEventListener('touchstart', startTouch, { passive: true })
     document.addEventListener('touchmove', moveTouch, { passive: false })
@@ -494,6 +571,10 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       cancelAnimationFrame(frame)
       cancelAnimationFrame(playbackFrame)
       cancelAnimationFrame(initial)
+      cancelSnap()
+      window.removeEventListener('pointerdown', cancelSnap)
+      window.removeEventListener('keydown', cancelSnap)
+      window.removeEventListener('blur', cancelSnap)
       window.removeEventListener('scroll', schedule)
       window.removeEventListener('wheel', normalizeWheel)
       document.removeEventListener('touchstart', startTouch)
@@ -613,7 +694,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           ref={track}
           className="scene-track"
           data-duration={sceneDuration}
-          style={enhanced ? { height: `calc(100svh * ${1 + sceneDuration * 1.6})` } : undefined}
+          style={enhanced ? { height: `calc(100svh * ${1 + sceneDuration * 0.8})` } : undefined}
         >
           <div className="scene-stage">
             {Children.map(children, (child, index) => (

@@ -1,279 +1,230 @@
-﻿'use client'
+'use client'
 
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import {
   motion,
   useMotionValue,
   useReducedMotion,
-  useSpring,
   useTransform,
   type MotionValue,
-  type PanInfo,
 } from 'motion/react'
 import { PlatformArtwork, SystemArtwork } from '@/components/atoms/ProjectArtwork'
-import { clamp, getSkillPosition, skillSegments, skills } from './skillsTimeline'
+import { clamp, getSkillFrame, projectStops, skills } from './skillsTimeline'
 
 type Project = (typeof skills)[number]['projects'][number]
+type OpenProject = (project: Project, trigger: HTMLButtonElement) => void
 
 function SkillCategoryPill({
   index,
   active,
-  phase,
   animated,
-  reduceMotion,
   ringPosition,
   radius,
-  onToggle,
-  onOpenProject,
+  onSelect,
 }: {
   index: number
   active: boolean
-  phase: number
   animated: boolean
-  reduceMotion: boolean | null
   ringPosition: MotionValue<number>
   radius: number
-  onToggle: (index: number, expanded: boolean) => void
-  onOpenProject: (project: Project, trigger: HTMLButtonElement) => void
+  onSelect: (index: number) => void
 }) {
   const skill = skills[index]
-  const [pillHeight, setPillHeight] = useState(150)
-  const pill = useRef<HTMLDivElement>(null)
-  const category = useRef<HTMLDivElement>(null)
-  const growth = active && animated ? clamp(phase / 0.45) : 0
-  const reveal = active
-    ? animated
-      ? Math.min(
-          clamp((phase - 0.2) / 0.35),
-          clamp((skillSegments[index].duration - 0.28 - phase) / 0.3),
-        )
-      : 1
-    : 0
-  const cardPosition = clamp(phase - 0.55, 0, skill.projects.length - 0.001)
-  const projectIndex = Math.floor(cardPosition)
-  const cardTravel = Math.min(
-    skill.projects.length - 1,
-    projectIndex + clamp((cardPosition - projectIndex - 0.75) / 0.25),
-  )
-  // Every pill sits on the same closed vertical ring, including the last above the first.
-  const angle = useTransform(ringPosition, (position) => {
-    const steps =
+  // A perspective ring brings the active skill forward while its neighbours tilt away.
+  const distance = useTransform(ringPosition, (position) => {
+    return (
       ((((index - position + skills.length / 2) % skills.length) + skills.length) % skills.length) -
       skills.length / 2
-    return steps * (360 / skills.length)
+    )
   })
-  const stepAngle = 360 / skills.length
-  const rotation = useTransform(angle, (value) => clamp((-value * 32.4) / stepAngle, -81, 81))
-  const vertical = useTransform(angle, (value) => Math.sin((value * Math.PI) / 180) * radius * 0.78)
-  const depth = useTransform(
-    angle,
-    (value) => (Math.cos((value * Math.PI) / 180) - 1) * radius * 0.85,
-  )
-  const fade = useTransform(angle, (value) =>
-    Math.pow(
-      Math.max(0, Math.cos((value * Math.PI) / 180)),
-      Math.log(0.466) / Math.log(Math.cos((stepAngle * Math.PI) / 180)),
-    ),
-  )
-  const order = useTransform(angle, (value) =>
-    Math.round(100 + Math.cos((value * Math.PI) / 180) * 50),
-  )
+  const rotation = useTransform(distance, (value) => clamp(-value * 38, -81, 81))
+  const vertical = useTransform(distance, (value) => Math.sin((value * Math.PI) / 4) * radius)
+  const depth = useTransform(distance, (value) => (Math.cos((value * Math.PI) / 4) - 1) * radius)
 
-  useLayoutEffect(() => {
-    const heading = category.current,
-      container = pill.current
-    if (!heading || !container) return
-    function measure() {
-      const style = getComputedStyle(container!)
-      setPillHeight(
-        heading!.offsetHeight +
-          parseFloat(style.paddingTop) +
-          parseFloat(style.paddingBottom) +
-          parseFloat(style.borderTopWidth) +
-          parseFloat(style.borderBottomWidth),
-      )
-    }
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(heading)
-    return () => observer.disconnect()
-  }, [])
+  const fade = useTransform(distance, (value) => clamp(1 - Math.abs(value) * 0.42))
+  const order = useTransform(distance, (value) => 20 - Math.round(Math.abs(value) * 4))
   return (
     <motion.div
-      ref={pill}
       role="listitem"
-      data-active={active ? '' : undefined}
       className="skills-category-pill"
-      data-expanded={reveal > 0 ? '' : undefined}
-      initial={false}
-      animate={{ '--pill-reveal': reveal }}
-      transition={reduceMotion ? { duration: 0 } : { type: 'spring', duration: 0.6, bounce: 0 }}
-      style={
-        {
-          '--pill-height': `${pillHeight}px`,
-          y: animated ? vertical : 0,
-          rotateX: animated ? rotation : 0,
-          z: animated ? depth : 0,
-          opacity: animated ? fade : 1,
-          zIndex: animated ? order : 1,
-        } as CSSProperties
-      }
+      data-active={active ? '' : undefined}
+      style={{
+        rotateX: animated ? rotation : 0,
+        y: animated ? vertical : 0,
+        z: animated ? depth : 0,
+        opacity: animated ? fade : 1,
+        zIndex: animated ? order : 1,
+      }}
     >
-      <div
-        ref={category}
-        className="skills-category-current"
-        aria-live={active ? 'polite' : 'off'}
-        aria-atomic="true"
-        data-skill={skill.name}
-      >
+      <div className="skills-category-current" data-skill={skill.name}>
         <p className="eyebrow">
-          0{index + 1} / 0{skills.length} — What I build
+          0{index + 1} / 0{skills.length} &mdash; What I build
         </p>
-        <h3 style={{ '--category-scale': 1 + growth * 0.06 } as CSSProperties}>{skill.name}</h3>
-        <p className="skills-technologies">{skill.technologies.join(' · ')}</p>
+        <h3>{skill.name}</h3>
+        <p className="skills-technologies">{skill.technologies.join(' \u00b7 ')}</p>
         {skill.note && <p className="skills-category-note">{skill.note}</p>}
-        <button
-          type="button"
-          className="skills-pill-toggle"
-          aria-label={
-            animated
-              ? `Select ${skill.name}`
-              : `${reveal > 0 ? 'Hide' : 'Show'} projects for ${skill.name}`
-          }
-          aria-pressed={animated ? active : undefined}
-          aria-expanded={reveal > 0}
-          aria-controls={`skills-pill-projects-${index}`}
-          onClick={() => onToggle(index, reveal > 0)}
-        />
-      </div>
-      <div
-        id={`skills-pill-projects-${index}`}
-        className="skills-project-stage"
-        aria-label={`Projects in ${skill.name}`}
-        data-skill={skill.name}
-        data-project={projectIndex}
-        aria-hidden={reveal === 0}
-        inert={reveal === 0}
-      >
-        <div className="skills-project-caption">
-          <span>
-            0{projectIndex + 1} / 0{skill.projects.length}
-          </span>
-        </div>
-        <div className="skills-project-window">
-          {skill.projects.map((project, position) => (
-            <article
-              key={`${skill.name}-${project.title}`}
-              className="scene-project skill-project-card"
-              aria-label={project.title}
-              aria-hidden={reveal === 0 || (animated && position !== projectIndex)}
-              inert={reveal === 0 || (animated && position !== projectIndex)}
-              style={
-                {
-                  '--card-offset': `${(position - cardTravel + 1 - reveal) * 112}%`,
-                  '--card-rotation': `${-(position - cardTravel + 1 - reveal) * 18}deg`,
-                  '--card-depth': `${-Math.abs(position - cardTravel + 1 - reveal) * 140}px`,
-                  '--card-opacity': clamp(1 - Math.abs(position - cardTravel + 1 - reveal) * 0.55),
-                  '--information-reveal': animated ? clamp((phase - 0.65 - position) / 0.35) : 1,
-                } as CSSProperties
-              }
-            >
-              <div className="card-scoop" aria-hidden="true" />
-              <p className="eyebrow">0{position + 1} — Project</p>
-              <h4>{project.title}</h4>
-              {'status' in project && <p className="skill-project-status">{project.status}</p>}
-              <p className="project-category">{project.category}</p>
-              <div className="artwork-frame">
-                {project.artwork === 'system' ? (
-                  <SystemArtwork />
-                ) : project.artwork === 'platform' ? (
-                  <PlatformArtwork />
-                ) : (
-                  <div className="skill-project-specimen" aria-hidden="true">
-                    <span>
-                      {project.artwork === 'terminal'
-                        ? 'Go / CLI'
-                        : project.artwork === 'model'
-                          ? 'Blender / Low-poly'
-                          : project.artwork === 'automation'
-                            ? 'Python / Image tools'
-                            : 'Ollama / Local models'}
-                    </span>
-                    <strong>
-                      {project.artwork === 'terminal'
-                        ? `> ${project.title}_`
-                        : project.artwork === 'model'
-                          ? '3D'
-                          : project.artwork === 'automation'
-                            ? 'Batch / Images'
-                            : 'Local / AI'}
-                    </strong>
-                  </div>
-                )}
-              </div>
-              <p className="skill-project-information">{project.description}</p>
-              <button
-                type="button"
-                className="project-open"
-                aria-haspopup="dialog"
-                onClick={(event) => {
-                  onOpenProject(project, event.currentTarget)
-                }}
-              >
-                Read project <span className="sr-only">— {project.title}</span>
-                <b aria-hidden="true">↗</b>
-              </button>
-            </article>
-          ))}
-        </div>
+        {animated && (
+          <button
+            type="button"
+            className="skills-pill-toggle"
+            aria-label={`Select ${skill.name}`}
+            aria-pressed={active}
+            aria-controls={`skills-projects-${index}`}
+            tabIndex={active ? 0 : -1}
+            onClick={() => onSelect(index)}
+          />
+        )}
       </div>
     </motion.div>
   )
 }
 
+function SkillProjects({
+  index,
+  active,
+  projectPosition,
+  animated,
+  onOpenProject,
+}: {
+  index: number
+  active: boolean
+  projectPosition: number
+  animated: boolean
+  onOpenProject: OpenProject
+}) {
+  const skill = skills[index]
+  const first = projectStops.findIndex((stop) => stop.skillIndex === index)
+  const localPosition = projectPosition - first
+  const projectIndex = Math.round(clamp(localPosition, 0, skill.projects.length - 1))
+  const visible = !animated || (localPosition > -1 && localPosition < skill.projects.length)
+  return (
+    <div
+      id={`skills-projects-${index}`}
+      className="skills-project-stage skills-project-deck"
+      aria-label={`Projects in ${skill.name}`}
+      data-skill={skill.name}
+      data-project={projectIndex}
+      data-visible={visible ? 'true' : undefined}
+      aria-hidden={animated && !active}
+      inert={animated && !active}
+      style={{
+        zIndex: animated ? 100 + index : 1,
+      }}
+    >
+      <div className="skills-project-caption">
+        <span>{skill.name}</span>
+        <span>
+          0{projectIndex + 1} / 0{skill.projects.length}
+        </span>
+      </div>
+      <div className="skills-project-window">
+        {skill.projects.map((project, position) => (
+          <article
+            key={`${skill.name}-${project.title}`}
+            className="scene-project skill-project-card"
+            aria-label={project.title}
+            data-visible={!animated || Math.abs(position - localPosition) < 1 ? 'true' : undefined}
+            aria-hidden={animated && (!active || position !== projectIndex)}
+            inert={animated && (!active || position !== projectIndex)}
+            style={
+              {
+                '--card-depth':
+                  (position >= localPosition
+                    ? (position - localPosition) * 520
+                    : (position - localPosition) * 320) + 'px',
+                '--card-opacity':
+                  position >= localPosition
+                    ? 1 - (1 - clamp((0.8 - (position - localPosition)) / 0.8)) ** 3
+                    : clamp(1 - (localPosition - position) / 0.7) ** 2,
+                '--card-blur': Math.max(0, localPosition - position) * 5 + 'px',
+                '--information-reveal': 1,
+                zIndex: 100 + position,
+              } as CSSProperties
+            }
+          >
+            <div className="card-scoop" aria-hidden="true" />
+            <p className="eyebrow">0{position + 1} — Project</p>
+            <h4>{project.title}</h4>
+            {'status' in project && <p className="skill-project-status">{project.status}</p>}
+            <p className="project-category">{project.category}</p>
+            <div className="artwork-frame">
+              {project.artwork === 'system' ? (
+                <SystemArtwork />
+              ) : project.artwork === 'platform' ? (
+                <PlatformArtwork />
+              ) : (
+                <div className="skill-project-specimen" aria-hidden="true">
+                  <span>
+                    {project.artwork === 'terminal'
+                      ? 'Go / CLI'
+                      : project.artwork === 'model'
+                        ? 'Blender / Low-poly'
+                        : project.artwork === 'automation'
+                          ? 'Python / Image tools'
+                          : 'Ollama / Local models'}
+                  </span>
+                  <strong>
+                    {project.artwork === 'terminal'
+                      ? `> ${project.title}_`
+                      : project.artwork === 'model'
+                        ? '3D'
+                        : project.artwork === 'automation'
+                          ? 'Batch / Images'
+                          : 'Local / AI'}
+                  </strong>
+                </div>
+              )}
+            </div>
+            <p className="skill-project-information">{project.description}</p>
+            <button
+              type="button"
+              className="project-open"
+              aria-haspopup="dialog"
+              onClick={(event) => {
+                onOpenProject(project, event.currentTarget)
+              }}
+            >
+              Read project <span className="sr-only">— {project.title}</span>
+              <b aria-hidden="true">↗</b>
+            </button>
+          </article>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function SkillsScene() {
-  const [selection, setSelection] = useState({ index: 0, phase: 0, intro: 0 })
+  const [selection, setSelection] = useState({ ...getSkillFrame(0), intro: 0 })
   const [pinned, setPinned] = useState(false)
   const [openedProject, setOpenedProject] = useState<Project | null>(null)
-  const [expandedIndex, setExpandedIndex] = useState<number | null>(0)
-  const browser = useRef<HTMLDivElement>(null)
-  const dialog = useRef<HTMLDialogElement>(null),
-    previousOverflow = useRef(''),
-    trigger = useRef<HTMLButtonElement | null>(null)
+  const dialog = useRef<HTMLDialogElement>(null)
+  const previousOverflow = useRef('')
+  const trigger = useRef<HTMLButtonElement | null>(null)
   const reduceMotion = useReducedMotion()
   const animated = pinned && !reduceMotion
-  const [radius, setRadius] = useState(280)
-  const ringTarget = useMotionValue(0)
-  const ringPosition = useSpring(ringTarget, { stiffness: 110, damping: 26, mass: 0.8 })
-  const drag = useRef<{ start: number } | null>(null)
-  const ignoreClickUntil = useRef(0)
-  const [dragging, setDragging] = useState(false)
-  useEffect(() => {
-    if (drag.current) return
-    const segment = skillSegments[selection.index]
-    const turn = clamp((selection.phase - (segment.duration - 0.28)) / 0.28)
-    const target = selection.index + turn
-    ringTarget.set(target + Math.round((ringTarget.get() - target) / skills.length) * skills.length)
-  }, [selection.index, selection.phase, ringTarget])
+  const wheel = useRef<HTMLDivElement>(null)
+  const [radius, setRadius] = useState(340)
+  const ringPosition = useMotionValue(0)
   useLayoutEffect(() => {
-    const container = browser.current
-    if (!container || !animated) return
-    const measure = () =>
-      setRadius(
-        (container.clientHeight * 0.48 * Math.sin((72 * Math.PI) / 180)) /
-          Math.sin((2 * Math.PI) / skills.length),
-      )
+    const element = wheel.current
+    if (!element || !animated) return
+    const measure = () => setRadius(Math.max(150, element.clientHeight * 0.52))
     measure()
     const observer = new ResizeObserver(measure)
-    observer.observe(container)
+    observer.observe(element)
     return () => observer.disconnect()
   }, [animated])
+  const introFade = animated ? clamp((selection.intro - 0.5) / 0.5) : 0
+  const entrance = animated ? clamp((selection.intro - 0.7) / 0.3) : 1
+  useLayoutEffect(() => {
+    ringPosition.set(selection.ringPosition)
+  }, [selection.ringPosition, ringPosition])
   useEffect(() => {
     function update(event: Event) {
-      if (drag.current) return
-      setPinned(true)
       const { progress, intro } = (event as CustomEvent<{ progress: number; intro: number }>).detail
-      setSelection({ ...getSkillPosition(progress), intro })
+      setPinned(true)
+      setSelection({ ...getSkillFrame(progress), intro })
     }
     window.addEventListener('portfolio:skills-progress', update)
     return () => window.removeEventListener('portfolio:skills-progress', update)
@@ -287,86 +238,117 @@ export function SkillsScene() {
       document.documentElement.style.overflow = previousOverflow.current
     }
   }, [openedProject])
-  function toggleProjects(index: number, expanded: boolean) {
-    if (performance.now() < ignoreClickUntil.current) return
-    if (!animated) {
-      setExpandedIndex(expanded ? null : index)
-      return
-    }
-    selectSkill(index)
-  }
   function selectSkill(index: number) {
-    const offset = 0
-    const handled = !window.dispatchEvent(
-      new CustomEvent('portfolio:select-skill', { detail: { index, offset }, cancelable: true }),
+    window.dispatchEvent(
+      new CustomEvent('portfolio:select-skill', {
+        detail: { index, offset: 0.95 },
+        cancelable: true,
+      }),
     )
-    if (!handled) setSelection({ index, phase: offset, intro: 1 })
   }
-  function startDrag(event: PointerEvent) {
-    if (!animated || (event.target as Element).closest('a, button:not(.skills-pill-toggle)')) return
-    drag.current = { start: ringPosition.get() }
-    setDragging(true)
-    setSelection((current) => ({ ...current, phase: 0 }))
-  }
-  function rotateDrag(_: PointerEvent, info: PanInfo) {
-    if (!drag.current) return
-    const position = drag.current.start - info.offset.y / 180
-    ringTarget.set(position)
-    const index = ((Math.round(position) % skills.length) + skills.length) % skills.length
-    setSelection({ index, phase: 0, intro: 1 })
-  }
-  function finishDrag(_: PointerEvent, info: PanInfo) {
-    if (!drag.current) return
-    const position = Math.round(drag.current.start - info.offset.y / 180)
-    ringTarget.set(position)
-    drag.current = null
-    setDragging(false)
-    ignoreClickUntil.current = performance.now() + 350
-    selectSkill(((position % skills.length) + skills.length) % skills.length)
+  function openProject(project: Project, button: HTMLButtonElement) {
+    trigger.current = button
+    setOpenedProject(project)
   }
   return (
-    <div className="skills-scene skills-index scene-content">
-      <div className="skills-heading">
+    <div
+      className="skills-scene skills-index skills-duet scene-content"
+      data-playing={animated ? '' : undefined}
+      style={{ '--skills-intro-fade': introFade, '--skills-entrance': entrance } as CSSProperties}
+    >
+      <div className="skills-heading" aria-hidden={animated && introFade === 1}>
         <p className="eyebrow">
-          <span>02 —</span> Skills
+          <span>02 &mdash;</span> Skills
         </p>
-        <h2>
-          The tools.
-          <br />
-          The thinking.
+        <h2 aria-label="What I use. What I build.">
+          {['What I use.', 'What I build.'].map((line, lineIndex) => (
+            <span className="skills-title-line" aria-hidden="true" key={line}>
+              {Array.from(line).map((letter, letterIndex) => {
+                const index = (lineIndex === 0 ? 0 : 11) + letterIndex
+                const fill = animated ? clamp((selection.intro / 0.44) * 26 - index) : 1
+                const fall = animated
+                  ? clamp((selection.intro - 0.58 - (index / 24) * 0.14) / 0.26)
+                  : 0
+                return (
+                  <span
+                    className="skills-title-letter"
+                    key={letterIndex}
+                    style={
+                      {
+                        '--letter-fill': fill * 100 + '%',
+                        transform:
+                          'translate3d(' +
+                          ((index % 3) - 1) * 3 * fall +
+                          'px, ' +
+                          (80 + (index % 3) * 8) * fall * fall +
+                          'px, ' +
+                          -80 * fall +
+                          'px) rotate(' +
+                          (index % 2 ? -1 : 1) * (3 + (index % 3)) * fall +
+                          'deg)',
+                      } as CSSProperties
+                    }
+                  >
+                    {letter === ' ' ? '\u00a0' : letter}
+                  </span>
+                )
+              })}
+            </span>
+          ))}
         </h2>
-        <p className="skills-intro">
-          What I build, the tools I reach for, and the work behind them.
-        </p>
+        <p className="skills-intro">Check out how I use my tech!</p>
       </div>
-      <motion.div
-        ref={browser}
-        className="skills-browser"
-        role="list"
-        aria-label="Skill categories"
-        data-dragging={dragging ? '' : undefined}
-        onPanStart={startDrag}
-        onPan={rotateDrag}
-        onPanEnd={finishDrag}
-      >
-        {skills.map((skill, index) => (
-          <SkillCategoryPill
-            key={skill.name}
-            index={index}
-            active={animated ? selection.index === index : expandedIndex === index}
-            phase={animated && selection.index === index ? selection.phase : 0}
-            animated={animated}
-            reduceMotion={reduceMotion}
-            ringPosition={ringPosition}
-            radius={radius}
-            onToggle={toggleProjects}
-            onOpenProject={(project, button) => {
-              trigger.current = button
-              setOpenedProject(project)
-            }}
-          />
-        ))}
-      </motion.div>
+      {animated ? (
+        <div className="skills-performance" inert={entrance < 0.5} aria-hidden={entrance < 0.5}>
+          <div ref={wheel} className="skills-browser" role="list" aria-label="Skill categories">
+            {skills.map((skill, index) => (
+              <SkillCategoryPill
+                key={skill.name}
+                index={index}
+                active={selection.index === index}
+                animated
+                ringPosition={ringPosition}
+                radius={radius}
+                onSelect={selectSkill}
+              />
+            ))}
+          </div>
+          <div className="skills-projects" aria-label="Related projects">
+            {skills.map((skill, index) => (
+              <SkillProjects
+                key={skill.name}
+                index={index}
+                active={selection.index === index}
+                projectPosition={selection.projectPosition}
+                animated
+                onOpenProject={openProject}
+              />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="skills-fallback">
+          {skills.map((skill, index) => (
+            <section className="skills-pair" key={skill.name} aria-label={skill.name}>
+              <SkillCategoryPill
+                index={index}
+                active
+                animated={false}
+                radius={radius}
+                ringPosition={ringPosition}
+                onSelect={selectSkill}
+              />
+              <SkillProjects
+                index={index}
+                active
+                projectPosition={0}
+                animated={false}
+                onOpenProject={openProject}
+              />
+            </section>
+          ))}
+        </div>
+      )}
       <span className="skills-index-portal" data-portal="work" aria-hidden="true" />
       <dialog
         ref={dialog}
@@ -400,7 +382,7 @@ export function SkillsScene() {
                 target="_blank"
                 rel="noreferrer"
               >
-                View on GitHub <b aria-hidden="true">?</b>
+                View on GitHub <b aria-hidden="true">&nearr;</b>
               </a>
             )}
           </div>

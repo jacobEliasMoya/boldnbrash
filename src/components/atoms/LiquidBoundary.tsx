@@ -133,6 +133,26 @@ export function LiquidBoundary() {
       radius += (targetRadius - radius) * ease
       power += (targetPower - power) * ease
       path!.setAttribute('d', contour())
+      const bounds = svg!.getBoundingClientRect()
+      for (const control of document.querySelectorAll<HTMLElement>('[data-liquid-header]')) {
+        const label = control.querySelector('.nav-label, .theme-toggle-track, span') ?? control
+        const rect = label.getBoundingClientRect()
+        // Check the edges as well as the centre; contrast must change before a letter disappears.
+        const covered =
+          !media.matches &&
+          rect.width > 0 &&
+          [0, 0.5, 1].some((x) =>
+            [0, 0.5, 1].some((y) =>
+              path!.isPointInFill(
+                new DOMPoint(
+                  rect.left + rect.width * x - bounds.left - frameInset,
+                  rect.top + rect.height * y - bounds.top - frameInset,
+                ),
+              ),
+            ),
+          )
+        control.dataset.liquidCovered = String(covered)
+      }
       svg!.dataset.edge = pointAt(position).edge
       svg!.dataset.pullDepth = depth.toFixed(2)
       svg!.dataset.pullPosition = position.toFixed(2)
@@ -305,6 +325,9 @@ export function LiquidBoundary() {
     media.addEventListener('change', preferenceChanged)
     return () => {
       cancelAnimationFrame(frame)
+      document.querySelectorAll<HTMLElement>('[data-liquid-covered]').forEach((control) => {
+        delete control.dataset.liquidCovered
+      })
       window.clearTimeout(idleTimer)
       observer.disconnect()
       window.removeEventListener('pointermove', move)
