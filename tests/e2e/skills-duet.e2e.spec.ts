@@ -49,7 +49,7 @@ for (const viewport of [
       await expect(page.locator('.skills-reveal')).toHaveAttribute('inert', '')
       await page.screenshot({ path: `test-results/duet-intro-${viewport.width}.png` })
       await expect(page.locator('.skills-scroll-cue')).toHaveCount(0)
-      await expect(page.getByRole('heading', { name: 'What I do. What I build.' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'My tech. And stuff.' })).toBeVisible()
       await scrollToPhase(page, 1.4 + (skillStart - 1.4) * 0.46)
       await expect(intro).toHaveCSS('opacity', '1')
       await expect(page.locator('.skills-title-letter')).toHaveCount(0)
@@ -82,8 +82,8 @@ for (const viewport of [
       await expect(firstProject).toBeVisible()
       const left = (await currentSkill.boundingBox())!
       const right = (await firstProject.boundingBox())!
-      if (viewport.width > 900) expect(right.x).toBeGreaterThan(left.x + left.width)
-      else expect(right.y).toBeGreaterThan(left.y + left.height)
+      if (viewport.width > 900) expect(left.x).toBeGreaterThan(right.x + right.width)
+      else expect(left.y).toBeGreaterThan(right.y + right.height)
       await page.screenshot({ path: `test-results/duet-project-${viewport.width}.png` })
       await scrollToPhase(page, skillStart + 1.45)
       const incomingCard = page.locator('.skill-project-card[aria-label="This portfolio"]')
@@ -139,4 +139,23 @@ test('reduced motion presents each skill beside its projects without hiding cont
   await expect(page.locator('.skills-performance')).toHaveCount(0)
   await expect(page.locator('.skills-pair')).toHaveCount(skills.length)
   await expect(page.locator('.skills-fallback article[aria-hidden="true"]')).toHaveCount(0)
+})
+
+
+test('period opening follows changes to the heading and supporting text', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('http://localhost:3000/#skills')
+  await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 15000 })
+  await page.locator('.skills-heading').evaluate((heading) => {
+    heading.querySelectorAll('.skills-title-fill')[1].textContent = 'New stuff'
+    heading.querySelector('.skills-intro')!.textContent = 'A longer supporting line. '.repeat(6)
+  })
+  await expect.poll(() => page.locator('.skills-scene').evaluate((scene) => {
+    const bounds = scene.getBoundingClientRect()
+    const dot = scene.querySelector('.skills-title-period')!.getBoundingClientRect()
+    const style = getComputedStyle(scene)
+    const x = parseFloat(style.getPropertyValue('--skills-portal-x'))
+    const y = parseFloat(style.getPropertyValue('--skills-portal-y'))
+    return Math.hypot(x - (dot.left + dot.width / 2 - bounds.left), y - (dot.top + dot.height / 2 - bounds.top))
+  })).toBeLessThan(0.5)
 })
