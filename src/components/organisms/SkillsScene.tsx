@@ -44,6 +44,7 @@ function SkillCategoryPill({
   const rotation = useTransform(distance, (value) => clamp(-value * (compact ? 62 : 38), -81, 81))
   const vertical = useTransform(distance, (value) => Math.sin((value * Math.PI) / 4) * radius)
   const depth = useTransform(distance, (value) => (Math.cos((value * Math.PI) / 4) - 1) * radius * (compact ? 3.5 : 1))
+  const opacity = useTransform(distance, (value) => compact ? 1 - clamp(Math.abs(value)) * 0.65 : 1)
   const visibility = useTransform(distance, (value) => Math.abs(value) < 1.75 ? 'visible' : 'hidden')
   const scaleX = useSpring(0.82, { stiffness: 340, damping: 17, mass: 0.8 })
   const scaleY = useSpring(0.82, { stiffness: 260, damping: 14, mass: 0.8 })
@@ -72,6 +73,7 @@ function SkillCategoryPill({
         rotateX: animated ? rotation : 0,
         y: animated ? vertical : 0,
         z: animated ? depth : 0,
+        opacity: animated ? opacity : 1,
         scaleX: animated ? scaleX : 1,
         scaleY: animated ? scaleY : 1,
         visibility: animated ? visibility : 'visible',
