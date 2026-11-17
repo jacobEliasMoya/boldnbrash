@@ -1,8 +1,14 @@
 import { expect, test, type Page } from '@playwright/test'
-import { skillStart, skills } from '../../src/components/organisms/skillsTimeline'
+import { skillStart, skills, skillSegments } from '../../src/components/organisms/skillsTimeline'
 
 async function scrollToPhase(page: Page, position: number) {
-  await page.evaluate((value) => {
+  await page.evaluate(({ value, segments, start }) => {
+    if (value >= start) {
+      const relative = value - start
+      const index = segments.reduce((selected, segment, i) => segment.start <= relative ? i : selected, 0)
+      window.dispatchEvent(new CustomEvent('portfolio:select-skill', { detail: { index, offset: relative - segments[index].start }, cancelable: true }))
+      return
+    }
     window.dispatchEvent(new Event('pointerdown'))
     const track = document.querySelector<HTMLElement>('.scene-track')!
     const stage = track.firstElementChild as HTMLElement
@@ -12,7 +18,7 @@ async function scrollToPhase(page: Page, position: number) {
         track.getBoundingClientRect().top +
         ((track.offsetHeight - stage.clientHeight) * value) / Number(track.dataset.duration),
     )
-  }, position)
+  }, { value: position, segments: skillSegments, start: skillStart })
   await expect
     .poll(
       async () =>

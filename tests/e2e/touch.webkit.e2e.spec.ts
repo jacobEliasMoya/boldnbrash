@@ -47,7 +47,7 @@ test('vertical touch input advances and reverses the scene clock', async ({ page
     .poll(async () =>
       Number(await page.locator('.scene-track').getAttribute('data-playback-progress')),
     )
-    .toBeGreaterThan(0.05)
+    .toBeGreaterThan(0.25)
   const before = Number(await page.locator('.scene-track').getAttribute('data-playback-progress'))
   expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
   await page.locator('.scene-top').evaluate((element) => {

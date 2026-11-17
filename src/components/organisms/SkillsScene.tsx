@@ -10,6 +10,7 @@ import {
   type MotionValue,
 } from 'motion/react'
 import { PlatformArtwork, SystemArtwork } from '@/components/atoms/ProjectArtwork'
+import { getPeriodOpening } from '@/components/atoms/periodOpening'
 import { clamp, getSkillFrame, projectStops, skills } from './skillsTimeline'
 
 type Project = (typeof skills)[number]['projects'][number]
@@ -231,9 +232,10 @@ export function SkillsScene() {
   }, [animated])
   const scene = useRef<HTMLDivElement>(null)
   const period = useRef<HTMLSpanElement>(null)
-  const [portal, setPortal] = useState({ x: 0, y: 0, radius: 0, dot: 0 })
+  const [portal, setPortal] = useState({ x: 0, y: 0, radius: 0, dot: 0, borderWidth: 12 })
   const expansion = animated ? clamp((selection.intro - 0.4) / 0.6) : 1
   const entrance = expansion === 1 ? 1 : 0
+  const opening = getPeriodOpening(expansion, portal.dot, portal.radius, portal.borderWidth)
   useLayoutEffect(() => {
     const element = scene.current
     const dot = period.current
@@ -245,6 +247,7 @@ export function SkillsScene() {
       const y = point.top + point.height / 2 - bounds.top
       setPortal({
         x, y, dot: point.width / 2,
+        borderWidth: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--frame-inset')) || 12,
         radius: Math.hypot(Math.max(x, bounds.width - x), Math.max(y, bounds.height - y)) + 2,
       })
     }
@@ -296,7 +299,7 @@ export function SkillsScene() {
       style={{
         '--skills-portal-x': `${portal.x}px`,
         '--skills-portal-y': `${portal.y}px`,
-        '--skills-portal-radius': `${expansion > 0 ? portal.dot + (portal.radius - portal.dot) * expansion * expansion : 0}px`,
+        '--skills-portal-radius': `${opening.innerRadius}px`,
       } as CSSProperties}
     >
       <div className="skills-heading" aria-hidden={animated && expansion === 1}>
@@ -309,6 +312,11 @@ export function SkillsScene() {
           </span>
         </h2>
       </div>
+      {animated && expansion > 0 && expansion < 1 && (
+        <svg className="skills-period-opening" aria-hidden="true" focusable="false">
+          <circle cx={portal.x} cy={portal.y} r={opening.ringRadius} strokeWidth={opening.ringWidth} />
+        </svg>
+      )}
       {animated ? (
         <div className="skills-reveal" inert={entrance < 1} aria-hidden={entrance < 1}>
         <div className="skills-performance">

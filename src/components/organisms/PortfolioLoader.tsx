@@ -4,6 +4,7 @@ import { motion, useMotionValue, useReducedMotion } from 'motion/react'
 import { useEffect, useRef, useState } from 'react'
 import { heroFrameCount } from '@/components/atoms/heroFrames'
 import { introCompleteEvent } from '@/hooks/useIntroReady'
+import { getPeriodOpening } from '@/components/atoms/periodOpening'
 
 const seenKey = 'portfolio:intro-seen'
 const frameDurations = [
@@ -22,6 +23,8 @@ const fadeDuration = 300
 const openerDuration = 1150
 const introLines = ['Im Jake']
 const copyStartsAt = frameStarts[13] + 300
+const copyFillStartsAt = copyStartsAt + 560
+const copyFillDuration = 650
 
 function circlePath(x: number, y: number, radius: number) {
   return `M${x - radius},${y} A${radius},${radius} 0 1 0 ${x + radius},${y} A${radius},${radius} 0 1 0 ${x - radius},${y} Z`
@@ -155,6 +158,8 @@ export function PortfolioLoader({ playOnce = false }: { playOnce?: boolean }) {
       const delta = previousTime ? Math.min(50, time - previousTime) : 0
       previousTime = time
       if (!document.hidden) elapsed += delta
+      const copyFill = reduceMotion ? 1 : Math.min(1, Math.max(0, (elapsed - copyFillStartsAt) / copyFillDuration))
+      layer.current?.style.setProperty('--title-fill', `${copyFill * 100}%`)
       if (reduceMotion) {
         if (!copyStarted) {
           copyStarted = true
@@ -215,7 +220,6 @@ export function PortfolioLoader({ playOnce = false }: { playOnce?: boolean }) {
             signalIntroComplete()
           }
           const progress = Math.min(1, (elapsed - readinessFadeStartsAt) / openerDuration)
-          const eased = progress * progress * (3 - 2 * progress)
           const { x, y } = openerOrigin
           const reach =
             Math.max(
@@ -223,11 +227,11 @@ export function PortfolioLoader({ playOnce = false }: { playOnce?: boolean }) {
               Math.hypot(innerWidth - x, y),
               Math.hypot(x, innerHeight - y),
               Math.hypot(innerWidth - x, innerHeight - y),
-            ) + 36
-          const radius = openerOrigin.radius + (reach - openerOrigin.radius) * eased
-          const opening = Math.min(1, Math.max(0, (progress - 0.1) / 0.12))
-          const thickness = radius * (1 - opening) + 32 * opening
-          const holeRadius = Math.max(0, radius - thickness)
+            )
+          const borderWidth = parseFloat(getComputedStyle(documentRoot).getPropertyValue('--frame-inset')) || 12
+          const { outerRadius: radius, innerRadius: holeRadius } = getPeriodOpening(
+            progress, openerOrigin.radius, reach, borderWidth,
+          )
           opener.current.style.clipPath = `circle(${radius}px at ${x}px ${y}px)`
           if (layer.current) {
             layer.current.dataset.phase = 'opening'
@@ -353,7 +357,7 @@ export function PortfolioLoader({ playOnce = false }: { playOnce?: boolean }) {
                   delay: (introLines.length - 1 - lineIndex) * 0.24,
                 }}
               >
-                {line}
+                <span className="portfolio-loader-text-fill">{line}</span>
                 {lineIndex === introLines.length - 1 && (
                   <span ref={period} className="portfolio-loader-period" />
                 )}

@@ -497,12 +497,12 @@ test('every mobile menu selection expands into its section and restores scrollin
   await page.goto(baseURL)
   await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 10000 })
   await expect(page.locator('.portfolio')).toHaveAttribute('data-enhanced', '')
-  for (const [label, id, color] of [
-    ['Skills', 'skills', 'rgb(56, 20, 255)'],
-    ['Approach', 'approach', 'rgb(56, 20, 255)'],
-    ['About', 'about', 'rgb(239, 235, 225)'],
-    ['Contact', 'contact', 'rgb(56, 20, 255)'],
-    ['Home', 'top', 'rgb(8, 8, 9)'],
+  for (const [label, id] of [
+    ['Skills & Work', 'skills'],
+    ['Approach', 'approach'],
+    ['About', 'about'],
+    ['Contact', 'contact'],
+    ['Home', 'top'],
   ]) {
     await page.getByRole('button', { name: 'Open menu' }).click()
     const menu = page.getByRole('dialog', { name: 'Mobile navigation' })
@@ -518,16 +518,16 @@ test('every mobile menu selection expands into its section and restores scrollin
     const link = menu.getByRole('link', { name: label + '.', exact: true })
     await expect(link).toHaveCSS('transform', 'none')
     const period = link.locator('.mobile-menu-period')
-    await expect(period).toHaveCSS('background-color', color)
+    await expect(period).toHaveCSS('background-color', 'rgb(8, 8, 9)')
     const bounds = (await period.boundingBox())!
     await link.click()
     const reveal = page.locator('.mobile-menu-reveal')
     await expect(reveal).toHaveAttribute('data-destination', id)
-    await expect(reveal).toHaveCSS('background-color', color)
-    const clip = await reveal.evaluate((element) => getComputedStyle(element).clipPath)
-    const origin = clip.match(/at ([\d.]+)px ([\d.]+)px/)!
-    expect(Math.abs(Number(origin[1]) - (bounds.x + bounds.width / 2))).toBeLessThan(1)
-    expect(Math.abs(Number(origin[2]) - (bounds.y + bounds.height / 2))).toBeLessThan(1)
+    const ring = reveal.locator('circle')
+    await expect(reveal).toHaveCSS('stroke', 'rgb(8, 8, 9)')
+    expect(Math.abs(Number(await ring.getAttribute('cx')) - (bounds.x + bounds.width / 2))).toBeLessThan(1)
+    expect(Math.abs(Number(await ring.getAttribute('cy')) - (bounds.y + bounds.height / 2))).toBeLessThan(1)
+    await expect.poll(() => ring.getAttribute('stroke-width')).toBe('12')
     await expect(menu).not.toBeVisible()
     await expect(page).toHaveURL(new RegExp('#' + id + '$'))
     await expect(page.locator('#' + id)).toHaveAttribute('aria-hidden', 'false')

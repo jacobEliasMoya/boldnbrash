@@ -10,6 +10,7 @@ for (const width of [1440, 390]) {
     await page.goto(baseURL)
     const loader = page.locator('.portfolio-loader')
     await expect(loader).toBeVisible()
+    await expect.poll(() => loader.evaluate((el) => parseFloat(getComputedStyle(el).getPropertyValue('--title-fill')))).toBe(0)
     await expect(page.locator('.site-header')).toHaveCSS('opacity', '0')
     await expect(page.locator('.site-header .wordmark')).toHaveCSS('opacity', '0')
     if (width === 390)
@@ -30,6 +31,7 @@ for (const width of [1440, 390]) {
     await expect(loader).toHaveAttribute('data-phase', 'copy', { timeout: 7000 })
     await expect(copyLines.last()).toHaveCSS('opacity', '1')
     await expect(loader).toHaveAttribute('data-phase', 'catch')
+    await expect.poll(() => loader.evaluate((el) => parseFloat(getComputedStyle(el).getPropertyValue('--title-fill')))).toBe(100)
     await expect(loader).toHaveAttribute('data-assets-ready', 'true')
     await expect(loader).toHaveAttribute('data-load-progress', '100')
     await expect(

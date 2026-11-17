@@ -17,6 +17,7 @@ import { ThemeToggle } from '@/components/atoms/ThemeToggle'
 import { MobileMenu } from './MobileMenu'
 import { heroAnimationTravel } from '@/components/atoms/heroFrames'
 import { getPortalBounds } from '@/components/atoms/portalBounds'
+import { getPeriodOpening } from '@/components/atoms/periodOpening'
 import { toPlaybackTime, fromPlaybackTime } from './scrollPlayback'
 import { useIntroReady } from '@/hooks/useIntroReady'
 
@@ -38,20 +39,12 @@ const origins = [
 ]
 
 export function SceneSequence({ children }: { children: ReactNode }) {
-  const [skillsCanvas, setSkillsCanvas] = useState(false)
-  useEffect(() => {
-    const update = (event: Event) => {
-      const { intro } = (event as CustomEvent<{ intro: number }>).detail
-      setSkillsCanvas(intro >= 0.95)
-    }
-    window.addEventListener('portfolio:skills-progress', update)
-    return () => window.removeEventListener('portfolio:skills-progress', update)
-  }, [])
   const reduceMotion = useReducedMotion()
   const introReady = useIntroReady()
   const timeline = useMotionValue(0)
   const track = useRef<HTMLDivElement>(null)
   const panels = useRef<(HTMLElement | null)[]>([])
+  const sceneOpenings = useRef<(SVGCircleElement | null)[]>([])
   const [enhanced, setEnhanced] = useState(false)
   const [active, setActive] = useState(0)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -135,6 +128,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     let requested = 0
     let previousPlaybackTime = 0
     let inputDirection = 0
+    let heroTouchPlayback = false
     let snapTimer = 0
     let snapFrame = 0
     let snapping = false
@@ -196,7 +190,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       }, 420)
     }
 
-    function advanceInput(pixels: number, target: Element | null) {
+    function advanceInput(pixels: number, target: Element | null, touchInput = false) {
       const node = track.current
       if (!node || media.matches || !pixels) return false
       if (target?.closest('dialog, input, textarea, select, [contenteditable="true"]')) return false
@@ -233,12 +227,15 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           ? currentClock
           : toPlaybackTime(nativeProgress)
       inputDirection = direction
-      const desired = base + direction * Math.min(Math.abs(pixels), 120) * 0.0015
+      heroTouchPlayback = touchInput && current === 0
+      const inputGain = heroTouchPlayback ? 0.004 : 0.0015
+      const maxLead = heroTouchPlayback ? 1.8 : 0.9
+      const desired = base + direction * Math.min(Math.abs(pixels), 120) * inputGain
       const bounded = Math.max(
         0,
         Math.min(
           toPlaybackTime(sceneDuration),
-          Math.max(currentClock - 0.9, Math.min(currentClock + 0.9, desired)),
+          Math.max(currentClock - maxLead, Math.min(currentClock + maxLead, desired)),
         ),
       )
       window.scrollTo({
@@ -306,7 +303,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       }
       const pixels = touch.lastY - point.clientY
       touch.lastY = point.clientY
-      if (touch.axis === 'vertical' && advanceInput(pixels, touch.target)) event.preventDefault()
+      if (touch.axis === 'vertical' && advanceInput(pixels, touch.target, true)) event.preventDefault()
     }
     function endTouch() {
       touch = null
@@ -347,10 +344,11 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         else settleFocus()
         return
       }
-      const step = Math.sign(difference) * Math.min(Math.abs(difference), delta / 1000)
+      const playbackStep = delta / 1000 * (heroTouchPlayback && current === 0 ? 1.6 : 1)
+      const step = Math.sign(difference) * Math.min(Math.abs(difference), playbackStep)
       displayed = fromPlaybackTime(currentTime + step)
       renderScene(displayed)
-      if (Math.abs(difference) > delta / 1000 + 0.000001) {
+      if (Math.abs(difference) > playbackStep + 0.000001) {
         playbackFrame = requestAnimationFrame(advancePlayback)
       } else {
         displayed = requested
@@ -434,9 +432,18 @@ export function SceneSequence({ children }: { children: ReactNode }) {
             Math.max(y, panelBounds.height - y),
           )
           const startingRadius = index === 1 && portalBounds ? portalBounds.width / 2 : 0
-          const openingRadius = startingRadius + reveal * (radius - startingRadius)
+          const borderWidth = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--frame-inset')) || 12
+          const aperture = getPeriodOpening(reveal, startingRadius, radius, borderWidth)
           panel.style.clipPath =
-            reveal === 1 ? 'none' : `circle(${openingRadius}px at ${x}px ${y}px)`
+            reveal === 1 ? 'none' : `circle(${aperture.innerRadius}px at ${x}px ${y}px)`
+          const ring = sceneOpenings.current[index]
+          if (ring) {
+            ring.style.visibility = reveal > 0 && reveal < 1 ? 'visible' : 'hidden'
+            ring.setAttribute('cx', String(x))
+            ring.setAttribute('cy', String(y))
+            ring.setAttribute('r', String(aperture.ringRadius))
+            ring.setAttribute('stroke-width', String(aperture.ringWidth))
+          }
         }
         panel.style.visibility = index === 0 || reveal > 0 ? 'visible' : 'hidden'
         if (reveal > 0.7) visible = index
@@ -477,6 +484,9 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       history.scrollRestoration = enabled ? 'manual' : previousScrollRestoration
       setEnhanced(enabled)
       if (!enabled) {
+        sceneOpenings.current.forEach((ring) => {
+          if (ring) ring.style.visibility = 'hidden'
+        })
         timeline.stop()
         cancelAnimationFrame(playbackFrame)
         playbackFrame = 0
@@ -630,7 +640,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           Skip to selected work
         </a>
         <motion.header
-          className={`site-header tone-${active === 0 || active === 3 || (active === 1 && skillsCanvas) ? 'paper' : 'dark'}`}
+          className={`site-header tone-${active === 0 || active === 1 || active === 3 ? 'paper' : 'dark'}`}
           initial={reduceMotion ? false : { opacity: 0, y: -24 }}
           animate={introReady ? { opacity: 1, y: 0 } : { opacity: 0, y: -24 }}
           transition={{ duration: reduceMotion ? 0 : 0.7, ease: [0.22, 1, 0.36, 1] }}
@@ -638,7 +648,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           <BlendedLogo
             enabled={enhanced}
             ready={introReady}
-            tone={active === 0 || active === 3 || (active === 1 && skillsCanvas) ? 'paper' : 'dark'}
+            tone={active === 0 || active === 1 || active === 3 ? 'paper' : 'dark'}
           >
             <motion.a
               className="wordmark"
@@ -659,7 +669,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           <BlendedNav
             enabled={enhanced}
             ready={introReady}
-            tone={active === 0 || active === 3 || (active === 1 && skillsCanvas) ? 'paper' : 'dark'}
+            tone={active === 0 || active === 1 || active === 3 ? 'paper' : 'dark'}
           >
             {scenes.map((scene, index) => (
               <motion.a
@@ -691,7 +701,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           <BlendedLogo
             enabled={enhanced}
             ready={introReady}
-            tone={active === 0 || active === 3 || (active === 1 && skillsCanvas) ? 'paper' : 'dark'}
+            tone={active === 0 || active === 1 || active === 3 ? 'paper' : 'dark'}
             control
           >
             <ThemeToggle />
@@ -732,6 +742,11 @@ export function SceneSequence({ children }: { children: ReactNode }) {
                 {child}
               </section>
             ))}
+            <svg className="scene-period-opening" aria-hidden="true" focusable="false">
+              {scenes.slice(1).map((scene, index) => (
+                <circle key={scene.id} ref={(node) => { sceneOpenings.current[index + 1] = node }} />
+              ))}
+            </svg>
           </div>
         </main>
       </div>
