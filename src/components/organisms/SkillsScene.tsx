@@ -321,19 +321,21 @@ export function SkillsScene() {
         '--skills-portal-radius': `${opening.innerRadius}px`,
       } as CSSProperties}
     >
-      <div className="skills-title-shadow" aria-hidden="true">
-        <span>My tech.</span>
-        <span>And stuff.</span>
-      </div>
       <div className="skills-heading" aria-hidden={animated && expansion === 1}>
-        <h2 aria-label="My tech. And stuff.">
-          <span className="skills-title-line" aria-hidden="true">
-            <span className="skills-title-fill" style={{ '--title-fill': `${animated ? clamp(selection.intro / 0.18) * 100 : 0}%` } as CSSProperties}>My tech.</span>
-          </span>
-          <span className="skills-title-line" aria-hidden="true">
-            <span className="skills-title-fill" style={{ '--title-fill': `${animated ? clamp((selection.intro - 0.18) / 0.18) * 100 : 0}%` } as CSSProperties}>And stuff</span><span ref={period} className="skills-title-period" />
-          </span>
-        </h2>
+        <div className="skills-title-stack">
+          <div className="skills-title-shadow" aria-hidden="true">
+            <span>My tech.</span>
+            <span>And stuff.</span>
+          </div>
+          <h2 aria-label="My tech. And stuff.">
+            <span className="skills-title-line" aria-hidden="true">
+              <span className="skills-title-fill" style={{ '--title-fill': `${animated ? clamp(selection.intro / 0.18) * 100 : 0}%` } as CSSProperties}>My tech.</span>
+            </span>
+            <span className="skills-title-line" aria-hidden="true">
+              <span className="skills-title-fill" style={{ '--title-fill': `${animated ? clamp((selection.intro - 0.18) / 0.18) * 100 : 0}%` } as CSSProperties}>And stuff</span><span ref={period} className="skills-title-period" />
+            </span>
+          </h2>
+        </div>
         <p className="skills-intro">Check out how I spend my time when I’m not working, being a dad, or playing guitar.</p>
       </div>
       {animated && expansion > 0 && expansion < 1 && (

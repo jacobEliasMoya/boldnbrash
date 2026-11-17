@@ -3126,8 +3126,15 @@ ul {
 
 .skills-duet .skills-heading {
   max-width: 1280px;
+  container-type: inline-size;
+}
+.skills-title-stack {
+  position: relative;
+  display: flow-root;
 }
 .skills-duet .skills-heading h2 {
+  position: relative;
+  z-index: 2;
   font-size: clamp(64px, 10vw, 152px);
   line-height: 0.96;
   max-width: none;
@@ -3146,18 +3153,17 @@ ul {
   display: grid;
   align-content: center;
   justify-items: center;
-  gap: 0.04em;
   color: #77777f;
   opacity: 0.14;
-  font: 900 min(12.5vw, 190px)/1.12 var(--display);
-  letter-spacing: -0.035em;
+  font: 900 min(12.5vw, 190px)/1.08 var(--display);
+  letter-spacing: -0.055em;
   text-transform: uppercase;
   white-space: nowrap;
   pointer-events: none;
 }
 @media (max-width: 900px) {
   .skills-title-shadow {
-    font-size: min(10.2vw, 88px);
+    font-size: min(15vw, 145px);
   }
 }
 .portfolio:not([data-enhanced]) .skills-title-shadow {
@@ -3170,7 +3176,8 @@ ul {
 }
 @media (max-width: 900px) {
   .skills-duet .skills-heading h2 {
-    font-size: clamp(28px, 9vw, 78px);
+    font-size: clamp(40px, 16cqw, 138px);
+    margin: 0 auto 10px;
   }
 }
 @media (max-height: 400px) {
