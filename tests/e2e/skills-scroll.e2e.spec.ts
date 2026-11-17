@@ -1,18 +1,14 @@
 import { expect, test, type Page } from '@playwright/test'
-import { projectStops, skillStart } from '../../src/components/organisms/skillsTimeline'
+import { projectStops, skillStart, skillSegments } from '../../src/components/organisms/skillsTimeline'
 
 async function moveTo(page: Page, position: number) {
-  await page.evaluate((position) => {
-    window.dispatchEvent(new Event('pointerdown'))
-    const track = document.querySelector<HTMLElement>('.scene-track')!
-    const stage = track.firstElementChild as HTMLElement
-    window.scrollTo(
-      0,
-      scrollY +
-        track.getBoundingClientRect().top +
-        ((track.offsetHeight - stage.clientHeight) * position) / Number(track.dataset.duration),
-    )
-  }, position)
+  await page.evaluate(({ position, segments, start }) => {
+    const relative = position - start
+    const index = segments.reduce((chosen, segment, i) => segment.start <= relative ? i : chosen, 0)
+    window.dispatchEvent(new CustomEvent('portfolio:select-skill', {
+      detail: { index, offset: relative - segments[index].start }, cancelable: true,
+    }))
+  }, { position, segments: skillSegments, start: skillStart })
   await page.waitForTimeout(60)
 }
 const progress = (page: Page) =>
@@ -26,7 +22,7 @@ test.beforeEach(async ({ page }) => {
   await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 15000 })
 })
 
-test('native wheel input stays in sync and small movements rotate immediately', async ({
+test('native wheel input glides and small movements remain responsive', async ({
   page,
 }) => {
   const middle = skillStart + (projectStops[1].position + projectStops[2].position) / 2
@@ -41,15 +37,14 @@ test('native wheel input stays in sync and small movements rotate immediately', 
   const forward = await progress(page)
   await page.mouse.wheel(0, -24)
   await expect.poll(() => progress(page)).toBeLessThan(forward - 0.01)
-  const syncError = await page.locator('.scene-track').evaluate((el) => {
+  await expect.poll(() => page.locator('.scene-track').evaluate((el) => {
     const track = el as HTMLElement
     const native =
       (-track.getBoundingClientRect().top /
         (track.offsetHeight - track.firstElementChild!.clientHeight)) *
       Number(track.dataset.duration)
     return Math.abs(native - Number(track.dataset.playbackProgress))
-  })
-  expect(syncError).toBeLessThan(0.01)
+  })).toBeLessThan(0.01)
 })
 
 test('every resting position snaps to an item and further input interrupts settling', async ({
@@ -82,13 +77,37 @@ test('project cards stay fixed during a circular reveal and settle completely', 
 })
 
 
-test('one deliberate wheel notch advances a project and crosses skill boundaries', async ({ page }) => {
-  for (const index of [0, 1]) {
-    await moveTo(page, skillStart + projectStops[index].position)
-    await page.mouse.move(300, 380)
-    await page.mouse.wheel(0, 100)
-    await expect.poll(() => progress(page)).toBeCloseTo(skillStart + projectStops[index + 1].position, 2)
-    await page.mouse.wheel(0, -100)
-    await expect.poll(() => progress(page)).toBeCloseTo(skillStart + projectStops[index].position, 2)
+test('continuous scrolling stays native and only settles after input stops', async ({ page }) => {
+  await moveTo(page, skillStart + projectStops[1].position)
+  await page.mouse.move(300, 380)
+  for (let i = 0; i < 4; i++) {
+    const before = await page.evaluate(() => scrollY)
+    await page.mouse.wheel(0, 60)
+    await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(before)
+    const travel = await page.evaluate((start) => scrollY - start, before)
+    expect(travel).toBeLessThanOrEqual(75)
+    await expect(page.locator('.scene-track')).not.toHaveAttribute('data-snapping')
   }
+  const position = await page.locator('.scene-track').evaluate((el) => {
+    const track = el as HTMLElement
+    return -track.getBoundingClientRect().top / (track.offsetHeight - track.firstElementChild!.clientHeight) * Number(track.dataset.duration)
+  })
+  const nearest = projectStops.reduce((best, stop) =>
+    Math.abs(skillStart + stop.position - position) < Math.abs(skillStart + best.position - position) ? stop : best,
+  )
+  await expect.poll(() => progress(page)).toBeCloseTo(skillStart + nearest.position, 2)
+})
+
+
+test('scrolling up after the final project stays within the stop list', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  const last = projectStops[projectStops.length - 1]
+  await moveTo(page, skillStart + last.position + 0.3)
+  const before = await progress(page)
+  await page.mouse.move(300, 380)
+  await page.mouse.wheel(0, -100)
+  await expect.poll(() => progress(page)).toBeLessThan(before - 0.1)
+  expect(errors).toEqual([])
+  await expect.poll(() => progress(page)).toBeCloseTo(skillStart + last.position, 2)
 })

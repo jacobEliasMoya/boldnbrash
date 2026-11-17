@@ -25,7 +25,7 @@ for (const width of [1440, 390]) {
     )
     await expect(page.locator('.portfolio')).toHaveJSProperty('inert', true)
     const copyLines = page.locator('.portfolio-loader-copy-line')
-    await expect(copyLines).toHaveText(['hey', 'I’m', 'Jake'])
+    await expect(copyLines).toHaveText(['Im Jake'])
     await expect(copyLines.last()).toHaveCSS('opacity', '0')
     await expect(loader).toHaveAttribute('data-phase', 'copy', { timeout: 7000 })
     await expect(copyLines.last()).toHaveCSS('opacity', '1')

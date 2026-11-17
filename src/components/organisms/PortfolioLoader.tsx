@@ -20,7 +20,7 @@ const readingHoldDuration = 400
 const readyDelayReduction = 333
 const fadeDuration = 300
 const openerDuration = 1150
-const introLines = ['hey', 'I’m', 'Jake']
+const introLines = ['Im Jake']
 const copyStartsAt = frameStarts[13] + 300
 
 function circlePath(x: number, y: number, radius: number) {

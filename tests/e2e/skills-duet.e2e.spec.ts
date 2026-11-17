@@ -43,7 +43,7 @@ for (const viewport of [
       await expect(page.locator('.skills-reveal')).toHaveAttribute('inert', '')
       await page.screenshot({ path: `test-results/duet-intro-${viewport.width}.png` })
       await expect(page.locator('.skills-scroll-cue')).toHaveCount(0)
-      await expect(page.getByRole('heading', { name: 'What I use. What I build.' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'What I do. What I build.' })).toBeVisible()
       await scrollToPhase(page, 1.4 + (skillStart - 1.4) * 0.46)
       await expect(intro).toHaveCSS('opacity', '1')
       await expect(page.locator('.skills-title-letter')).toHaveCount(0)

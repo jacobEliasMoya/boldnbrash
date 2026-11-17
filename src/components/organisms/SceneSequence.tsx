@@ -162,8 +162,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           return
         if (displayed < skillStart || displayed > skillStart + skillTravel) return
         const nearest = projectStops.reduce((best, stop) =>
-          Math.abs(skillStart + stop.position - displayed) <
-          Math.abs(skillStart + best.position - displayed)
+          Math.abs(skillStart + stop.position - requested) <
+          Math.abs(skillStart + best.position - requested)
             ? stop
             : best,
         )
@@ -193,7 +193,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           }
         }
         snapFrame = requestAnimationFrame(settle)
-      }, 280)
+      }, 420)
     }
 
     function advanceInput(pixels: number, target: Element | null) {
@@ -259,30 +259,6 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       const pixels =
         event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1)
       const target = event.target instanceof Element ? event.target : null
-      if (
-        current === 1 && !media.matches && pixels && track.current &&
-        displayed >= skillStart && displayed <= skillStart + skillTravel &&
-        !target?.closest('dialog, input, textarea, select, [contenteditable="true"]')
-      ) {
-        const node = track.current
-        const position = displayed - skillStart
-        const next = projectStops.findIndex((stop) => stop.position > position + 0.01)
-        const interval = pixels > 0
-          ? Math.max(1, next < 0 ? projectStops.length - 1 : next)
-          : Math.max(1, projectStops.reduce((last, stop, index) => stop.position < position - 0.01 ? index + 1 : last, 0))
-        const gap = projectStops[interval].position - projectStops[interval - 1].position
-        // A normal wheel notch crosses the halfway point, even between categories.
-        const travel = Math.sign(pixels) * gap * Math.min(Math.abs(pixels) / 150, 0.85)
-        const top = scrollY + node.getBoundingClientRect().top
-        const distance = node.offsetHeight - (node.firstElementChild?.clientHeight ?? innerHeight)
-        event.preventDefault()
-        window.scrollTo({
-          top: top + distance * Math.max(0, Math.min(sceneDuration, displayed + travel)) / sceneDuration,
-          behavior: 'instant',
-        })
-        update()
-        return
-      }
       if (advanceInput(pixels, target))
         event.preventDefault()
     }
@@ -339,8 +315,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
 
     function render(value: number, immediate = false) {
       requested = Math.max(0, Math.min(sceneDuration, value))
-      const liveSkills = current === 1
-      if (immediate || liveSkills) {
+      if (immediate || snapping) {
         cancelAnimationFrame(playbackFrame)
         playbackFrame = 0
         displayed = requested
@@ -361,6 +336,17 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       const currentTime = toPlaybackTime(displayed)
       const targetTime = toPlaybackTime(requested)
       const difference = targetTime - currentTime
+      if (current === 1) {
+        // Absorb discrete mouse-wheel ticks into a short glide, without an input queue.
+        const settled = Math.abs(difference) < 0.002
+        displayed = settled
+          ? requested
+          : fromPlaybackTime(currentTime + difference * (1 - Math.exp(-delta / 85)))
+        renderScene(displayed)
+        if (!settled) playbackFrame = requestAnimationFrame(advancePlayback)
+        else settleFocus()
+        return
+      }
       const step = Math.sign(difference) * Math.min(Math.abs(difference), delta / 1000)
       displayed = fromPlaybackTime(currentTime + step)
       renderScene(displayed)
@@ -730,7 +716,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           ref={track}
           className="scene-track"
           data-duration={sceneDuration}
-          style={enhanced ? { height: `calc(100svh * ${1 + sceneDuration * 0.8})` } : undefined}
+          style={enhanced ? { height: `calc(100svh * ${1 + sceneDuration * 0.9})` } : undefined}
         >
           <div className="scene-stage">
             {Children.map(children, (child, index) => (

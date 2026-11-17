@@ -4,7 +4,7 @@ export function PlatformArtwork() {
       <rect x="1" y="1" width="498" height="248" rx="16" fill="#0c0c0e" stroke="#777570" />
       <path d="M1 30h498M82 30v219" stroke="#55534f" />
       {[16, 29, 42].map((x) => (
-        <circle key={x} cx={x} cy="15" r="3" fill="#765cff" />
+        <circle key={x} cx={x} cy="15" r="3" fill="var(--accent)" />
       ))}
       {[58, 82, 106, 130, 154, 178].map((y, i) => (
         <rect
@@ -14,19 +14,19 @@ export function PlatformArtwork() {
           width={i === 2 ? 54 : 42}
           height="8"
           rx="4"
-          fill={i === 2 ? '#6544ff' : '#565552'}
+          fill={i === 2 ? 'var(--accent)' : '#565552'}
         />
       ))}
       <rect x="100" y="48" width="245" height="135" rx="12" stroke="#686661" />
       <path
         d="M114 163c32-60 45-16 72-37s35-51 63-30 39-19 64-16 16-11 19-20"
-        stroke="#7053ff"
+        stroke="var(--accent)"
         strokeWidth="4"
         strokeLinecap="round"
       />
       <path
         d="M114 163c32-60 45-16 72-37s35-51 63-30 39-19 64-16 16-11 19-20v112H114z"
-        fill="#4521ff"
+        fill="var(--accent)"
         opacity=".13"
       />
       <rect x="359" y="48" width="123" height="135" rx="12" stroke="#686661" />
@@ -35,7 +35,7 @@ export function PlatformArtwork() {
         cx="420"
         cy="115"
         r="33"
-        stroke="#6544ff"
+        stroke="var(--accent)"
         strokeWidth="14"
         strokeDasharray="145 210"
         transform="rotate(-90 420 115)"

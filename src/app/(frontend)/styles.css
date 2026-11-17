@@ -24,6 +24,8 @@
   --frame-inset: 12px;
   --frame-stroke: 3px;
   --blue: #3814ff;
+  --accent: #ffc857;
+  --accent-ink: #805000;
   --display: 'Fedro', 'Cooper Black', Georgia, serif;
   --mono: 'Courier New', monospace;
   --gutter: clamp(24px, 5vw, 88px);
@@ -84,6 +86,7 @@ p {
 /* Paragraph typography stays consistent across section-specific font shorthands. */
 p {
   font-family: 'JetBrains Mono', monospace !important;
+  font-weight: 800 !important;
 }
 h1,
 h2,
@@ -492,6 +495,9 @@ ul {
 }
 .portfolio-loader-copy-row:nth-child(2) {
   font-size: 0.76em;
+}
+.portfolio-loader-copy-row:only-child {
+  font-size: 1em;
 }
 .portfolio-loader-copy-line {
   transform-origin: 50% 100%;
@@ -2314,6 +2320,7 @@ ul {
   --frame-color: #53505f;
   --ink: #efebe1;
   --blue: #a28aff;
+  --accent-ink: var(--accent);
   color-scheme: dark;
 }
 :root[data-theme='dark'] .scene-about {
@@ -2879,7 +2886,7 @@ ul {
   font-size: 13px;
 }
 .skills-duet .skills-category-pill[data-active] {
-  box-shadow: inset 0 0 0 1px #cbbcff66;
+  box-shadow: none;
 }
 .skills-projects {
   position: relative;
@@ -3121,7 +3128,7 @@ ul {
 }
 @media (max-width: 900px) {
   .skills-duet .skills-heading h2 {
-    font-size: clamp(32px, 10.8vw, 90px);
+    font-size: clamp(28px, 9vw, 78px);
   }
 }
 @media (max-height: 400px) {
@@ -3265,10 +3272,10 @@ ul {
 }
 
 
-/* The introduction uses a softer violet; the lettering fills before the portal opens. */
+/* White lettering fills with purple before the period opens the next canvas. */
 .scene-skills {
-  background: #7555c9;
-  --skills-title-ink: #30204f;
+  background: var(--skills-blue);
+  --skills-title-ink: var(--accent);
   --skills-title-base: #ffffff;
 }
 .skills-duet .skills-heading {
@@ -3279,6 +3286,9 @@ ul {
   color: var(--skills-title-base);
 }
 .skills-title-fill {
+  display: inline-block;
+  padding-inline: 0.08em;
+  margin-inline: -0.08em;
   color: transparent;
   background: linear-gradient(90deg,
     var(--skills-title-ink) 0 var(--title-fill, 0%),
@@ -3288,5 +3298,62 @@ ul {
 }
 :root[data-theme='dark'] .scene-skills {
   background: #23115e;
-  --skills-title-ink: #bca2f2;
+  --skills-title-ink: var(--accent);
+}
+
+
+/* Amber connects small details across the purple and neutral scenes. */
+::selection {
+  background: var(--accent);
+  color: #211d29;
+}
+.hero-greeting > .name-pill,
+:root[data-theme='dark'] .hero-greeting > .name-pill {
+  background: var(--accent);
+  color: #211d29;
+}
+.skills-category-current > .eyebrow,
+.skills-category-note,
+.skills-pill-toggle,
+.skills-duet .skill-project-card > .eyebrow,
+.skills-duet .skill-project-card .project-open b,
+.approach-step-number,
+.approach-heading > .eyebrow,
+.contact-scene > .eyebrow,
+.email-link span {
+  color: var(--accent);
+}
+.skills-duet .skills-category-pill[data-active] {
+  box-shadow: none;
+}
+.skills-duet .skill-project-card .project-open:hover {
+  background: var(--accent);
+  color: #211d29;
+  border-color: var(--accent);
+}
+.skills-duet .skill-project-card .project-open:hover b {
+  color: #211d29;
+}
+.about-details summary span,
+.about-heading > .eyebrow,
+.project-dialog .eyebrow {
+  color: var(--accent-ink);
+}
+.email-link {
+  border-color: var(--accent);
+}
+.email-link:hover {
+  background: var(--accent);
+  color: #211d29;
+}
+.email-link:hover span {
+  color: #211d29;
+}
+.specimen-buttons span:first-child,
+.specimen-check,
+.specimen-toggle,
+.specimen-range {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #211d29;
 }

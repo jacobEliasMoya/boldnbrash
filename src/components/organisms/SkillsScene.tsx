@@ -5,6 +5,7 @@ import {
   motion,
   useMotionValue,
   useReducedMotion,
+  useSpring,
   useTransform,
   type MotionValue,
 } from 'motion/react'
@@ -41,6 +42,22 @@ function SkillCategoryPill({
   const vertical = useTransform(distance, (value) => Math.sin((value * Math.PI) / 4) * radius)
   const depth = useTransform(distance, (value) => (Math.cos((value * Math.PI) / 4) - 1) * radius)
   const visibility = useTransform(distance, (value) => Math.abs(value) < 1.75 ? 'visible' : 'hidden')
+  const scaleX = useSpring(0.82, { stiffness: 340, damping: 17, mass: 0.8 })
+  const scaleY = useSpring(0.82, { stiffness: 260, damping: 14, mass: 0.8 })
+  useEffect(() => {
+    if (!animated) return
+    let focused: boolean | undefined
+    const update = (value: number) => {
+      // Pop only as the item reaches the centre, rather than halfway through a turn.
+      const next = active && Math.abs(value) < 0.12
+      if (next === focused) return
+      focused = next
+      scaleX.set(next ? 0.94 : 0.82)
+      scaleY.set(next ? 0.94 : 0.82)
+    }
+    update(distance.get())
+    return distance.on('change', update)
+  }, [active, animated, distance, scaleX, scaleY])
 
   const order = useTransform(distance, (value) => 20 - Math.round(Math.abs(value) * 4))
   return (
@@ -52,6 +69,8 @@ function SkillCategoryPill({
         rotateX: animated ? rotation : 0,
         y: animated ? vertical : 0,
         z: animated ? depth : 0,
+        scaleX: animated ? scaleX : 1,
+        scaleY: animated ? scaleY : 1,
         visibility: animated ? visibility : 'visible',
         zIndex: animated ? order : 1,
       }}
@@ -204,7 +223,7 @@ export function SkillsScene() {
   useLayoutEffect(() => {
     const element = wheel.current
     if (!element || !animated) return
-    const measure = () => setRadius(Math.max(150, element.clientHeight * 0.52))
+    const measure = () => setRadius(Math.max(130, element.clientHeight * 0.46))
     measure()
     const observer = new ResizeObserver(measure)
     observer.observe(element)
@@ -281,18 +300,14 @@ export function SkillsScene() {
       } as CSSProperties}
     >
       <div className="skills-heading" aria-hidden={animated && expansion === 1}>
-        <p className="eyebrow">
-          <span>02 &mdash;</span> Skills &amp; Work
-        </p>
-        <h2 aria-label="What I use. What I build.">
+        <h2 aria-label="What I do. What I build.">
           <span className="skills-title-line" aria-hidden="true">
-            <span className="skills-title-fill" style={{ '--title-fill': `${animated ? clamp(selection.intro / 0.18) * 100 : 0}%` } as CSSProperties}>What I use.</span>
+            <span className="skills-title-fill" style={{ '--title-fill': `${animated ? clamp(selection.intro / 0.18) * 100 : 0}%` } as CSSProperties}>What I do.</span>
           </span>
           <span className="skills-title-line" aria-hidden="true">
             <span className="skills-title-fill" style={{ '--title-fill': `${animated ? clamp((selection.intro - 0.18) / 0.18) * 100 : 0}%` } as CSSProperties}>What I build</span><span ref={period} className="skills-title-period" />
           </span>
         </h2>
-        <p className="skills-intro">Check out how I use my tech!</p>
       </div>
       {animated ? (
         <div className="skills-reveal" inert={entrance < 1} aria-hidden={entrance < 1}>
