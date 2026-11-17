@@ -1,13 +1,13 @@
 ﻿'use client'
 
-import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react'
 import { animate, motion, useReducedMotion } from 'motion/react'
 import { createPortal } from 'react-dom'
 import { BlendedLogo } from '@/components/atoms/BlendedLogo'
 import { getPeriodOpening } from '@/components/atoms/periodOpening'
 
 type Scene = { id: string; label: string }
-type Phase = 'menu' | 'closing' | 'expanding'
+type Phase = 'opening' | 'menu' | 'closing' | 'expanding'
 
 export function MobileMenu({
   scenes,
@@ -25,6 +25,9 @@ export function MobileMenu({
   const dialog = useRef<HTMLDialogElement>(null)
   const menuPanel = useRef<HTMLDivElement>(null)
   const openingRing = useRef<SVGCircleElement>(null)
+  const entryRing = useRef<SVGCircleElement>(null)
+  const entryOrigin = useRef({ x: 0, y: 0, radius: 0 })
+  const stopEntering = useRef<(() => void) | null>(null)
   const stopOpening = useRef<(() => void) | null>(null)
   const toggle = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(false)
@@ -35,10 +38,15 @@ export function MobileMenu({
     y: number
   } | null>(null)
   const reduceMotion = useReducedMotion()
-  useEffect(() => () => stopOpening.current?.(), [])
+  useEffect(() => () => {
+    stopOpening.current?.()
+    stopEntering.current?.()
+  }, [])
 
   const finishClose = useCallback(
     (destination?: string) => {
+      stopOpening.current?.()
+      stopEntering.current?.()
       if (dialog.current?.open) dialog.current.close()
       setOpen(false)
       setPhase('menu')
@@ -52,15 +60,43 @@ export function MobileMenu({
     [onOpenChange],
   )
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return
     const previousOverflow = document.documentElement.style.overflow
     document.documentElement.style.overflow = 'hidden'
     dialog.current?.showModal()
+    if (!reduceMotion && menuPanel.current) {
+      const { x, y, radius } = entryOrigin.current
+      const panel = menuPanel.current
+      const reach = Math.hypot(Math.max(x, panel.clientWidth - x), Math.max(y, panel.clientHeight - y))
+      const borderWidth = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--frame-inset')) || 12
+      const control = animate(0, 1, {
+        duration: 0.65,
+        ease: 'linear',
+        onUpdate: (progress) => {
+          const aperture = getPeriodOpening(progress, radius, reach, borderWidth)
+          panel.style.clipPath = `circle(${aperture.innerRadius}px at ${x}px ${y}px)`
+          if (entryRing.current) {
+            entryRing.current.style.visibility = 'visible'
+            entryRing.current.setAttribute('cx', String(x))
+            entryRing.current.setAttribute('cy', String(y))
+            entryRing.current.setAttribute('r', String(aperture.ringRadius))
+            entryRing.current.setAttribute('stroke-width', String(aperture.ringWidth))
+          }
+        },
+        onComplete: () => {
+          panel.style.clipPath = 'none'
+          if (entryRing.current) entryRing.current.style.visibility = 'hidden'
+          setPhase('menu')
+        },
+      })
+      stopEntering.current = () => control.stop()
+    }
     return () => {
+      stopEntering.current?.()
       document.documentElement.style.overflow = previousOverflow
     }
-  }, [open])
+  }, [open, reduceMotion])
 
   useEffect(() => {
     const compact = window.matchMedia('(max-width: 760px)')
@@ -146,8 +182,10 @@ export function MobileMenu({
             delay: reduceMotion ? 0 : 0.22,
             ease: [0.22, 1, 0.36, 1],
           }}
-          onClick={() => {
-            setPhase('menu')
+          onClick={(event) => {
+            const bounds = event.currentTarget.getBoundingClientRect()
+            entryOrigin.current = { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2, radius: Math.min(bounds.width, bounds.height) / 2 }
+            setPhase(reduceMotion ? 'menu' : 'opening')
             setSelection(null)
             setOpen(true)
             onOpenChange(true)
@@ -166,18 +204,23 @@ export function MobileMenu({
             ref={dialog}
             id="mobile-menu"
             className="mobile-menu-dialog"
-            data-transitioning={phase === 'expanding' ? '' : undefined}
+            data-transitioning={phase === 'opening' || phase === 'expanding' ? '' : undefined}
             aria-label="Mobile navigation"
             onCancel={(event) => {
               event.preventDefault()
+              stopEntering.current?.()
               setPhase('closing')
             }}
           >
+            <svg className="mobile-menu-entry-ring" aria-hidden="true" focusable="false">
+              <circle ref={entryRing} />
+            </svg>
             {open && (
               <motion.div
                 ref={menuPanel}
                 className="mobile-menu-panel"
-                initial={reduceMotion ? false : { opacity: 0 }}
+                initial={false}
+                style={phase === 'opening' ? { clipPath: 'circle(0px at 50% 50%)' } : undefined}
                 animate={
                   phase === 'closing'
                     ? { opacity: 0 }
@@ -204,7 +247,10 @@ export function MobileMenu({
                     className="mobile-menu-close"
                     aria-label="Close menu"
                     autoFocus
-                    onClick={() => setPhase('closing')}
+                    onClick={() => {
+                      stopEntering.current?.()
+                      setPhase('closing')
+                    }}
                   >
                     <span aria-hidden="true">×</span>
                   </button>

@@ -461,7 +461,7 @@ test('mobile category controls stay usable and project information fits the card
   }
 })
 
-test('mobile menu drops in, traps navigation, and restores focus after dismissal', async ({
+test('mobile menu opens from the toggle, traps navigation, and restores focus after dismissal', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
@@ -472,9 +472,14 @@ test('mobile menu drops in, traps navigation, and restores focus after dismissal
   for (const navigation of await page.locator('.desktop-navigation').all()) {
     await expect(navigation).not.toBeVisible()
   }
+  const toggleBounds = (await toggle.boundingBox())!
   await toggle.click()
   const menu = page.getByRole('dialog', { name: 'Mobile navigation' })
   await expect(menu).toBeVisible()
+  const entryRing = menu.locator('.mobile-menu-entry-ring circle')
+  await expect.poll(() => entryRing.getAttribute('stroke-width')).toBe('12')
+  expect(Number(await entryRing.getAttribute('cx'))).toBeCloseTo(toggleBounds.x + toggleBounds.width / 2, 0)
+  expect(Number(await entryRing.getAttribute('cy'))).toBeCloseTo(toggleBounds.y + toggleBounds.height / 2, 0)
   await expect(menu.getByRole('link')).toHaveCount(5)
   await expect(menu.getByRole('button', { name: 'Close menu' })).toBeFocused()
   await expect(page.locator('html')).toHaveCSS('overflow', 'hidden')

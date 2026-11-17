@@ -3445,3 +3445,21 @@ ul {
   fill: none;
   stroke: var(--ink);
 }
+.mobile-menu-entry-ring {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: var(--ink);
+  pointer-events: none;
+}
+.mobile-menu-entry-ring circle {
+  visibility: hidden;
+}
+@media (max-width: 760px) {
+  .site-header .logo-anchor {
+    margin-left: 20px;
+  }
+}
