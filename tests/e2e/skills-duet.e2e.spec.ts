@@ -45,7 +45,8 @@ for (const viewport of [
       const intro = page.locator('.skills-heading')
       await expect(intro).toHaveCSS('opacity', '1')
       const bounds = (await intro.boundingBox())!
-      expect(Math.abs(bounds.x + bounds.width / 2 - viewport.width / 2)).toBeLessThan(3)
+      const sceneBounds = (await page.locator('#skills').boundingBox())!
+      expect(Math.abs(bounds.x + bounds.width / 2 - (sceneBounds.x + sceneBounds.width / 2))).toBeLessThan(3)
       await expect(page.locator('.skills-reveal')).toHaveAttribute('inert', '')
       await page.screenshot({ path: `test-results/duet-intro-${viewport.width}.png` })
       await expect(page.locator('.skills-scroll-cue')).toHaveCount(0)

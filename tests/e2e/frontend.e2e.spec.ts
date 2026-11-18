@@ -473,26 +473,83 @@ test('mobile menu opens from the toggle, traps navigation, and restores focus af
     await expect(navigation).not.toBeVisible()
   }
   const toggleBounds = (await toggle.boundingBox())!
+  const documentWidth = await page.evaluate(() => document.documentElement.clientWidth)
+  await expect(page.locator('html')).toHaveCSS('scrollbar-gutter', 'stable')
+  await page.evaluate(() => {
+    const observer = new MutationObserver(() => {
+      const panel = document.querySelector('.mobile-menu-panel')
+      if (!panel) return
+      document.documentElement.dataset.menuInitialClip = getComputedStyle(panel).clipPath
+      const ring = document.querySelector('.mobile-menu-entry-ring circle')!
+      document.documentElement.dataset.menuInitialRingDiameter = String(
+        2 * Number(ring.getAttribute('r')) + Number(ring.getAttribute('stroke-width')),
+      )
+      observer.disconnect()
+    })
+    observer.observe(document.body, { childList: true, subtree: true })
+  })
   await toggle.click()
   const menu = page.getByRole('dialog', { name: 'Mobile navigation' })
   await expect(menu).toBeVisible()
+  await expect(page.locator('html')).toHaveAttribute('data-menu-initial-clip', /^circle\(0px /)
+  const mergedDiameter = 7 * Math.sqrt(3)
+  expect(Number(await page.locator('html').getAttribute('data-menu-initial-ring-diameter'))).toBeCloseTo(mergedDiameter, 1)
+  const dotCenters = await toggle.locator('i').evaluateAll((dots) => dots.map((dot) => {
+    const bounds = dot.getBoundingClientRect()
+    return { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2, width: bounds.width }
+  }))
+  for (const dot of dotCenters) {
+    expect(dot.x).toBeCloseTo(toggleBounds.x + toggleBounds.width / 2, 0)
+    expect(dot.y).toBeCloseTo(toggleBounds.y + toggleBounds.height / 2, 0)
+    expect(dot.width).toBeCloseTo(mergedDiameter, 1)
+  }
   const entryRing = menu.locator('.mobile-menu-entry-ring circle')
   await expect.poll(() => entryRing.getAttribute('stroke-width')).toBe('12')
   expect(Number(await entryRing.getAttribute('cx'))).toBeCloseTo(toggleBounds.x + toggleBounds.width / 2, 0)
   expect(Number(await entryRing.getAttribute('cy'))).toBeCloseTo(toggleBounds.y + toggleBounds.height / 2, 0)
   await expect(menu.getByRole('link')).toHaveCount(5)
+  await expect(entryRing).toHaveCSS('visibility', 'hidden')
   await expect(menu.getByRole('button', { name: 'Close menu' })).toBeFocused()
   await expect(page.locator('html')).toHaveCSS('overflow', 'hidden')
+  expect(await page.evaluate(() => document.documentElement.clientWidth)).toBe(documentWidth)
+  const expandedRadius = Number(await entryRing.getAttribute('r'))
+  const closeButton = menu.getByRole('button', { name: 'Close menu' })
+  await expect(closeButton.locator('i')).toHaveCount(5)
+  const closeBounds = (await closeButton.boundingBox())!
   await page.keyboard.press('Escape')
+  await expect(entryRing).toHaveCSS('visibility', 'visible')
+  const closedDots = await closeButton.locator('i').evaluateAll((dots) => dots.map((dot) => {
+    const bounds = dot.getBoundingClientRect()
+    return { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 }
+  }))
+  for (const dot of closedDots) {
+    expect(dot.x).toBeCloseTo(closeBounds.x + closeBounds.width / 2, 0)
+    expect(dot.y).toBeCloseTo(closeBounds.y + closeBounds.height / 2, 0)
+  }
+  expect(Number(await entryRing.getAttribute('cx'))).toBeCloseTo(closeBounds.x + closeBounds.width / 2, 0)
+  expect(Number(await entryRing.getAttribute('cy'))).toBeCloseTo(closeBounds.y + closeBounds.height / 2, 0)
+  await expect(page.locator('.mobile-menu-panel')).toHaveCSS('opacity', '1')
+  await expect.poll(async () => Number(await entryRing.getAttribute('r'))).toBeLessThan(expandedRadius - 1)
   await expect(menu).not.toBeVisible()
   await expect(toggle).toBeFocused()
   await expect(toggle).toHaveAttribute('aria-expanded', 'false')
   await page.evaluate(() => document.fonts.ready.then(() => undefined))
   await expect(page.locator('html')).not.toHaveCSS('overflow', 'hidden')
+  expect(await page.evaluate(() => document.documentElement.clientWidth)).toBe(documentWidth)
   await toggle.click()
   await menu.getByRole('button', { name: 'Close menu' }).click()
   await expect(menu).not.toBeVisible()
   await expect(toggle).toBeFocused()
+  await expect.poll(() => toggle.locator('i').evaluateAll((dots) => {
+    const left = dots[1].getBoundingClientRect()
+    const right = dots[2].getBoundingClientRect()
+    return right.left - left.left
+  })).toBeGreaterThan(11)
+  await toggle.click()
+  await expect(menu).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(menu).not.toBeVisible()
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
 })
 
 test('every mobile menu selection expands into its section and restores scrolling', async ({
@@ -524,7 +581,7 @@ test('every mobile menu selection expands into its section and restores scrollin
     await expect(link).toHaveCSS('transform', 'none')
     const period = link.locator('.mobile-menu-period')
     await expect(period).toHaveCSS('background-color', 'rgb(8, 8, 9)')
-    const bounds = (await period.boundingBox())!
+    const bounds = (await link.locator('.mobile-menu-number').boundingBox())!
     await link.click()
     const reveal = page.locator('.mobile-menu-reveal')
     await expect(reveal).toHaveAttribute('data-destination', id)
@@ -640,4 +697,110 @@ test('the ring keeps each skill centered through project reveals on desktop and 
       }
     }
   }
+})
+
+
+test.describe('mobile wheel input', () => {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
+  test('wheel advances and reverses the skills introduction fill on a touch device', async ({ page }) => {
+    await page.goto(`${baseURL}/#skills`)
+    await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 15000 })
+    const lines = page.locator('.skills-title-fill')
+    await expect(lines.first()).toHaveCSS('--title-fill', '0%')
+    await page.mouse.move(180, 400)
+    await page.mouse.wheel(0, 120)
+    await expect.poll(async () => parseFloat(await lines.first().evaluate((line) =>
+      getComputedStyle(line).getPropertyValue('--title-fill')))).toBeGreaterThan(20)
+    for (let i = 0; i < 3; i++) await page.mouse.wheel(0, 120)
+    await expect(lines.first()).toHaveCSS('--title-fill', '100%')
+    await expect.poll(async () => parseFloat(await lines.nth(1).evaluate((line) =>
+      getComputedStyle(line).getPropertyValue('--title-fill')))).toBeGreaterThan(50)
+    await page.mouse.wheel(0, -120)
+    await expect.poll(async () => parseFloat(await lines.nth(1).evaluate((line) =>
+      getComputedStyle(line).getPropertyValue('--title-fill')))).toBeLessThan(55)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  })
+})
+
+test('mobile navigation waits for liquid coverage and completed lettering before opening', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(baseURL)
+  await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 15000 })
+  await page.getByRole('button', { name: 'Open menu', exact: true }).click()
+  const menu = page.getByRole('dialog', { name: 'Mobile navigation' })
+  await expect(menu.locator('.mobile-menu-entry-ring circle')).toHaveCSS('visibility', 'hidden')
+  await menu.evaluate((element) => {
+    const link = element.querySelector<HTMLAnchorElement>('a[href="#contact"]')!
+    const label = link.querySelector<HTMLElement>('.mobile-menu-label-fill')!
+    const samples: { fill: number; covered: boolean; opening: boolean }[] = []
+    function sample() {
+      const panel = element.querySelector('.mobile-menu-panel')!.getBoundingClientRect()
+      const number = link.querySelector('.mobile-menu-number')!.getBoundingClientRect()
+      const path = element.querySelector<SVGPathElement>('.mobile-menu-liquid path')!
+      const fill = parseFloat(getComputedStyle(label).getPropertyValue('--letter-fill'))
+      const covered = [number.top + 1, number.bottom - 1].every((y) =>
+        path.isPointInFill(new DOMPoint(number.right - panel.left - 1, y - panel.top)))
+      const opening = !!element.querySelector('.mobile-menu-reveal')
+      samples.push({ fill, covered, opening })
+      if (opening) element.setAttribute('data-sequence', JSON.stringify(samples))
+      else requestAnimationFrame(sample)
+    }
+    sample()
+    link.click()
+  })
+  await expect(menu).toHaveAttribute('data-sequence')
+  const samples = JSON.parse((await menu.getAttribute('data-sequence'))!) as {
+    fill: number; covered: boolean; opening: boolean
+  }[]
+  expect(samples.some((sample) => !sample.covered && sample.fill === 0)).toBe(true)
+  expect(samples.some((sample) => sample.fill > 0 && sample.fill < 100)).toBe(true)
+  expect(samples.filter((sample) => sample.fill > 0).every((sample) => sample.covered)).toBe(true)
+  expect(samples.at(-1)).toMatchObject({ fill: 100, opening: true })
+  await expect(menu).not.toBeVisible()
+  await expect(page).toHaveURL(/#contact$/)
+})
+
+test('mobile liquid selector follows wheel, swipe, and keyboard focus while covering only numbers', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(baseURL)
+  await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 15000 })
+  await page.getByRole('button', { name: 'Open menu', exact: true }).click()
+  const menu = page.getByRole('dialog', { name: 'Mobile navigation' })
+  const links = menu.locator('.mobile-menu-links')
+  const highlighted = links.locator('a[data-highlighted]')
+  await expect(highlighted).toHaveAttribute('href', '#top')
+  await expect(menu.locator('.mobile-menu-entry-ring circle')).toHaveCSS('visibility', 'hidden')
+  await links.dispatchEvent('wheel', { deltaY: 70 })
+  await expect(highlighted).toHaveAttribute('href', '#skills')
+  await expect(highlighted.locator('.mobile-menu-label-fill')).toHaveCSS('--letter-fill', '100%')
+  await expect(links.locator('a[href="#top"] .mobile-menu-label-fill')).toHaveCSS('--letter-fill', '0%')
+  await expect.poll(() => menu.evaluate((element) => {
+    const path = element.querySelector<SVGPathElement>('.mobile-menu-liquid path')!
+    const bounds = element.querySelector('[data-highlighted] .mobile-menu-number')!.getBoundingClientRect()
+    const label = element.querySelector('[data-highlighted] .mobile-menu-label')!.getBoundingClientRect()
+    return path.isPointInFill(new DOMPoint(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2)) &&
+      !path.isPointInFill(new DOMPoint(label.left + 1, label.top + label.height / 2))
+  })).toBe(true)
+  const frame = await menu.locator('.mobile-menu-panel').evaluate((panel) => {
+    const style = getComputedStyle(panel, '::after')
+    return { inset: parseFloat(style.top), radius: parseFloat(style.borderTopLeftRadius) }
+  })
+  expect(frame.inset).toBe(12)
+  expect(frame.radius).toBe(25)
+  await links.evaluate((element) => {
+    for (const [type, y] of [['pointerdown', 600], ['pointermove', 504], ['pointerup', 504]] as const) {
+      element.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerType: 'touch', isPrimary: true, pointerId: 1, clientY: y }))
+    }
+  })
+  await expect(highlighted).toHaveAttribute('href', '#about')
+  await expect(menu).toBeVisible()
+  await menu.getByRole('link', { name: 'Contact.', exact: true }).focus()
+  await expect(highlighted).toHaveAttribute('href', '#contact')
+  await expect(highlighted.locator('.mobile-menu-label-fill')).toHaveCSS('--letter-fill', '100%')
+  await page.setViewportSize({ width: 320, height: 844 })
+  const fits = await links.locator('.mobile-menu-label').evaluateAll((labels) => labels.every((label) => label.getBoundingClientRect().right <= innerWidth - 20))
+  expect(fits).toBe(true)
+  await menu.getByRole('link', { name: 'About.', exact: true }).click()
+  await expect(menu).not.toBeVisible()
+  await expect(page).toHaveURL(/#about$/)
 })

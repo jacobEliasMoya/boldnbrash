@@ -41,6 +41,7 @@
 }
 html {
   scroll-behavior: auto;
+  scrollbar-gutter: stable;
   overscroll-behavior: none;
   overflow-x: clip;
 }
@@ -393,7 +394,8 @@ ul {
   padding-inline: 0.045em;
   margin-inline: -0.045em;
 }
-.portfolio[data-enhanced] .hero-letter {
+.portfolio[data-enhanced] .hero-letter,
+.mobile-menu-label-fill {
   color: transparent;
   background: linear-gradient(
     90deg,
@@ -2108,7 +2110,7 @@ ul {
 .mobile-menu-dialog {
   position: fixed;
   inset: 0;
-  width: 100vw;
+  width: 100%;
   max-width: none;
   height: 100dvh;
   max-height: 100dvh;
@@ -2120,7 +2122,7 @@ ul {
   overflow: hidden;
 }
 .mobile-menu-dialog::backdrop {
-  background: rgb(8 8 9 / 0.82);
+  background: var(--frame-color);
 }
 .mobile-menu-panel {
   position: relative;
@@ -2134,9 +2136,10 @@ ul {
   overflow: hidden;
   overscroll-behavior: contain;
   backface-visibility: hidden;
-  will-change: opacity;
+  will-change: clip-path;
 }
 .mobile-menu-heading {
+  min-height: 48px;
   position: relative;
   z-index: 2;
   display: flex;
@@ -2149,20 +2152,47 @@ ul {
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
+.mobile-menu-panel::after {
+  content: '';
+  position: absolute;
+  inset: var(--frame-inset, 12px);
+  z-index: 4;
+  border-radius: 25px;
+  box-shadow: 0 0 0 50px var(--frame-color);
+  pointer-events: none;
+}
 .mobile-menu-close {
+  touch-action: manipulation;
   display: grid;
   place-items: center;
   width: 48px;
   height: 48px;
   flex-shrink: 0;
-  border: 1px solid #08080940;
+  padding: 0;
+  border: 0;
   border-radius: 50%;
   background: transparent;
-  font:
-    32px/1 'Instrument Sans',
-    sans-serif;
+  color: inherit;
+}
+.mobile-menu-close-dots {
+  position: relative;
+  display: block;
+  width: 22px;
+  height: 22px;
+}
+.mobile-menu-close-dots i {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  margin: -3.5px 0 0 -3.5px;
+  border-radius: 50%;
+  background: currentColor;
 }
 .mobile-menu-links {
+  container-type: inline-size;
+  touch-action: pan-x pinch-zoom;
   position: relative;
   z-index: 2;
   display: flex;
@@ -2175,9 +2205,9 @@ ul {
 .mobile-menu-links a {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   width: 100%;
-  font: 900 clamp(38px, 11vw, 72px)/1.08 var(--display);
+  font: 900 clamp(28px, 10.5cqw, 68px)/1.08 var(--display);
   letter-spacing: -0.04em;
   transform-origin: center;
 }
@@ -2190,6 +2220,11 @@ ul {
 .mobile-menu-label {
   white-space: nowrap;
 }
+.mobile-menu-label-fill {
+  display: inline-block;
+  padding-inline: 0.08em;
+  margin-inline: -0.08em;
+}
 .mobile-menu-period {
   display: inline-block;
   width: 0.18em;
@@ -2200,12 +2235,34 @@ ul {
   box-shadow: 0 0 0 1px rgb(239 235 225 / 0.3);
 }
 .mobile-menu-number {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 36px;
   flex-shrink: 0;
-  font:
-    10px 'JetBrains Mono',
-    monospace;
-  opacity: 0.5;
+  font: 800 24px/1.2 'JetBrains Mono', monospace;
+  color: var(--ink);
   letter-spacing: 0;
+}
+.mobile-menu-number-contrast {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--canvas);
+  clip-path: inset(0 100% 0 0);
+}
+:root[data-theme='dark'] .mobile-menu-number-contrast {
+  color: var(--ink);
+}
+.mobile-menu-liquid {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  fill: var(--frame-color);
 }
 .mobile-menu-current {
   margin-left: auto;
@@ -2236,6 +2293,7 @@ ul {
     display: none;
   }
   .mobile-menu-toggle {
+    touch-action: manipulation;
     display: grid;
     place-items: center;
     width: 44px;
@@ -2247,20 +2305,20 @@ ul {
     color: inherit;
   }
   .mobile-menu-toggle > span {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 3px;
-    width: 28px;
-    height: 28px;
-    border: 1px solid currentColor;
-    border-radius: 50%;
+    position: relative;
+    display: block;
+    width: 22px;
+    height: 22px;
   }
   .mobile-menu-toggle i {
+    position: absolute;
+    top: 50%;
+    left: 50%;
     display: block;
-    width: 14px;
-    height: 1.5px;
+    width: 7px;
+    height: 7px;
+    margin: -3.5px 0 0 -3.5px;
+    border-radius: 50%;
     background: currentColor;
   }
   .portfolio[data-menu-open] .scene-stage {

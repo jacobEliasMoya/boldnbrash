@@ -1,13 +1,17 @@
 ﻿'use client'
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react'
-import { animate, motion, useReducedMotion } from 'motion/react'
+import { animate, motion, useMotionValue, useReducedMotion, useTransform } from 'motion/react'
 import { createPortal } from 'react-dom'
 import { BlendedLogo } from '@/components/atoms/BlendedLogo'
 import { getPeriodOpening } from '@/components/atoms/periodOpening'
+import { MobileMenuLiquid } from './MobileMenuLiquid'
 
 type Scene = { id: string; label: string }
 type Phase = 'opening' | 'menu' | 'closing' | 'expanding'
+const mergedDotRadius = 3.5 * Math.sqrt(3)
+const mergeDuration = 0.26
+const openingDuration = 0.72
 
 export function MobileMenu({
   scenes,
@@ -27,10 +31,26 @@ export function MobileMenu({
   const openingRing = useRef<SVGCircleElement>(null)
   const entryRing = useRef<SVGCircleElement>(null)
   const entryOrigin = useRef({ x: 0, y: 0, radius: 0 })
+  const entryGeometry = useRef({ reach: 0, borderWidth: 12 })
   const stopEntering = useRef<(() => void) | null>(null)
+  const stopGathering = useRef<(() => void) | null>(null)
   const stopOpening = useRef<(() => void) | null>(null)
   const toggle = useRef<HTMLButtonElement>(null)
+  const closeToggle = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(false)
+  const [highlighted, setHighlighted] = useState(active)
+  const [covered, setCovered] = useState<number | null>(null)
+  const filled = useRef<number | null>(null)
+  const pendingLink = useRef<{ index: number; link: HTMLAnchorElement } | null>(null)
+  const handleCovered = useCallback((index: number | null) => setCovered(index), [])
+  useEffect(() => {
+    if (filled.current !== highlighted) filled.current = null
+    if (pendingLink.current?.index !== highlighted) pendingLink.current = null
+  }, [highlighted])
+  const drag = useRef<{ y: number; index: number; moved: boolean } | null>(null)
+  const wheelInput = useRef({ delta: 0, time: 0 })
+  const [gathering, setGathering] = useState(false)
+  const [closePosition, setClosePosition] = useState({ left: 0, top: 0 })
   const [phase, setPhase] = useState<Phase>('menu')
   const [selection, setSelection] = useState<{
     index: number
@@ -38,54 +58,94 @@ export function MobileMenu({
     y: number
   } | null>(null)
   const reduceMotion = useReducedMotion()
+  const gather = useMotionValue(0)
+  const closeGather = useMotionValue(0)
+  const entryProgress = useMotionValue(0)
+  const panelClip = useMotionValue('none')
+  const topY = useTransform(gather, (progress) => -7 * (1 - progress))
+  const bottomY = useTransform(gather, (progress) => 3.5 * (1 - progress))
+  const leftX = useTransform(gather, (progress) => -6 * (1 - progress))
+  const rightX = useTransform(gather, (progress) => 6 * (1 - progress))
+  const closePositive = useTransform(closeGather, (progress) => 6 * (1 - progress))
+  const closeNegative = useTransform(closeGather, (progress) => -6 * (1 - progress))
+  const dotScale = useTransform(gather, (progress) => Math.sqrt(1 + 2 * Math.max(0, Math.min(1, progress))))
+  const closeDotScale = useTransform(closeGather, (progress) => Math.sqrt(1 + 2 * Math.max(0, Math.min(1, progress))))
   useEffect(() => () => {
     stopOpening.current?.()
     stopEntering.current?.()
+    stopGathering.current?.()
   }, [])
 
   const finishClose = useCallback(
-    (destination?: string) => {
+    (destination?: string, spreadDots = false) => {
       stopOpening.current?.()
       stopEntering.current?.()
+      stopGathering.current?.()
+      closeGather.set(0)
+      if (spreadDots) {
+        const control = animate(gather, 0, { duration: mergeDuration, ease: [0.4, 0, 0.2, 1] })
+        stopGathering.current = () => control.stop()
+      } else {
+        gather.set(0)
+      }
+      setGathering(false)
       if (dialog.current?.open) dialog.current.close()
       setOpen(false)
       setPhase('menu')
       setSelection(null)
+      pendingLink.current = null
+      filled.current = null
+      setCovered(null)
       onOpenChange(false)
       requestAnimationFrame(() => {
         const target = destination ? document.getElementById(destination) : toggle.current
         target?.focus({ preventScroll: true })
       })
     },
-    [onOpenChange],
+    [onOpenChange, gather, closeGather],
   )
+
+  const measureEntry = useCallback(() => {
+    const panel = menuPanel.current
+    if (!panel) return
+    const { x, y } = entryOrigin.current
+    entryGeometry.current = {
+      reach: Math.hypot(Math.max(x, panel.clientWidth - x), Math.max(y, panel.clientHeight - y)),
+      borderWidth: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--frame-inset')) || 12,
+    }
+  }, [])
+
+  const renderEntry = useCallback((progress: number) => {
+    const { x, y, radius } = entryOrigin.current
+    const { reach, borderWidth } = entryGeometry.current
+    const aperture = getPeriodOpening(progress, radius, reach, borderWidth)
+    panelClip.set(`circle(${aperture.innerRadius}px at ${x}px ${y}px)`)
+    if (entryRing.current) {
+      entryRing.current.style.visibility = 'visible'
+      entryRing.current.setAttribute('cx', String(x))
+      entryRing.current.setAttribute('cy', String(y))
+      entryRing.current.setAttribute('r', String(aperture.ringRadius))
+      entryRing.current.setAttribute('stroke-width', String(aperture.ringWidth))
+    }
+  }, [panelClip])
 
   useLayoutEffect(() => {
     if (!open) return
     const previousOverflow = document.documentElement.style.overflow
     document.documentElement.style.overflow = 'hidden'
     dialog.current?.showModal()
+    measureEntry()
+    const observer = new ResizeObserver(measureEntry)
+    if (menuPanel.current) observer.observe(menuPanel.current)
     if (!reduceMotion && menuPanel.current) {
-      const { x, y, radius } = entryOrigin.current
-      const panel = menuPanel.current
-      const reach = Math.hypot(Math.max(x, panel.clientWidth - x), Math.max(y, panel.clientHeight - y))
-      const borderWidth = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--frame-inset')) || 12
-      const control = animate(0, 1, {
-        duration: 0.65,
+      entryProgress.set(0)
+      renderEntry(0)
+      const control = animate(entryProgress, 1, {
+        duration: openingDuration,
         ease: 'linear',
-        onUpdate: (progress) => {
-          const aperture = getPeriodOpening(progress, radius, reach, borderWidth)
-          panel.style.clipPath = `circle(${aperture.innerRadius}px at ${x}px ${y}px)`
-          if (entryRing.current) {
-            entryRing.current.style.visibility = 'visible'
-            entryRing.current.setAttribute('cx', String(x))
-            entryRing.current.setAttribute('cy', String(y))
-            entryRing.current.setAttribute('r', String(aperture.ringRadius))
-            entryRing.current.setAttribute('stroke-width', String(aperture.ringWidth))
-          }
-        },
+        onUpdate: renderEntry,
         onComplete: () => {
-          panel.style.clipPath = 'none'
+          panelClip.set('none')
           if (entryRing.current) entryRing.current.style.visibility = 'hidden'
           setPhase('menu')
         },
@@ -94,26 +154,71 @@ export function MobileMenu({
     }
     return () => {
       stopEntering.current?.()
+      observer.disconnect()
       document.documentElement.style.overflow = previousOverflow
     }
-  }, [open, reduceMotion])
+  }, [open, reduceMotion, entryProgress, panelClip, renderEntry, measureEntry])
+
+  function closeMenu() {
+    pendingLink.current = null
+    if (phase === 'closing') return
+    stopEntering.current?.()
+    stopOpening.current?.()
+    if (reduceMotion) {
+      finishClose()
+      return
+    }
+    setPhase('closing')
+    setSelection(null)
+    if (phase === 'menu' && closeToggle.current) {
+      const bounds = closeToggle.current.getBoundingClientRect()
+      entryOrigin.current = { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2, radius: mergedDotRadius }
+    }
+    measureEntry()
+    const control = animate(closeGather, 1, {
+      duration: mergeDuration, ease: [0.4, 0, 0.2, 1],
+      onComplete: () => {
+        const collapse = animate(entryProgress, 0, {
+          duration: Math.max(0.12, openingDuration * entryProgress.get()),
+          ease: 'linear',
+          onUpdate: renderEntry,
+          onComplete: () => finishClose(undefined, true),
+        })
+        stopEntering.current = () => collapse.stop()
+      },
+    })
+    stopGathering.current = () => control.stop()
+  }
 
   useEffect(() => {
     const compact = window.matchMedia('(max-width: 760px)')
     function resize() {
-      if (!compact.matches && open) finishClose()
+      if (!compact.matches && (open || gathering)) finishClose()
     }
     compact.addEventListener('change', resize)
     return () => compact.removeEventListener('change', resize)
-  }, [open, finishClose])
+  }, [open, gathering, finishClose])
 
   function choose(event: MouseEvent<HTMLAnchorElement>, index: number) {
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
     event.preventDefault()
     event.stopPropagation()
     if (phase !== 'menu') return
-    const period = event.currentTarget.querySelector<HTMLElement>('.mobile-menu-period')!
-    const panel = event.currentTarget.closest<HTMLElement>('.mobile-menu-panel')!
+    if (drag.current?.moved) {
+      drag.current = null
+      return
+    }
+    setHighlighted(index)
+    pendingLink.current = { index, link: event.currentTarget }
+    if (filled.current === index && covered === index) {
+      pendingLink.current = null
+      beginNavigation(index, event.currentTarget)
+    }
+  }
+
+  function beginNavigation(index: number, link: HTMLAnchorElement) {
+    const period = link.querySelector<HTMLElement>('.mobile-menu-number')!
+    const panel = link.closest<HTMLElement>('.mobile-menu-panel')!
     const bounds = period.getBoundingClientRect()
     const panelBounds = panel.getBoundingClientRect()
     const x =
@@ -143,9 +248,9 @@ export function MobileMenu({
         if (menuPanel.current) {
           const r = aperture.innerRadius
           const hole = `M${x - r},${y} A${r},${r} 0 1 0 ${x + r},${y} A${r},${r} 0 1 0 ${x - r},${y} Z`
-          menuPanel.current.style.clipPath = r > 0
+          panelClip.set(r > 0
             ? `path(evenodd, "M0,0 H${panel.clientWidth} V${panel.clientHeight} H0 Z ${hole}")`
-            : 'none'
+            : 'none')
         }
         if (openingRing.current) {
           openingRing.current.setAttribute('r', String(aperture.ringRadius))
@@ -170,7 +275,6 @@ export function MobileMenu({
           ref={toggle}
           type="button"
           className="mobile-menu-toggle"
-          data-liquid-header
           aria-label="Open menu"
           aria-haspopup="dialog"
           aria-controls="mobile-menu"
@@ -183,18 +287,38 @@ export function MobileMenu({
             ease: [0.22, 1, 0.36, 1],
           }}
           onClick={(event) => {
+            if (gathering || open) return
             const bounds = event.currentTarget.getBoundingClientRect()
-            entryOrigin.current = { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2, radius: Math.min(bounds.width, bounds.height) / 2 }
-            setPhase(reduceMotion ? 'menu' : 'opening')
-            setSelection(null)
-            setOpen(true)
-            onOpenChange(true)
+            const origin = { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2, radius: mergedDotRadius }
+            entryOrigin.current = origin
+            setClosePosition({ left: origin.x - 24, top: origin.y - 24 })
+            const openMenu = () => {
+              const { x, y } = entryOrigin.current
+              panelClip.set(reduceMotion ? 'none' : `circle(0px at ${x}px ${y}px)`)
+              setGathering(false)
+              setHighlighted(active)
+              drag.current = null
+              setPhase(reduceMotion ? 'menu' : 'opening')
+              setSelection(null)
+              setOpen(true)
+              onOpenChange(true)
+            }
+            if (reduceMotion) {
+              openMenu()
+              return
+            }
+            setGathering(true)
+            const control = animate(gather, 1, {
+              duration: mergeDuration, ease: [0.4, 0, 0.2, 1],
+              onComplete: openMenu,
+            })
+            stopGathering.current = () => control.stop()
           }}
         >
-          <span aria-hidden="true">
-            <i />
-            <i />
-            <i />
+          <span className="mobile-menu-dots" aria-hidden="true">
+            <motion.i style={{ x: 0, y: topY, scale: dotScale }} />
+            <motion.i style={{ x: leftX, y: bottomY, scale: dotScale }} />
+            <motion.i style={{ x: rightX, y: bottomY, scale: dotScale }} />
           </span>
         </motion.button>
       </BlendedLogo>
@@ -204,12 +328,11 @@ export function MobileMenu({
             ref={dialog}
             id="mobile-menu"
             className="mobile-menu-dialog"
-            data-transitioning={phase === 'opening' || phase === 'expanding' ? '' : undefined}
+            data-transitioning={phase !== 'menu' ? '' : undefined}
             aria-label="Mobile navigation"
             onCancel={(event) => {
               event.preventDefault()
-              stopEntering.current?.()
-              setPhase('closing')
+              closeMenu()
             }}
           >
             <svg className="mobile-menu-entry-ring" aria-hidden="true" focusable="false">
@@ -220,45 +343,62 @@ export function MobileMenu({
                 ref={menuPanel}
                 className="mobile-menu-panel"
                 initial={false}
-                style={phase === 'opening' ? { clipPath: 'circle(0px at 50% 50%)' } : undefined}
-                animate={
-                  phase === 'closing'
-                    ? { opacity: 0 }
-                    : { opacity: 1 }
-                }
-                transition={
-                  reduceMotion
-                    ? { duration: 0 }
-                    : phase === 'closing'
-                        ? { duration: 0.3, ease: 'easeOut' }
-                        : {
-                            duration: 0.24,
-                            ease: 'easeOut',
-                          }
-                }
-                onAnimationComplete={() => {
-                  if (phase === 'closing') finishClose()
-                }}
+                style={{ clipPath: panelClip }}
               >
+                <MobileMenuLiquid panel={menuPanel} index={highlighted} reduced={!!reduceMotion} onCovered={handleCovered} />
                 <div className="mobile-menu-heading">
                   <span>Jacob Moya / Menu</span>
                   <button
+                    ref={closeToggle}
                     type="button"
                     className="mobile-menu-close"
+                    style={{ position: 'fixed', left: closePosition.left, top: closePosition.top }}
                     aria-label="Close menu"
                     autoFocus
-                    onClick={() => {
-                      stopEntering.current?.()
-                      setPhase('closing')
-                    }}
+                    onClick={closeMenu}
                   >
-                    <span aria-hidden="true">×</span>
+                    <span className="mobile-menu-close-dots" aria-hidden="true">
+                      <motion.i style={{ x: closeNegative, y: closeNegative, scale: closeDotScale }} />
+                      <motion.i style={{ x: closePositive, y: closeNegative, scale: closeDotScale }} />
+                      <motion.i style={{ x: 0, y: 0, scale: closeDotScale }} />
+                      <motion.i style={{ x: closeNegative, y: closePositive, scale: closeDotScale }} />
+                      <motion.i style={{ x: closePositive, y: closePositive, scale: closeDotScale }} />
+                    </span>
                   </button>
                 </div>
                 <nav
                   className="mobile-menu-links"
                   aria-label="Mobile portfolio"
                   inert={phase !== 'menu'}
+                  onWheel={(event) => {
+                    if (phase !== 'menu') return
+                    event.stopPropagation()
+                    const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? innerHeight : 1)
+                    const now = performance.now()
+                    if (now - wheelInput.current.time > 180 || Math.sign(delta) !== Math.sign(wheelInput.current.delta)) {
+                      wheelInput.current.delta = 0
+                    }
+                    wheelInput.current.time = now
+                    wheelInput.current.delta += delta
+                    if (Math.abs(wheelInput.current.delta) >= 32) {
+                      const step = Math.sign(delta) * Math.max(1, Math.floor(Math.abs(wheelInput.current.delta) / 60))
+                      setHighlighted((current) => Math.max(0, Math.min(scenes.length - 1, current + step)))
+                      wheelInput.current.delta = 0
+                    }
+                  }}
+                  onPointerDown={(event) => {
+                    drag.current = null
+                    if (event.pointerType !== 'mouse' && event.isPrimary) {
+                      drag.current = { y: event.clientY, index: highlighted, moved: false }
+                    }
+                  }}
+                  onPointerMove={(event) => {
+                    if (!drag.current || event.pointerType === 'mouse' || phase !== 'menu') return
+                    const distance = drag.current.y - event.clientY
+                    if (Math.abs(distance) > 10) drag.current.moved = true
+                    setHighlighted(Math.max(0, Math.min(scenes.length - 1, drag.current.index + Math.round(distance / 48))))
+                  }}
+                  onPointerCancel={() => { drag.current = null }}
                 >
                   {scenes.map((scene, index) => (
                     <motion.a
@@ -266,23 +406,47 @@ export function MobileMenu({
                       href={`#${scene.id}`}
                       aria-label={`${scene.label}.`}
                       aria-current={active === index ? 'location' : undefined}
+                      data-highlighted={highlighted === index ? '' : undefined}
+                      onPointerEnter={(event) => {
+                        if (event.pointerType === 'mouse' && phase === 'menu') setHighlighted(index)
+                      }}
+                      onFocus={() => setHighlighted(index)}
                       onClick={(event) => choose(event, index)}
-                      initial={reduceMotion ? false : { opacity: 0, y: -24 }}
+                      initial={false}
                       animate={{
                         opacity: !selection || selection.index === index ? 1 : 0,
-                        y: 0,
                         color: 'var(--ink)',
                       }}
                       transition={{
-                        duration: reduceMotion ? 0 : 0.35,
-                        delay: selection || reduceMotion ? 0 : 0.12 + index * 0.06,
+                        duration: reduceMotion ? 0 : 0.2,
                       }}
                     >
                       <span className="mobile-menu-number" aria-hidden="true">
-                        0{index + 1}
+                        <span>0{index + 1}</span>
+                        <span className="mobile-menu-number-contrast">0{index + 1}</span>
                       </span>
                       <span className="mobile-menu-label">
-                        {scene.label}
+                        <motion.span
+                          className="mobile-menu-label-fill"
+                          initial={false}
+                          animate={{ '--letter-fill': highlighted === index && covered === index ? '100%' : '0%' }}
+                          transition={{ duration: reduceMotion ? 0 : 0.36, ease: [0.22, 1, 0.36, 1] }}
+                          onAnimationStart={() => {
+                            if (filled.current === index) filled.current = null
+                          }}
+                          onAnimationComplete={(definition) => {
+                            if (typeof definition !== 'object' || !('--letter-fill' in definition) ||
+                              definition['--letter-fill'] !== '100%' || highlighted !== index) return
+                            filled.current = index
+                            const pending = pendingLink.current
+                            if (pending?.index === index && phase === 'menu') {
+                              pendingLink.current = null
+                              beginNavigation(index, pending.link)
+                            }
+                          }}
+                        >
+                          {scene.label}
+                        </motion.span>
                         <span
                           className="mobile-menu-period"
                           aria-hidden="true"

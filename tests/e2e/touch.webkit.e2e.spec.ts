@@ -64,6 +64,21 @@ test('vertical touch input advances and reverses the scene clock', async ({ page
   }
 })
 
+test('skills introduction fill responds to mobile wheel input and vertical swipes', async ({ page }) => {
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('portfolio:select-scene', { detail: 1 })))
+  const first = page.locator('.skills-title-fill').first()
+  await expect(first).toHaveCSS('--title-fill', '0%')
+  await first.dispatchEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true })
+  await expect.poll(async () => parseFloat(await first.evaluate((line) =>
+    getComputedStyle(line).getPropertyValue('--title-fill')))).toBeGreaterThan(20)
+  const consumed = await swipe(page, '.skills-title-fill', 620, 320)
+  expect(consumed.every(Boolean)).toBe(true)
+  await expect(first).toHaveCSS('--title-fill', '100%')
+  await swipe(page, '.skills-title-fill', 320, 620)
+  await expect.poll(async () => parseFloat(await first.evaluate((line) =>
+    getComputedStyle(line).getPropertyValue('--title-fill')))).toBeLessThan(70)
+})
+
 test('pulling past the beginning is consumed instead of escaping the app', async ({ page }) => {
   const consumed = await swipe(page, '.hero-copy', 300, 650)
   expect(consumed.every(Boolean)).toBe(true)

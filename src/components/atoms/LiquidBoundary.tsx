@@ -216,6 +216,10 @@ export function LiquidBoundary() {
     }
     function move(event: PointerEvent) {
       if (media.matches || event.pointerType !== 'mouse') return
+      if ((event.target as Element).closest('.mobile-menu-toggle, .mobile-menu-close')) {
+        reset()
+        return
+      }
       activity()
       const bounds = svg!.getBoundingClientRect()
       const x = Math.max(0, Math.min(width, event.clientX - bounds.left - frameInset))
@@ -269,6 +273,10 @@ export function LiquidBoundary() {
     }
     function focus(event: FocusEvent) {
       if (media.matches) return
+      if ((event.target as Element).closest('.mobile-menu-toggle, .mobile-menu-close')) {
+        reset()
+        return
+      }
       activity()
       targetDepth = 0
       if (

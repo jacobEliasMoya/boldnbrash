@@ -59,6 +59,12 @@ export function drawHeroFrame(
   dark = false,
 ) {
   context.clearRect(0, 0, context.canvas.width, context.canvas.height)
+  // Enlarge the painted character, not the layout box. Keep his feet anchored
+  // to the same ground plane so the hero cannot gain extra scrollable area.
+  context.save()
+  context.translate(center, 546)
+  context.scale(1.3, 1.3)
+  context.translate(-center, -546)
   // Paint in stage coordinates before flipping the sprite, so the ground
   // shadow follows the character without mirroring or shifting between frames.
   const passing = positionedFrame === 5 || positionedFrame === 7
@@ -82,5 +88,6 @@ export function drawHeroFrame(
   }
   // This common crop retains the movement already present in all 16 supplied frames.
   context.drawImage(image, 700, 80, 580, 640, 0, 0, 580, 640)
+  context.restore()
   context.restore()
 }

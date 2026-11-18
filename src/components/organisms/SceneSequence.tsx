@@ -194,8 +194,6 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       const node = track.current
       if (!node || media.matches || !pixels) return false
       if (target?.closest('dialog, input, textarea, select, [contenteditable="true"]')) return false
-      // Inside Skills, native wheel/touch travel is the animation's position, without a queue.
-      if (current === 1) return false
       const direction = Math.sign(pixels)
       while (target && target !== node) {
         const element = target as HTMLElement
@@ -217,6 +215,14 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       const distance =
         node.offsetHeight - (node.firstElementChild?.clientHeight ?? window.innerHeight)
       if (distance <= 0) return false
+      // Mobile's clipped skills surface can consume native scroll chaining.
+      // Forward the same travel to the document after nested scroll areas have
+      // had a chance to handle it; keep the skills timeline free of a queue.
+      if (current === 1) {
+        window.scrollTo({ top: window.scrollY + pixels, behavior: 'instant' })
+        update()
+        return true
+      }
       const nativeProgress = Math.max(
         0,
         Math.min(sceneDuration, ((window.scrollY - start) / distance) * sceneDuration),
