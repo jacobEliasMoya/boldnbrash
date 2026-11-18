@@ -193,9 +193,33 @@ test('header controls stay readable over a solid liquid boundary', async ({ page
   }
   await expect(page.locator('.liquid-boundary path')).toHaveCount(1)
   await page.getByRole('link', { name: 'Skills & Work', exact: true }).click()
-  await expect(page.locator('.liquid-blended-nav')).toHaveAttribute('data-tone', 'dark')
-  await expect(page.locator('.liquid-blended-nav')).toHaveCSS('color', 'rgb(239, 235, 225)')
+  await expect(page.locator('.liquid-blended-nav')).toHaveAttribute('data-tone', 'paper')
+  await expect(page.locator('.liquid-blended-nav')).toHaveCSS('color', 'rgb(8, 8, 9)')
   await expect(page.locator('.liquid-blended-nav')).toHaveCSS('mix-blend-mode', 'normal')
+})
+
+test('outer liquid motion cannot shift content in desktop mobile testing', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(`${baseURL}/#skills`)
+  await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 15000 })
+  const liquid = page.locator('.liquid-boundary')
+  await expect(liquid).toHaveCSS('contain', 'strict')
+  await expect(liquid).toHaveCSS('overflow-anchor', 'none')
+  const snapshot = () => page.evaluate(() => {
+    const heading = document.querySelector('.skills-heading')!.getBoundingClientRect()
+    return { x: scrollX, y: scrollY, width: document.documentElement.scrollWidth,
+      height: document.documentElement.scrollHeight, left: heading.left, top: heading.top }
+  })
+  const initial = await snapshot()
+  for (const [x, y] of [[190, 12], [360, 30], [363, 400], [360, 810], [190, 830], [12, 810], [12, 400], [30, 30]]) {
+    await page.mouse.move(x, y)
+    await page.waitForTimeout(120)
+    expect(await snapshot()).toEqual(initial)
+  }
+  await expect(liquid).toHaveAttribute('data-mode', 'idle', { timeout: 5000 })
+  const position = Number(await liquid.getAttribute('data-pull-position'))
+  await expect.poll(async () => Math.abs(Number(await liquid.getAttribute('data-pull-position')) - position)).toBeGreaterThan(20)
+  expect(await snapshot()).toEqual(initial)
 })
 
 test('the liquid takes a gentle idle lap and yields to the pointer', async ({ page }) => {

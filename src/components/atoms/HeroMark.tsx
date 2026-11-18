@@ -26,6 +26,7 @@ export function HeroMark() {
     let ready = false
     let paintedPose = ''
     let edgeCenter = 760
+    let characterScale = 1
     let lastCenter: number | null = null
     let facingRight = false
     let directionAnchor: number | null = null
@@ -106,6 +107,7 @@ export function HeroMark() {
         center,
         mirrored,
         document.documentElement.dataset.theme === 'dark',
+        characterScale,
       )
       surface!.style.opacity = pose.mode === 'gone' ? '0' : '1'
       surface!.dataset.frame = String(pose.frame)
@@ -124,6 +126,7 @@ export function HeroMark() {
       paint()
     }
     function measure() {
+      characterScale = window.matchMedia('(max-width: 760px), (pointer: coarse) and (max-height: 560px)').matches ? 1.3 : 1
       const bounds = element!.getBoundingClientRect()
       const scale = bounds.height / 640
       if (!scale) return
