@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { projectStops, skillStart } from '../../src/components/organisms/skillsTimeline'
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000'
 
@@ -77,6 +78,25 @@ test('skills introduction fill responds to mobile wheel input and vertical swipe
   await swipe(page, '.skills-title-fill', 320, 620)
   await expect.poll(async () => parseFloat(await first.evaluate((line) =>
     getComputedStyle(line).getPropertyValue('--title-fill')))).toBeLessThan(70)
+})
+
+test('one mobile swipe advances a project and reverses across category gaps', async ({ page }) => {
+  const boundary = projectStops.findIndex((stop, index) => index > 0 && stop.skillIndex !== projectStops[index - 1].skillIndex) - 1
+  for (const index of [0, boundary]) {
+    const stop = projectStops[index]
+    await page.evaluate(({ index, offset }) => window.dispatchEvent(new CustomEvent('portfolio:select-skill', {
+      detail: { index, offset }, cancelable: true,
+    })), { index: stop.skillIndex, offset: stop.projectIndex + 0.95 })
+    const progress = () => page.locator('.scene-track').getAttribute('data-playback-progress').then(Number)
+    const initial = skillStart + stop.position
+    await expect.poll(async () => Math.abs(await progress() - initial)).toBeLessThan(0.01)
+    await swipe(page, '.skills-browser', 600, 420)
+    await expect.poll(async () => Math.abs(await progress() - (skillStart + projectStops[index + 1].position)), { timeout: 5000 }).toBeLessThan(0.01)
+    await swipe(page, '.skills-browser', 420, 600)
+    await expect.poll(async () => Math.abs(await progress() - initial), { timeout: 5000 }).toBeLessThan(0.01)
+    await swipe(page, '.skills-browser', 600, 570)
+    await expect.poll(async () => Math.abs(await progress() - initial), { timeout: 5000 }).toBeLessThan(0.01)
+  }
 })
 
 test('pulling past the beginning is consumed instead of escaping the app', async ({ page }) => {

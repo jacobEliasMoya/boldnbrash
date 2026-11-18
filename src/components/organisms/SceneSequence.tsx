@@ -219,7 +219,23 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       // Forward the same travel to the document after nested scroll areas have
       // had a chance to handle it; keep the skills timeline free of a queue.
       if (current === 1) {
-        window.scrollTo({ top: window.scrollY + pixels, behavior: 'instant' })
+        let travel = pixels
+        if (touchInput && displayed >= skillStart && displayed <= skillStart + skillTravel && touch) {
+          if (touch.skillsGain === null) {
+            const position = requested - skillStart
+            const next = direction > 0
+              ? projectStops.findIndex((stop) => stop.position > position + 0.01)
+              : projectStops.reduce((last, stop, index) => stop.position < position - 0.01 ? index : last, -1)
+            const interval = Math.max(1, Math.min(projectStops.length - 1,
+              direction > 0 ? (next < 0 ? projectStops.length - 1 : next) : next + 1))
+            const gap = projectStops[interval].position - projectStops[interval - 1].position
+            // A 260px swipe travels one project interval, even across categories.
+            // Small adjustments stay proportional and release still snaps smoothly.
+            touch.skillsGain = Math.max(1, (gap * distance) / sceneDuration / 260)
+          }
+          travel *= touch.skillsGain
+        }
+        window.scrollTo({ top: window.scrollY + travel, behavior: 'instant' })
         update()
         return true
       }
@@ -272,6 +288,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       lastY: number
       axis: 'vertical' | 'horizontal' | null
       target: Element | null
+      skillsGain: number | null
     } | null = null
     function startTouch(event: TouchEvent) {
       cancelSnap()
@@ -286,6 +303,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         lastY: point.clientY,
         axis: null,
         target: event.target instanceof Element ? event.target : null,
+        skillsGain: null,
       }
     }
     function moveTouch(event: TouchEvent) {
