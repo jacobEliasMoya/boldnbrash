@@ -394,7 +394,8 @@ export function MobileMenu({
                   }}
                   onPointerMove={(event) => {
                     if (!drag.current || event.pointerType === 'mouse' || phase !== 'menu') return
-                    const distance = drag.current.y - event.clientY
+                    // The menu selector follows the finger rather than document scrolling.
+                    const distance = event.clientY - drag.current.y
                     if (Math.abs(distance) > 10) drag.current.moved = true
                     setHighlighted(Math.max(0, Math.min(scenes.length - 1, drag.current.index + Math.round(distance / 48))))
                   }}

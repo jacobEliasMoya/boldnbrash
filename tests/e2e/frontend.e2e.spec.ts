@@ -812,12 +812,18 @@ test('mobile liquid selector follows wheel, swipe, and keyboard focus while cove
   expect(frame.inset).toBe(12)
   expect(frame.radius).toBe(25)
   await links.evaluate((element) => {
-    for (const [type, y] of [['pointerdown', 600], ['pointermove', 504], ['pointerup', 504]] as const) {
+    for (const [type, y] of [['pointerdown', 504], ['pointermove', 600], ['pointerup', 600]] as const) {
       element.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerType: 'touch', isPrimary: true, pointerId: 1, clientY: y }))
     }
   })
   await expect(highlighted).toHaveAttribute('href', '#about')
   await expect(menu).toBeVisible()
+  await links.evaluate((element) => {
+    for (const [type, y] of [['pointerdown', 600], ['pointermove', 504], ['pointerup', 504]] as const) {
+      element.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerType: 'touch', isPrimary: true, pointerId: 1, clientY: y }))
+    }
+  })
+  await expect(highlighted).toHaveAttribute('href', '#skills')
   await menu.getByRole('link', { name: 'Contact.', exact: true }).focus()
   await expect(highlighted).toHaveAttribute('href', '#contact')
   await expect(highlighted.locator('.mobile-menu-label-fill')).toHaveCSS('--letter-fill', '100%')
