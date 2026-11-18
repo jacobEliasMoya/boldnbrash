@@ -58,12 +58,13 @@ export function drawHeroFrame(
   mirrored = true,
   dark = false,
   characterScale = 1,
+  offsetY = 0,
 ) {
   context.clearRect(0, 0, context.canvas.width, context.canvas.height)
   // Enlarge the painted character, not the layout box. Keep his feet anchored
   // to the same ground plane so the hero cannot gain extra scrollable area.
   context.save()
-  context.translate(center, 546)
+  context.translate(center, 546 + offsetY)
   context.scale(characterScale, characterScale)
   context.translate(-center, -546)
   // Paint in stage coordinates before flipping the sprite, so the ground

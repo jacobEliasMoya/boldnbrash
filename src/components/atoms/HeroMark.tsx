@@ -89,7 +89,7 @@ export function HeroMark() {
           ...ripples.current.slice(-2),
           {
             x: ((center + 30) / 640) * 500,
-            y: (546 / 640) * 500,
+            y: ((546 + (characterScale > 1 ? 40 : 0)) / 640) * 500,
             time: performance.now(),
           },
         ]
@@ -108,6 +108,7 @@ export function HeroMark() {
         mirrored,
         document.documentElement.dataset.theme === 'dark',
         characterScale,
+        characterScale > 1 ? 40 : 0,
       )
       surface!.style.opacity = pose.mode === 'gone' ? '0' : '1'
       surface!.dataset.frame = String(pose.frame)
