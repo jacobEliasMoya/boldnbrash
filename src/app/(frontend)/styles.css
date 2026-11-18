@@ -78,6 +78,11 @@ button {
   outline: 2px solid currentColor;
   outline-offset: 6px;
 }
+@media (max-width: 760px), (pointer: coarse) {
+  :root:not([data-keyboard-navigation]) :focus-visible {
+    outline: none;
+  }
+}
 h1,
 h2,
 h3,
@@ -159,8 +164,8 @@ ul {
   display: grid;
   place-items: center;
   font:
-    600 18px/1.2 'Instrument Sans',
-    sans-serif;
+    800 18px/1.2 'JetBrains Mono',
+    monospace;
   text-transform: capitalize;
   letter-spacing: -0.015em;
   min-width: 42px;
@@ -184,8 +189,8 @@ ul {
 .nav-home-icon {
   width: 16px;
   height: 16px;
-  fill: none;
-  stroke: currentColor;
+  fill: currentColor;
+  stroke: none;
   stroke-width: 1.8;
   stroke-linejoin: round;
 }

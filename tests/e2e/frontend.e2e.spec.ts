@@ -175,6 +175,9 @@ test('header controls stay readable over a solid liquid boundary', async ({ page
     .getByRole('navigation', { name: 'Portfolio' })
     .getByRole('link', { name: 'Home' })
   await expect(home.locator('.nav-home-icon')).toBeVisible()
+  await expect(home).toHaveCSS('font-family', /JetBrains Mono/)
+  await expect(home).toHaveCSS('font-weight', '800')
+  await expect(home.locator('.nav-home-icon')).toHaveCSS('stroke', 'none')
   await expect(page.locator('.nav-highlight')).toHaveCount(0)
   for (const control of [
     page.getByRole('link', { name: 'Approach', exact: true }),
@@ -538,6 +541,12 @@ test('mobile menu opens from the toggle, traps navigation, and restores focus af
   expect(await page.evaluate(() => document.documentElement.clientWidth)).toBe(documentWidth)
   const expandedRadius = Number(await entryRing.getAttribute('r'))
   const closeButton = menu.getByRole('button', { name: 'Close menu' })
+  await expect(closeButton).toHaveCSS('outline-style', 'none')
+  await page.keyboard.press('Tab')
+  await expect(menu.getByRole('link').first()).toBeFocused()
+  await expect(menu.getByRole('link').first()).toHaveCSS('outline-style', 'solid')
+  await page.keyboard.press('Shift+Tab')
+  await expect(closeButton).toBeFocused()
   await expect(closeButton.locator('i')).toHaveCount(5)
   const closeBounds = (await closeButton.boundingBox())!
   await page.keyboard.press('Escape')

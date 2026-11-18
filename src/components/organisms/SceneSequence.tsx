@@ -50,6 +50,27 @@ export function SceneSequence({ children }: { children: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
+    const root = document.documentElement
+    function keyboard(event: KeyboardEvent) {
+      if (event.key === 'Tab' || event.key.startsWith('Arrow')) root.dataset.keyboardNavigation = ''
+    }
+    function pointer() {
+      delete root.dataset.keyboardNavigation
+    }
+    document.addEventListener('keydown', keyboard, true)
+    document.addEventListener('pointerdown', pointer, true)
+    document.addEventListener('touchstart', pointer, { passive: true, capture: true })
+    document.addEventListener('wheel', pointer, { passive: true, capture: true })
+    return () => {
+      document.removeEventListener('keydown', keyboard, true)
+      document.removeEventListener('pointerdown', pointer, true)
+      document.removeEventListener('touchstart', pointer, true)
+      document.removeEventListener('wheel', pointer, true)
+      delete root.dataset.keyboardNavigation
+    }
+  }, [])
+
+  useEffect(() => {
     const element = track.current
     if (!element) return
     const media = window.matchMedia('(prefers-reduced-motion: reduce)')
