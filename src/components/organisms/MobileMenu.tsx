@@ -9,7 +9,7 @@ import { MobileMenuLiquid } from './MobileMenuLiquid'
 import { ThemeToggle } from '@/components/atoms/ThemeToggle'
 
 type Scene = { id: string; label: string }
-type Phase = 'opening' | 'menu' | 'closing' | 'expanding'
+type Phase = 'opening' | 'menu' | 'expanding'
 const mergedDotRadius = 3.5 * Math.sqrt(3)
 const mergeDuration = 0.26
 const openingDuration = 0.72
@@ -160,34 +160,17 @@ export function MobileMenu({
   }, [open, reduceMotion, entryProgress, panelClip, renderEntry, measureEntry])
 
   function closeMenu() {
+    if (phase === 'expanding') return
     pendingLink.current = null
-    if (phase === 'closing') return
     stopEntering.current?.()
     stopOpening.current?.()
-    if (reduceMotion) {
+    stopGathering.current?.()
+    const link = menuPanel.current?.querySelectorAll<HTMLAnchorElement>('.mobile-menu-links > a')[highlighted]
+    if (!link) {
       finishClose()
       return
     }
-    setPhase('closing')
-    setSelection(null)
-    if (phase === 'menu' && closeToggle.current) {
-      const bounds = closeToggle.current.getBoundingClientRect()
-      entryOrigin.current = { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2, radius: mergedDotRadius }
-    }
-    measureEntry()
-    const control = animate(closeGather, 1, {
-      duration: mergeDuration, ease: [0.4, 0, 0.2, 1],
-      onComplete: () => {
-        const collapse = animate(entryProgress, 0, {
-          duration: Math.max(0.12, openingDuration * entryProgress.get()),
-          ease: 'linear',
-          onUpdate: renderEntry,
-          onComplete: () => finishClose(undefined, true),
-        })
-        stopEntering.current = () => collapse.stop()
-      },
-    })
-    stopGathering.current = () => control.stop()
+    beginNavigation(highlighted, link)
   }
 
   useEffect(() => {
