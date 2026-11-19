@@ -183,7 +183,6 @@ export const sceneStops = [
   1.4,
   skillStart + skillTravel + 1,
   skillStart + skillTravel + 2,
-  skillStart + skillTravel + 3,
 ]
 export const sceneDuration = sceneStops[sceneStops.length - 1]
 

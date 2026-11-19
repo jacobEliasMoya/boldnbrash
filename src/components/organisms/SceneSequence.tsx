@@ -24,7 +24,6 @@ import { useIntroReady } from '@/hooks/useIntroReady'
 const scenes = [
   { id: 'top', label: 'Home' },
   { id: 'skills', label: 'Skills & Work' },
-  { id: 'approach', label: 'Approach' },
   { id: 'about', label: 'About' },
   { id: 'contact', label: 'Contact' },
 ]
@@ -34,7 +33,6 @@ const heroRevealTravel = sceneStops[1] - heroFillTravel
 const origins = [
   [50, 50],
   [85, 80],
-  [19, 84],
   [82, 72],
 ]
 
@@ -155,6 +153,82 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     let snapping = false
     let snapExpectedY = 0
 
+    const transitionRanges = [
+      { start: heroFillTravel, end: sceneStops[1] },
+      { start: sceneStops[1], end: skillStart },
+      ...sceneStops.slice(2).map((end) => ({ start: end - 1, end })),
+    ]
+    let sceneTransition: { range: (typeof transitionRanges)[number]; direction: number; stop?: () => void } | null = null
+    let transitionLatch: { direction: number; lastInput: number } | null = null
+    let transitionIntent = { direction: 0, pixels: 0, time: 0 }
+    let transitionExpectedY = 0
+
+    function cancelSceneTransition() {
+      sceneTransition?.stop?.()
+      sceneTransition = null
+      transitionLatch = null
+      track.current?.removeAttribute('data-transitioning')
+    }
+
+    function triggerSceneTransition(pixels: number, proposed: number, start: number, distance: number) {
+      const direction = Math.sign(pixels)
+      const now = performance.now()
+      if (!sceneTransition && transitionLatch && transitionLatch.direction === direction &&
+        now - transitionLatch.lastInput < 320) {
+        transitionLatch.lastInput = now
+        return true
+      }
+      const ranges = direction > 0 ? transitionRanges : [...transitionRanges].reverse()
+      const range = sceneTransition?.range ?? ranges.find((range) =>
+        direction > 0
+          ? proposed > range.start && displayed < range.end - 0.001
+          : proposed < range.end && displayed > range.start + 0.001)
+      if (!range) return false
+      if (sceneTransition?.direction === direction) {
+        transitionLatch = { direction, lastInput: now }
+        return true
+      }
+      if (!sceneTransition) {
+        if (transitionIntent.direction !== direction || now - transitionIntent.time > 180)
+          transitionIntent = { direction, pixels: 0, time: now }
+        transitionIntent.pixels += Math.abs(pixels)
+        transitionIntent.time = now
+        if (transitionIntent.pixels < 12) return false
+      }
+      cancelSnap()
+      sceneTransition?.stop?.()
+      stopPlayback?.()
+      stopPlayback = undefined
+      const target = direction > 0 ? range.end : range.start
+      const transition = { range, direction, stop: undefined as (() => void) | undefined }
+      sceneTransition = transition
+      transitionLatch = { direction, lastInput: now }
+      track.current?.setAttribute('data-transitioning', direction > 0 ? 'forward' : 'backward')
+      const control = animate(displayed, target, {
+        duration: Math.max(0.24, 0.85 * Math.abs(target - displayed) / (range.end - range.start)),
+        ease: [0.22, 1, 0.36, 1],
+        onUpdate: (value) => {
+          displayed = requested = value
+          gestureTargetClock = toPlaybackTime(value)
+          playbackClock.jump(gestureTargetClock)
+          window.scrollTo({ top: start + distance * value / sceneDuration, behavior: 'instant' })
+          transitionExpectedY = scrollY
+          timeline.jump(value)
+          renderScene(value)
+        },
+        onComplete: () => {
+          if (sceneTransition !== transition) return
+          sceneTransition = null
+          track.current?.removeAttribute('data-transitioning')
+          displayed = requested = target
+          renderScene(target)
+          settleFocus()
+        },
+      })
+      transition.stop = () => control.stop()
+      return true
+    }
+
     function cancelSnap() {
       window.clearTimeout(snapTimer)
       stopSnap?.()
@@ -164,7 +238,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     }
     function armSnap() {
       window.clearTimeout(snapTimer)
-      if (snapping || media.matches) return
+      if (snapping || sceneTransition || media.matches) return
       snapTimer = window.setTimeout(() => {
         const node = track.current
         if (
@@ -257,6 +331,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           }
           travel = pixels * touch.skillsGain
         }
+        const proposed = ((window.scrollY + travel - start) / distance) * sceneDuration
+        if (triggerSceneTransition(pixels, proposed, start, distance)) return true
         window.scrollTo({ top: window.scrollY + travel, behavior: 'instant' })
         update()
         if (touchInput) gestureTargetClock = toPlaybackTime(requested)
@@ -285,6 +361,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           touchInput ? desired : Math.max(currentClock - 0.9, Math.min(currentClock + 0.9, desired)),
         ),
       )
+      if (triggerSceneTransition(pixels, fromPlaybackTime(bounded), start, distance)) return true
       // Accumulate fractional gesture travel before the browser rounds scrollY.
       if (touchInput) gestureTargetClock = bounded
       window.scrollTo({
@@ -363,6 +440,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     }
 
     function render(value: number, immediate = false) {
+      if (sceneTransition && !immediate) return
       const next = Math.max(0, Math.min(sceneDuration, value))
       if (next === requested && stopPlayback && !immediate && !snapping) return
       requested = next
@@ -407,6 +485,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     }
     function update() {
       frame = 0
+      if (sceneTransition) return
       const node = track.current
       if (!node || media.matches) return
       const bounds = node.getBoundingClientRect()
@@ -521,12 +600,17 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     }
 
     function schedule() {
+      if (sceneTransition) {
+        if (Math.abs(scrollY - transitionExpectedY) <= 2) return
+        cancelSceneTransition()
+      }
       if (snapping && Math.abs(window.scrollY - snapExpectedY) > 2) cancelSnap()
       armSnap()
       if (!frame) frame = window.requestAnimationFrame(update)
     }
 
     function setup() {
+      cancelSceneTransition()
       cancelSnap()
       const enabled = !media.matches
       history.scrollRestoration = enabled ? 'manual' : previousScrollRestoration
@@ -560,6 +644,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     }
 
     function goTo(index: number, immediate = true) {
+      cancelSceneTransition()
       cancelSnap()
       const node = track.current
       if (!node) return
@@ -581,6 +666,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     }
 
     function selectSkill(event: Event) {
+      cancelSceneTransition()
       cancelSnap()
       const detail = (event as CustomEvent<number | { index: number; offset: number }>).detail
       const index = typeof detail === 'number' ? detail : detail.index
@@ -646,6 +732,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
 
     return () => {
       history.scrollRestoration = previousScrollRestoration
+      cancelSceneTransition()
       stopRendering()
       timeline.stop()
       playbackClock.destroy()
@@ -692,7 +779,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           Skip to selected work
         </a>
         <motion.header
-          className={`site-header tone-${active === 0 || active === 1 || active === 3 ? 'paper' : 'dark'}`}
+          className={`site-header tone-${scenes[active]?.id === 'contact' ? 'dark' : 'paper'}`}
           initial={reduceMotion ? false : { opacity: 0, y: -24 }}
           animate={introReady ? { opacity: 1, y: 0 } : { opacity: 0, y: -24 }}
           transition={{ duration: reduceMotion ? 0 : 0.7, ease: [0.22, 1, 0.36, 1] }}
@@ -700,7 +787,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           <BlendedLogo
             enabled={enhanced}
             ready={introReady}
-            tone={active === 0 || active === 1 || active === 3 ? 'paper' : 'dark'}
+            tone={scenes[active]?.id === 'contact' ? 'dark' : 'paper'}
           >
             <motion.a
               className="wordmark"
@@ -725,7 +812,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           <BlendedNav
             enabled={enhanced}
             ready={introReady}
-            tone={active === 0 || active === 1 || active === 3 ? 'paper' : 'dark'}
+            tone={scenes[active]?.id === 'contact' ? 'dark' : 'paper'}
           >
             {scenes.map((scene, index) => (
               <motion.a
@@ -771,7 +858,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           <BlendedLogo
             enabled={enhanced}
             ready={introReady}
-            tone={active === 0 || active === 1 || active === 3 ? 'paper' : 'dark'}
+            tone={scenes[active]?.id === 'contact' ? 'dark' : 'paper'}
             control
           >
             <ThemeToggle />

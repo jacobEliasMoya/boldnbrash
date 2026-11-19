@@ -1,7 +1,7 @@
 export function Correspondence() {
   return (
     <div className="contact-scene scene-content">
-      <p className="eyebrow">05 — Contact</p>
+      <p className="eyebrow">04 — Contact</p>
       <h2>
         Have something
         <br />

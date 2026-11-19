@@ -7,6 +7,7 @@ import { BlendedLogo } from '@/components/atoms/BlendedLogo'
 import { getPeriodOpening } from '@/components/atoms/periodOpening'
 import { MobileMenuLiquid } from './MobileMenuLiquid'
 import { ThemeToggle } from '@/components/atoms/ThemeToggle'
+import { ProfileLinks } from '@/components/molecules/ProfileLinks'
 
 type Scene = { id: string; label: string }
 type Phase = 'opening' | 'menu' | 'expanding'
@@ -250,7 +251,7 @@ export function MobileMenu({
       <BlendedLogo
         enabled={introReady && reduceMotion === false}
         ready={introReady}
-        tone={active === 0 || active === 1 || active === 3 ? 'paper' : 'dark'}
+        tone={scenes[active]?.id === 'contact' ? 'dark' : 'paper'}
         control
         menu
       >
@@ -467,6 +468,7 @@ export function MobileMenu({
                     </motion.a>
                   ))}
                 </nav>
+                <ProfileLinks placement="menu" inactive={phase !== 'menu'} />
                 {selection && (
                   <svg className="mobile-menu-reveal" data-destination={scenes[selection.index].id} aria-hidden="true" focusable="false">
                     <circle ref={openingRing} cx={selection.x} cy={selection.y} />

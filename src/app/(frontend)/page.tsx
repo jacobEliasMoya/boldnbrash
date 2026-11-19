@@ -1,7 +1,6 @@
 import { SceneSequence } from '@/components/organisms/SceneSequence'
 import { PortfolioHero } from '@/components/organisms/PortfolioHero'
 import { SkillsScene } from '@/components/organisms/SkillsScene'
-import { ApproachScene } from '@/components/organisms/ApproachScene'
 import { ProfileSections } from '@/components/organisms/ProfileSections'
 import { Correspondence } from '@/components/organisms/Correspondence'
 import { PortfolioLoader } from '@/components/organisms/PortfolioLoader'
@@ -18,7 +17,6 @@ export default function HomePage() {
       <SceneSequence>
         <PortfolioHero />
         <SkillsScene />
-        <ApproachScene />
         <ProfileSections />
         <Correspondence />
       </SceneSequence>

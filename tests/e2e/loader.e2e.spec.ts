@@ -48,9 +48,9 @@ for (const width of [1440, 390]) {
       await expect(page.getByRole('button', { name: 'Open menu' })).toHaveCSS('opacity', '0')
     await expect(page.locator('.hero-letter').first()).toHaveCSS('opacity', '0')
     await expect(loader).toHaveAttribute('data-play-once', 'false')
-    await expect(loader, 'the light-mode loader should be white without an inset frame').toHaveCSS(
+    await expect(loader, 'the light-mode loader should use the cream canvas without an inset frame').toHaveCSS(
       'background-color',
-      'rgb(255, 255, 255)',
+      'rgb(239, 235, 225)',
     )
     expect(await loader.evaluate((element) => getComputedStyle(element, '::after').content)).toBe(
       'none',

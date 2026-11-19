@@ -180,7 +180,7 @@ test('header controls stay readable over a solid liquid boundary', async ({ page
   await expect(home.locator('.nav-home-icon')).toHaveCSS('stroke', 'none')
   await expect(page.locator('.nav-highlight')).toHaveCount(0)
   for (const control of [
-    page.getByRole('link', { name: 'Approach', exact: true }),
+    page.getByRole('link', { name: 'About', exact: true }),
     page.getByRole('link', { name: 'Jacob Moya home' }),
     page.getByRole('button', { name: 'Night mode' }),
   ]) {
@@ -311,17 +311,17 @@ test('section reveals remain partial until further scrolling and reverse with sc
   await expect(page.locator('#top')).toHaveAttribute('aria-hidden', 'false')
 })
 
-test('approach navigation and history work by keyboard', async ({ page }) => {
+test('about navigation and history work by keyboard', async ({ page }) => {
   await page.goto(baseURL)
   await expect(page.locator('.portfolio')).toHaveAttribute('data-enhanced', '')
-  await page.getByRole('link', { name: 'Approach', exact: true }).click()
-  await expect(page).toHaveURL(/#approach$/)
-  await expect(page.locator('#approach')).toHaveAttribute('aria-hidden', 'false')
-  await expect(page.locator('#approach .approach-steps li')).toHaveCount(3)
+  await page.getByRole('link', { name: 'About', exact: true }).click()
+  await expect(page).toHaveURL(/#about$/)
+  await expect(page.locator('#about')).toHaveAttribute('aria-hidden', 'false')
+  await expect(page.locator('#about .about-details')).toHaveCount(2)
   await page.getByRole('link', { name: 'Contact', exact: true }).click()
   await expect(page.getByRole('link', { name: 'Get in touch' })).toHaveAttribute('href', /^mailto:/)
   await page.goBack()
-  await expect(page.locator('#approach')).toHaveAttribute('aria-hidden', 'false')
+  await expect(page.locator('#about')).toHaveAttribute('aria-hidden', 'false')
   await page.goto(`${baseURL}/#skills`)
   await expect(page.locator('#skills')).toHaveAttribute('aria-hidden', 'false')
 })
@@ -345,16 +345,16 @@ test('mobile retains reveals and scrollable content; reduced motion retains docu
   await page.getByRole('button', { name: 'Open menu' }).click()
   await page
     .getByRole('dialog', { name: 'Mobile navigation' })
-    .getByRole('link', { name: 'Approach.', exact: true })
+    .getByRole('link', { name: 'About.', exact: true })
     .click()
   await expect(page.getByRole('dialog', { name: 'Mobile navigation' })).not.toBeVisible()
-  await expect(page.locator('#approach')).toHaveAttribute('aria-hidden', 'false')
-  await expect(page.getByRole('heading', { name: 'How I get there.' })).toBeInViewport()
-  const work = page.locator('#approach')
+  await expect(page.locator('#about')).toHaveAttribute('aria-hidden', 'false')
+  await expect(page.getByRole('heading', { name: 'Curious by nature. Hands on by choice.' })).toBeInViewport()
+  const work = page.locator('#about')
   await work.evaluate((el) => {
     el.scrollTop = el.scrollHeight
   })
-  await expect(work.locator('.approach-steps li').last()).toBeInViewport()
+  await expect(work.locator('.scene-footnote').last()).toBeInViewport()
   await page.getByRole('link', { name: 'Jacob Moya home' }).click()
   await expect(page.locator('#top')).toHaveAttribute('aria-hidden', 'false')
   await page.setViewportSize({ width: 1440, height: 900 })
@@ -405,13 +405,13 @@ test('skill categories retain the card layout, stack, and scroll progression', a
       const card = page.getByRole('article', { name: project.title, exact: true })
       await expect(card).toBeInViewport()
       await expect(card.locator('.skill-project-information')).toHaveCSS('opacity', '1')
-      await expect(page.locator('#approach')).toHaveJSProperty('inert', true)
+      await expect(page.locator('#about')).toHaveJSProperty('inert', true)
     }
   }
   await scrollTimeline(page, skillStart + skillTravel - 0.05)
-  await expect(page.locator('#approach')).toHaveJSProperty('inert', true)
+  await expect(page.locator('#about')).toHaveJSProperty('inert', true)
   await scrollTimeline(page, sceneStops[2])
-  await expect(page.locator('#approach')).toHaveAttribute('aria-hidden', 'false')
+  await expect(page.locator('#about')).toHaveAttribute('aria-hidden', 'false')
   await scrollTimeline(page, skillStart + 1.1)
   await expect(
     page.locator('.skills-category-pill[data-active] .skills-category-current h3').last(),
@@ -594,7 +594,6 @@ test('every mobile menu selection expands into its section and restores scrollin
   await expect(page.locator('.portfolio')).toHaveAttribute('data-enhanced', '')
   for (const [label, id] of [
     ['Skills & Work', 'skills'],
-    ['Approach', 'approach'],
     ['About', 'about'],
     ['Contact', 'contact'],
     ['Home', 'top'],

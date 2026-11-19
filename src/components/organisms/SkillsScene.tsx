@@ -11,6 +11,7 @@ import {
 } from 'motion/react'
 import { ProjectCover } from '@/components/atoms/ProjectCover'
 import { ProjectCTA } from '@/components/atoms/ProjectCTA'
+import { ProjectDialog } from './ProjectDialog'
 import { getPeriodOpening } from '@/components/atoms/periodOpening'
 import { clamp, getSkillFrame, projectStops, skills } from './skillsTimeline'
 
@@ -187,8 +188,6 @@ export function SkillsScene() {
   const [selection, setSelection] = useState({ ...getSkillFrame(0), intro: 0 })
   const [pinned, setPinned] = useState(false)
   const [openedProject, setOpenedProject] = useState<Project | null>(null)
-  const dialog = useRef<HTMLDialogElement>(null)
-  const previousOverflow = useRef('')
   const trigger = useRef<HTMLButtonElement | null>(null)
   const reduceMotion = useReducedMotion()
   const animated = pinned && !reduceMotion
@@ -258,15 +257,6 @@ export function SkillsScene() {
     window.addEventListener('portfolio:skills-progress', update)
     return () => window.removeEventListener('portfolio:skills-progress', update)
   }, [])
-  useEffect(() => {
-    if (!openedProject) return
-    previousOverflow.current = document.documentElement.style.overflow
-    document.documentElement.style.overflow = 'hidden'
-    dialog.current?.showModal()
-    return () => {
-      document.documentElement.style.overflow = previousOverflow.current
-    }
-  }, [openedProject])
   function selectSkill(index: number) {
     window.dispatchEvent(
       new CustomEvent('portfolio:select-skill', {
@@ -361,45 +351,14 @@ export function SkillsScene() {
           ))}
         </div>
       )}
-      <span className="skills-index-portal" data-portal="approach" aria-hidden="true" />
-      <dialog
-        ref={dialog}
-        className="project-dialog"
-        aria-label={openedProject?.title}
+      <span className="skills-index-portal" data-portal="about" aria-hidden="true" />
+      <ProjectDialog
+        project={openedProject}
         onClose={() => {
           setOpenedProject(null)
           trigger.current?.focus({ preventScroll: true })
         }}
-        onClick={(event) => {
-          if (event.target === event.currentTarget) dialog.current?.close()
-        }}
-      >
-        {openedProject && (
-          <div className="dialog-sheet">
-            <button className="dialog-close" autoFocus onClick={() => dialog.current?.close()}>
-              Close <span aria-hidden="true">×</span>
-            </button>
-            <p className="eyebrow">Skills &amp; Work</p>
-            <h2>{openedProject.title}</h2>
-            <p className="project-category">{openedProject.category}</p>
-            <div className="project-story">
-              {openedProject.details.map((paragraph) => (
-                <p key={paragraph}>{paragraph}</p>
-              ))}
-            </div>
-            {'sourceUrl' in openedProject && (
-              <a
-                className="project-open"
-                href={openedProject.sourceUrl}
-                target="_blank"
-                rel="noreferrer"
-              >
-                View on GitHub <b aria-hidden="true">&nearr;</b>
-              </a>
-            )}
-          </div>
-        )}
-      </dialog>
+      />
     </div>
   )
 }

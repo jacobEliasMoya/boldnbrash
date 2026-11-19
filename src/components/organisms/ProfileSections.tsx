@@ -1,9 +1,11 @@
+import { ProfileLinks } from '@/components/molecules/ProfileLinks'
+
 export function ProfileSections() {
   return (
     <div className="about-scene scene-content">
       <div className="about-heading">
         <p className="eyebrow">
-          <span>04 —</span> About
+          <span>03 —</span> About
         </p>
         <h2>
           Curious by nature.
@@ -20,6 +22,7 @@ export function ProfileSections() {
           Based in Southern California. Working across interfaces, content
           platforms, and tools.
         </p>
+        <ProfileLinks placement="about" />
         <details className="about-details">
           <summary>
             Experience <span aria-hidden="true">+</span>
@@ -75,7 +78,7 @@ export function ProfileSections() {
       />
       <div className="scene-footnote">
         <span>Southern California</span>
-        <span>04 / 05</span>
+        <span>03 / 04</span>
       </div>
     </div>
   )

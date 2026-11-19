@@ -65,7 +65,7 @@ for (const viewport of [
       expect(expandedRadius).toBeGreaterThan(initialRadius)
       await expect(intro).toHaveCSS('opacity', '1')
       await expect(intro).toHaveCSS('transform', 'none')
-      await expect(page.locator('.skills-reveal')).toHaveCSS('background-color', 'rgb(255, 255, 255)')
+      await expect(page.locator('.skills-reveal')).toHaveCSS('background-color', 'rgb(239, 235, 225)')
       await expect(page.locator('.skills-project-deck').first()).toHaveAttribute(
         'aria-hidden',
         'false',
