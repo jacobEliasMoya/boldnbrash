@@ -147,7 +147,9 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     let displayed = 0
     let requested = 0
     let inputDirection = 0
-    let heroTouchPlayback = false
+    let gesturePlayback = false
+    let gestureTargetClock = 0
+    const playbackClock = motionValue(0)
     let snapTimer = 0
     let stopSnap: (() => void) | undefined
     let snapping = false
@@ -233,6 +235,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       const distance =
         node.offsetHeight - (node.firstElementChild?.clientHeight ?? window.innerHeight)
       if (distance <= 0) return false
+      gesturePlayback = touchInput
       // Mobile's clipped skills surface can consume native scroll chaining.
       // Forward the same travel to the document after nested scroll areas have
       // had a chance to handle it; keep the skills timeline free of a queue.
@@ -256,6 +259,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         }
         window.scrollTo({ top: window.scrollY + travel, behavior: 'instant' })
         update()
+        if (touchInput) gestureTargetClock = toPlaybackTime(requested)
         return true
       }
       const nativeProgress = Math.max(
@@ -263,22 +267,26 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         Math.min(sceneDuration, ((window.scrollY - start) / distance) * sceneDuration),
       )
       const currentClock = toPlaybackTime(displayed)
+      if (touchInput && inputDirection && inputDirection !== direction) {
+        // Reverse immediately rather than inheriting forward spring momentum.
+        playbackClock.jump(currentClock)
+      }
       const base =
         inputDirection && inputDirection !== direction
           ? currentClock
-          : toPlaybackTime(nativeProgress)
+          : touchInput ? gestureTargetClock : toPlaybackTime(nativeProgress)
       inputDirection = direction
-      heroTouchPlayback = touchInput && current === 0
-      const inputGain = touchInput ? (heroTouchPlayback ? 0.006 : 0.004) : 0.0015
-      const maxLead = touchInput ? 1.8 : 0.9
-      const desired = base + direction * Math.min(Math.abs(pixels), 120) * inputGain
+      const inputGain = touchInput ? (current === 0 ? 0.006 : 0.004) : 0.0015
+      const desired = base + direction * (touchInput ? Math.abs(pixels) : Math.min(Math.abs(pixels), 120)) * inputGain
       const bounded = Math.max(
         0,
         Math.min(
           toPlaybackTime(sceneDuration),
-          Math.max(currentClock - maxLead, Math.min(currentClock + maxLead, desired)),
+          touchInput ? desired : Math.max(currentClock - 0.9, Math.min(currentClock + 0.9, desired)),
         ),
       )
+      // Accumulate fractional gesture travel before the browser rounds scrollY.
+      if (touchInput) gestureTargetClock = bounded
       window.scrollTo({
         top: start + (distance * fromPlaybackTime(bounded)) / sceneDuration,
         behavior: 'instant',
@@ -316,6 +324,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         return
       }
       const point = event.touches[0]
+      gestureTargetClock = toPlaybackTime(requested)
       touch = {
         x: point.clientX,
         y: point.clientY,
@@ -354,25 +363,20 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     }
 
     function render(value: number, immediate = false) {
-      requested = Math.max(0, Math.min(sceneDuration, value))
+      const next = Math.max(0, Math.min(sceneDuration, value))
+      if (next === requested && stopPlayback && !immediate && !snapping) return
+      requested = next
       stopPlayback?.()
       stopPlayback = undefined
       if (immediate || snapping || media.matches) {
         displayed = requested
+        playbackClock.jump(toPlaybackTime(displayed))
+        if (immediate) gesturePlayback = false
         renderScene(displayed)
         return
       }
       const currentTime = toPlaybackTime(displayed)
-      // Native scroll can reach Skills before the visible walk finishes.
-      // Cross the hero boundary on its own clock before switching to Skills easing.
-      const heroPlayback = displayed < heroAnimationTravel ||
-        (displayed === heroAnimationTravel && requested < heroAnimationTravel)
-      const segmentTarget = heroPlayback && requested > heroAnimationTravel
-        ? heroAnimationTravel
-        : displayed > heroAnimationTravel && requested < heroAnimationTravel
-          ? heroAnimationTravel
-          : requested
-      const targetTime = toPlaybackTime(segmentTarget)
+      const targetTime = toPlaybackTime(requested)
       const difference = Math.abs(targetTime - currentTime)
       if (difference < 0.000001) {
         displayed = requested
@@ -380,20 +384,23 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         settleFocus()
         return
       }
-      const control = animate(currentTime, targetTime, {
-        ...(current === 1 && !heroPlayback
-          ? { type: 'tween' as const, duration: 0.24, ease: [0.22, 1, 0.36, 1] as const }
-          : { type: 'tween' as const, duration: difference / (heroTouchPlayback && heroPlayback ? 1.6 : 1), ease: 'linear' as const }),
+      // Animate the same MotionValue on every retarget so drag velocity survives.
+      // A critically damped spring follows the finger without a fixed-speed queue.
+      const control = animate(playbackClock, targetTime, {
+        ...(gesturePlayback
+          ? { type: 'spring' as const, stiffness: 420, damping: 42, mass: 0.9, restDelta: 0.0005, restSpeed: 0.005 }
+          : current === 1
+            ? { type: 'tween' as const, duration: 0.24, ease: [0.22, 1, 0.36, 1] as const }
+            : { type: 'tween' as const, duration: difference, ease: 'linear' as const }),
         onUpdate: (time) => {
           displayed = fromPlaybackTime(time)
           renderScene(displayed)
         },
         onComplete: () => {
           stopPlayback = undefined
-          displayed = segmentTarget
+          displayed = requested
           renderScene(displayed)
-          if (segmentTarget !== requested) render(requested)
-          else settleFocus()
+          settleFocus()
         },
       })
       stopPlayback = () => control.stop()
@@ -641,6 +648,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       history.scrollRestoration = previousScrollRestoration
       stopRendering()
       timeline.stop()
+      playbackClock.destroy()
       cancelAnimationFrame(frame)
       stopPlayback?.()
       cancelAnimationFrame(initial)

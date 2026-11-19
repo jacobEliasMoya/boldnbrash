@@ -1,6 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
 import { projectStops, skillStart } from '../../src/components/organisms/skillsTimeline'
-import { heroAnimationTravel } from '../../src/components/atoms/heroFrames'
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000'
 
@@ -66,28 +65,73 @@ test('vertical touch input advances and reverses the scene clock', async ({ page
   }
 })
 
-test('a fast mobile scroll keeps the walk clock until the hero animation finishes', async ({ page }) => {
-  await swipe(page, '.hero-copy', 620, 500)
-  const samples = await page.evaluate(async (destination) => {
+test('walking follows short swipes at different speeds without a playback queue', async ({ page }) => {
+  test.setTimeout(60000)
+  for (const { steps, interval } of [{ steps: 8, interval: 16 }, { steps: 2, interval: 64 }, { steps: 20, interval: 25 }]) {
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent('portfolio:select-scene', { detail: 0 })))
+    const result = await page.evaluate(async ({ steps, interval }) => {
+      const target = document.querySelector('.hero-copy')!
+      const track = document.querySelector<HTMLElement>('.scene-track')!
+      const send = (type: string, y: number) => {
+        const event = new Event(type, { bubbles: true, cancelable: true })
+        Object.defineProperty(event, 'touches', { value: type === 'touchend' ? [] : [{ clientX: 180, clientY: y }] })
+        target.dispatchEvent(event)
+      }
+      const read = () => {
+        const rect = track.getBoundingClientRect()
+        return {
+          visible: Number(track.dataset.playbackProgress),
+          target: -rect.top / (track.offsetHeight - track.firstElementChild!.clientHeight) * Number(track.dataset.duration),
+        }
+      }
+      send('touchstart', 650)
+      for (let index = 1; index <= steps; index++) {
+        send('touchmove', 650 - 400 * index / steps)
+        await new Promise((resolve) => setTimeout(resolve, interval))
+      }
+      send('touchend', 250)
+      const released = read()
+      await new Promise((resolve) => setTimeout(resolve, 600))
+      return { released, settled: read() }
+    }, { steps, interval })
+    // The same thumb travel must not be dropped when events arrive in larger chunks.
+    expect(result.released.target).toBeGreaterThan(0.47)
+    expect(result.released.target).toBeLessThan(0.52)
+    expect(result.released.visible).toBeGreaterThan(steps === 2 ? 0.08 : 0.12)
+    expect(Math.abs(result.settled.visible - result.settled.target)).toBeLessThan(0.005)
+  }
+})
+
+test('a held drag reverses the walk promptly and settles after release', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const target = document.querySelector('.hero-copy')!
     const track = document.querySelector<HTMLElement>('.scene-track')!
-    const stage = track.firstElementChild as HTMLElement
-    const top = scrollY + track.getBoundingClientRect().top
-    window.scrollTo({
-      top: top + (track.offsetHeight - stage.clientHeight) * destination / Number(track.dataset.duration),
-      behavior: 'instant',
-    })
-    const samples: number[] = []
-    const started = performance.now()
-    while (performance.now() - started < 450) {
-      await new Promise(requestAnimationFrame)
-      samples.push(Number(track.dataset.playbackProgress))
+    const send = (type: string, y: number) => {
+      const event = new Event(type, { bubbles: true, cancelable: true })
+      Object.defineProperty(event, 'touches', { value: type === 'touchend' ? [] : [{ clientX: 180, clientY: y }] })
+      target.dispatchEvent(event)
     }
-    return samples
-  }, skillStart + projectStops[0].position)
-  expect(samples.at(-1)!).toBeGreaterThan(samples[0])
-  expect(Math.max(...samples)).toBeLessThan(heroAnimationTravel)
-  await expect.poll(async () => Number(await page.locator('.scene-track').getAttribute('data-playback-progress')),
-    { timeout: 10000 }).toBeGreaterThan(heroAnimationTravel)
+    const progress = () => Number(track.dataset.playbackProgress)
+    send('touchstart', 650)
+    for (let i = 1; i <= 12; i++) {
+      send('touchmove', 650 - i * 12)
+      await new Promise((resolve) => setTimeout(resolve, 25))
+    }
+    const forward = progress()
+    for (let i = 1; i <= 6; i++) {
+      send('touchmove', 506 + i * 12)
+      await new Promise((resolve) => setTimeout(resolve, 25))
+    }
+    const reversed = progress()
+    send('touchend', 578)
+    await new Promise((resolve) => setTimeout(resolve, 600))
+    const rect = track.getBoundingClientRect()
+    const destination = -rect.top / (track.offsetHeight - track.firstElementChild!.clientHeight) * Number(track.dataset.duration)
+    return { forward, reversed, settled: progress(), destination }
+  })
+  expect(result.forward).toBeGreaterThan(0.05)
+  expect(result.reversed).toBeLessThan(result.forward - 0.015)
+  expect(Math.abs(result.settled - result.destination)).toBeLessThan(0.005)
 })
 
 test('skills introduction fill responds to mobile wheel input and vertical swipes', async ({ page }) => {
