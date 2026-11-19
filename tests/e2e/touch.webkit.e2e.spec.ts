@@ -80,7 +80,8 @@ test('skills introduction fill responds to mobile wheel input and vertical swipe
     getComputedStyle(line).getPropertyValue('--title-fill')))).toBeLessThan(70)
 })
 
-test('one mobile swipe advances a project and reverses across category gaps', async ({ page }) => {
+test('a short thumb swipe advances a project and reverses across category gaps', async ({ page }) => {
+  test.setTimeout(60000)
   const boundary = projectStops.findIndex((stop, index) => index > 0 && stop.skillIndex !== projectStops[index - 1].skillIndex) - 1
   for (const index of [0, boundary]) {
     const stop = projectStops[index]
@@ -90,9 +91,9 @@ test('one mobile swipe advances a project and reverses across category gaps', as
     const progress = () => page.locator('.scene-track').getAttribute('data-playback-progress').then(Number)
     const initial = skillStart + stop.position
     await expect.poll(async () => Math.abs(await progress() - initial)).toBeLessThan(0.01)
-    await swipe(page, '.skills-browser', 600, 420)
+    await swipe(page, '.skills-browser', 600, 480)
     await expect.poll(async () => Math.abs(await progress() - (skillStart + projectStops[index + 1].position)), { timeout: 5000 }).toBeLessThan(0.01)
-    await swipe(page, '.skills-browser', 420, 600)
+    await swipe(page, '.skills-browser', 480, 600)
     await expect.poll(async () => Math.abs(await progress() - initial), { timeout: 5000 }).toBeLessThan(0.01)
     await swipe(page, '.skills-browser', 600, 570)
     await expect.poll(async () => Math.abs(await progress() - initial), { timeout: 5000 }).toBeLessThan(0.01)

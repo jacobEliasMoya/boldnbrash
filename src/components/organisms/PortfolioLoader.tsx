@@ -216,8 +216,6 @@ export function PortfolioLoader({ playOnce = false }: { playOnce?: boolean }) {
             openerStarted = true
             opener.current.style.visibility = 'visible'
             documentRoot.dataset.introReveal = 'ring'
-            // The hero animates behind the real aperture, rather than waiting for a fade.
-            signalIntroComplete()
           }
           const progress = Math.min(1, (elapsed - readinessFadeStartsAt) / openerDuration)
           const { x, y } = openerOrigin
@@ -228,9 +226,8 @@ export function PortfolioLoader({ playOnce = false }: { playOnce?: boolean }) {
               Math.hypot(x, innerHeight - y),
               Math.hypot(innerWidth - x, innerHeight - y),
             )
-          const borderWidth = parseFloat(getComputedStyle(documentRoot).getPropertyValue('--frame-inset')) || 12
           const { outerRadius: radius, innerRadius: holeRadius } = getPeriodOpening(
-            progress, openerOrigin.radius, reach, borderWidth,
+            progress, openerOrigin.radius, reach,
           )
           opener.current.style.clipPath = `circle(${radius}px at ${x}px ${y}px)`
           if (layer.current) {
@@ -300,7 +297,12 @@ export function PortfolioLoader({ playOnce = false }: { playOnce?: boolean }) {
         aria-valuemax={100}
         aria-valuenow={loadProgress}
       >
-        <span style={{ width: `${loadProgress}%` }} />
+        <motion.span
+          initial={{ scaleX: 0 }}
+          animate={{ scaleX: loadProgress / 100 }}
+          style={{ width: '100%', transformOrigin: 'left' }}
+          transition={{ duration: reduceMotion ? 0 : 0.35, ease: [0.22, 1, 0.36, 1] }}
+        />
       </div>
       <div className="portfolio-loader-silhouette" aria-hidden="true">
         {introLines.map((line, lineIndex) => (

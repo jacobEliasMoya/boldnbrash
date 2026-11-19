@@ -5,10 +5,10 @@ export const skills = [
     note: '',
     projects: [
       {
-        title: 'Multi-state Astro platform',
-        category: 'Astro / platform engineering',
+        title: 'Astro platform',
+        category: 'Astro',
         description:
-          'Helped consolidate roughly 16 builds into one shared Astro platform for more than 50 state sites.',
+          'Helped bring 16 builds into one for 50+ state sites.',
         details: [
           'Helped consolidate roughly 16 builds into one shared Astro build for a platform designed to support more than 50 state sites.',
           'Resolved cross-state content leakage and added validation for routes, content, SEO, and assets.',
@@ -17,9 +17,9 @@ export const skills = [
       },
       {
         title: 'This portfolio',
-        category: 'Next.js / TypeScript / motion',
+        category: 'Next.js / TypeScript',
         description:
-          'Connected scenes, scroll-driven transitions, and project stories built with Next.js and TypeScript.',
+          'The site you’re on. Built around scroll and motion.',
         details: [
           'Built the portfolio with Next.js, React, and TypeScript.',
           'Connected section reveals and project cards to scroll progress, with keyboard navigation and a reduced-motion document layout.',
@@ -35,40 +35,37 @@ export const skills = [
     projects: [
       {
         title: 'RegisteredAgents.com',
-        category: 'Strapi / GraphQL / content architecture',
-        description: 'Built content models and reusable page sections for RegisteredAgents.com.',
+        category: 'Strapi / GraphQL',
+        description: 'Built the content models and page sections behind the site.',
         details: [
           'Built content models and reusable page sections for RegisteredAgents.com.',
-          'Stack: Strapi and GraphQL.',
         ],
         artwork: 'platform',
       },
     ],
   },
   {
-    name: 'Backend & Developer Tools',
+    name: 'Backend & Dev Tools',
     technologies: ['Go (Golang)', 'Rust'],
-    note: 'Independent Go and Rust tooling projects.',
+    note: '',
     projects: [
       {
         title: 'GitGo',
         sourceUrl: 'https://github.com/jacobEliasMoya/Git-Go',
-        category: 'Go / command-line tools',
-        description: 'A standalone command-line project written in Go.',
+        category: 'Go',
+        description: 'A command-line tool for Git workflows.',
         details: [
-          'GitGo is a standalone command-line project written in Go.',
-          'Explores Git workflows through a command-line interface.',
+          'A personal Go project for working with Git from the command line.',
         ],
         artwork: 'terminal',
       },
       {
         title: 'Nexus',
         sourceUrl: 'https://github.com/jacobEliasMoya/nexus',
-        category: 'Rust / developer tools',
-        description: 'A Rust project focused on deterministic, AI-readable context for codebases.',
+        category: 'Rust',
+        description: 'Packages codebase context for AI tools.',
         details: [
-          'Explores generating deterministic context that AI tools can read from a codebase.',
-          'An independent Rust developer-tool project, documented in the public repository.',
+          'A personal Rust project that generates repeatable codebase context for AI tools.',
         ],
         artwork: 'terminal',
       },
@@ -81,7 +78,7 @@ export const skills = [
     projects: [
       {
         title: 'Low-poly spaceship',
-        category: 'Blender / 3D modeling',
+        category: 'Blender',
         description: 'A low-poly spaceship modeled in Blender.',
         details: ['A low-poly spaceship modeled in Blender.'],
         artwork: 'model',
@@ -94,11 +91,11 @@ export const skills = [
     note: '',
     projects: [
       {
-        title: 'Offline Survival Agent',
+        title: 'Survival Agent',
         status: 'In development',
-        category: 'Ollama / local models / tool calling',
+        category: 'Ollama',
         description:
-          'Building an offline Survival Agent with Ollama, local models, and tool calling.',
+          'An offline survival assistant I’m building with local models.',
         details: ['In development. The planned stack is Ollama, local models, and tool calling.'],
         artwork: 'agent',
       },
@@ -113,10 +110,10 @@ export const skills = [
         title: 'Design system',
         category: 'React / UI components',
         description:
-          'Reusable React components with variants, themes, and consistent interaction states.',
+          'Shared React components with themes and variants.',
         details: [
           'Built reusable React components with variants and themes.',
-          'Extended a shared section overlay across roughly 21 components, improving responsive layouts, dark mode, contrast, and interaction states.',
+          'Updated a shared section overlay across roughly 21 components, including mobile layouts, dark mode, and contrast fixes.',
         ],
         artwork: 'system',
       },
@@ -128,23 +125,23 @@ export const skills = [
     note: '',
     projects: [
       {
-        title: 'Custom reviews template',
-        category: 'BIZIQ / PHP / WordPress',
+        title: 'Reviews template',
+        category: 'BIZIQ / WordPress',
         description:
-          'Built a PHP reviews template for a proprietary WordPress theme, improving readability and usability.',
+          'Built a custom reviews template for BIZIQ’s WordPress theme.',
         details: [
           'Created a custom PHP reviews template within the proprietary WordPress theme at BIZIQ.',
-          'Part of broader work building and optimizing more than 200 WordPress sites, with attention to speed, SEO, and accessibility.',
+          'At BIZIQ, I worked on more than 200 WordPress sites.',
         ],
         artwork: 'platform',
       },
       {
-        title: 'VAREP website migration',
-        category: 'VAREP National / WordPress / migration',
+        title: 'VAREP migration',
+        category: 'VAREP / WordPress',
         description:
-          'Helped move VAREP from Joomla to WordPress, translating wireframes into responsive pages.',
+          'Helped move the site from Joomla to WordPress.',
         details: [
-          'Led the transition from Joomla to WordPress while supporting a senior developer and collaborating with designers.',
+          'Worked with a senior developer and designers on the move from Joomla to WordPress.',
           'Built responsive pages with Beaver Builder and supported content migration, plugin configuration, QA, and Gravity Forms.',
         ],
         artwork: 'platform',
@@ -159,9 +156,9 @@ export const skills = [
       {
         title: 'ProductivePython',
         sourceUrl: 'https://github.com/jacobEliasMoya/ProductivePython',
-        category: 'Python / image processing / CLI',
+        category: 'Python / Pillow',
         description:
-          'Batch tools for folder-based GPS tagging, image resizing, compression, and WebP conversion.',
+          'Tools to geotag, resize, and compress images in bulk.',
         details: [
           'BulkGeoTagger writes GPS metadata using city names from image folders and a coordinate lookup.',
           'BulkCompressor resizes images, targets a chosen file size, optionally converts to WebP, and packages the output.',

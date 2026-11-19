@@ -1,7 +1,7 @@
 'use client'
 
 import { Children, useEffect, useRef, useState, type ReactNode } from 'react'
-import { motion, MotionConfig, useReducedMotion, useMotionValue } from 'motion/react'
+import { animate, motionValue, motion, MotionConfig, useReducedMotion, useMotionValue } from 'motion/react'
 import {
   sceneDuration,
   sceneStops,
@@ -74,33 +74,25 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     const element = track.current
     if (!element) return
     const media = window.matchMedia('(prefers-reduced-motion: reduce)')
-    let frame = 0
-    let previous = 0
-    let x = 0
-    let y = 0
-    let targetX = 0
-    let targetY = 0
-
-    function paint(time: number) {
-      const delta = previous ? Math.min(time - previous, 50) : 16
-      previous = time
-      const ease = 1 - Math.exp(-delta / 240)
-      x += (targetX - x) * ease
-      y += (targetY - y) * ease
-      const settled = Math.abs(targetX - x) + Math.abs(targetY - y) < 0.02
-      if (settled) {
-        x = targetX
-        y = targetY
-      }
-      element!.style.setProperty('--background-x', `${x.toFixed(3)}px`)
-      element!.style.setProperty('--background-y', `${y.toFixed(3)}px`)
-      frame = settled ? 0 : requestAnimationFrame(paint)
-      if (settled) previous = 0
-    }
+    const x = motionValue(0)
+    const y = motionValue(0)
+    let stopX: (() => void) | undefined
+    let stopY: (() => void) | undefined
+    const unsubscribeX = x.on('change', (value) => element.style.setProperty('--background-x', `${value}px`))
+    const unsubscribeY = y.on('change', (value) => element.style.setProperty('--background-y', `${value}px`))
     function update(nextX: number, nextY: number) {
-      targetX = nextX
-      targetY = nextY
-      if (!frame) frame = requestAnimationFrame(paint)
+      stopX?.()
+      stopY?.()
+      if (media.matches) {
+        x.jump(0)
+        y.jump(0)
+        return
+      }
+      const spring = { type: 'spring' as const, stiffness: 75, damping: 22 }
+      const horizontal = animate(x, nextX, spring)
+      const vertical = animate(y, nextY, spring)
+      stopX = () => horizontal.stop()
+      stopY = () => vertical.stop()
     }
     function reset() {
       update(0, 0)
@@ -115,8 +107,10 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     }
     function preferenceChanged() {
       if (!media.matches) return
-      cancelAnimationFrame(frame)
-      frame = previous = x = y = targetX = targetY = 0
+      stopX?.()
+      stopY?.()
+      x.jump(0)
+      y.jump(0)
       element!.style.removeProperty('--background-x')
       element!.style.removeProperty('--background-y')
     }
@@ -126,7 +120,12 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     document.addEventListener('visibilitychange', reset)
     media.addEventListener('change', preferenceChanged)
     return () => {
-      cancelAnimationFrame(frame)
+      stopX?.()
+      stopY?.()
+      unsubscribeX()
+      unsubscribeY()
+      x.destroy()
+      y.destroy()
       window.removeEventListener('pointermove', move)
       document.documentElement.removeEventListener('pointerleave', reset)
       window.removeEventListener('blur', reset)
@@ -144,21 +143,20 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     let frame = 0
     let current = 0
     let pendingFocus: number | null = null
-    let playbackFrame = 0
+    let stopPlayback: (() => void) | undefined
     let displayed = 0
     let requested = 0
-    let previousPlaybackTime = 0
     let inputDirection = 0
     let heroTouchPlayback = false
     let snapTimer = 0
-    let snapFrame = 0
+    let stopSnap: (() => void) | undefined
     let snapping = false
     let snapExpectedY = 0
 
     function cancelSnap() {
       window.clearTimeout(snapTimer)
-      cancelAnimationFrame(snapFrame)
-      snapFrame = 0
+      stopSnap?.()
+      stopSnap = undefined
       snapping = false
       track.current?.removeAttribute('data-snapping')
     }
@@ -190,24 +188,23 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         const distance = node.offsetHeight - (node.firstElementChild?.clientHeight ?? innerHeight)
         const destination = trackTop + (distance * target) / sceneDuration
         const duration = 480 + Math.min(1, Math.abs(target - displayed)) * 260
-        const began = performance.now()
         snapping = true
         node.dataset.snapping = 'true'
-        function settle(time: number) {
-          const t = Math.min(1, (time - began) / duration)
-          // Start and finish at rest, without the abrupt kick of an ease-out snap.
-          const eased = t * t * t * (t * (t * 6 - 15) + 10)
-          window.scrollTo({ top: start + (destination - start) * eased, behavior: 'instant' })
-          snapExpectedY = window.scrollY
-          update()
-          if (t < 1) snapFrame = requestAnimationFrame(settle)
-          else {
+        const control = animate(start, destination, {
+          duration: duration / 1000,
+          ease: [0.65, 0, 0.35, 1],
+          onUpdate: (top) => {
+            window.scrollTo({ top, behavior: 'instant' })
+            snapExpectedY = window.scrollY
+            update()
+          },
+          onComplete: () => {
             snapping = false
-            snapFrame = 0
-            node!.removeAttribute('data-snapping')
-          }
-        }
-        snapFrame = requestAnimationFrame(settle)
+            stopSnap = undefined
+            node.removeAttribute('data-snapping')
+          },
+        })
+        stopSnap = () => control.stop()
       }, 420)
     }
 
@@ -240,7 +237,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       // Forward the same travel to the document after nested scroll areas have
       // had a chance to handle it; keep the skills timeline free of a queue.
       if (current === 1) {
-        let travel = pixels
+        let travel = touchInput ? pixels * 1.6 : pixels
         if (touchInput && displayed >= skillStart && displayed <= skillStart + skillTravel && touch) {
           if (touch.skillsGain === null) {
             const position = requested - skillStart
@@ -250,11 +247,12 @@ export function SceneSequence({ children }: { children: ReactNode }) {
             const interval = Math.max(1, Math.min(projectStops.length - 1,
               direction > 0 ? (next < 0 ? projectStops.length - 1 : next) : next + 1))
             const gap = projectStops[interval].position - projectStops[interval - 1].position
-            // A 260px swipe travels one project interval, even across categories.
+            // A short thumb swipe travels one project interval, even across categories.
             // Small adjustments stay proportional and release still snaps smoothly.
-            touch.skillsGain = Math.max(1, (gap * distance) / sceneDuration / 260)
+            const swipeTravel = Math.max(120, Math.min(160, innerHeight * 0.2))
+            touch.skillsGain = Math.max(1, (gap * distance) / sceneDuration / swipeTravel)
           }
-          travel *= touch.skillsGain
+          travel = pixels * touch.skillsGain
         }
         window.scrollTo({ top: window.scrollY + travel, behavior: 'instant' })
         update()
@@ -271,8 +269,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           : toPlaybackTime(nativeProgress)
       inputDirection = direction
       heroTouchPlayback = touchInput && current === 0
-      const inputGain = heroTouchPlayback ? 0.004 : 0.0015
-      const maxLead = heroTouchPlayback ? 1.8 : 0.9
+      const inputGain = touchInput ? (heroTouchPlayback ? 0.006 : 0.004) : 0.0015
+      const maxLead = touchInput ? 1.8 : 0.9
       const desired = base + direction * Math.min(Math.abs(pixels), 120) * inputGain
       const bounded = Math.max(
         0,
@@ -357,49 +355,38 @@ export function SceneSequence({ children }: { children: ReactNode }) {
 
     function render(value: number, immediate = false) {
       requested = Math.max(0, Math.min(sceneDuration, value))
-      if (immediate || snapping) {
-        cancelAnimationFrame(playbackFrame)
-        playbackFrame = 0
+      stopPlayback?.()
+      stopPlayback = undefined
+      if (immediate || snapping || media.matches) {
         displayed = requested
         renderScene(displayed)
         return
       }
-      if (!playbackFrame) {
-        previousPlaybackTime = performance.now()
-        playbackFrame = requestAnimationFrame(advancePlayback)
-      }
-    }
-
-    function advancePlayback(time: number) {
-      playbackFrame = 0
-      if (media.matches) return
-      const delta = Math.min(50, time - previousPlaybackTime)
-      previousPlaybackTime = time
       const currentTime = toPlaybackTime(displayed)
       const targetTime = toPlaybackTime(requested)
-      const difference = targetTime - currentTime
-      if (current === 1) {
-        // Absorb discrete mouse-wheel ticks into a short glide, without an input queue.
-        const settled = Math.abs(difference) < 0.002
-        displayed = settled
-          ? requested
-          : fromPlaybackTime(currentTime + difference * (1 - Math.exp(-delta / 85)))
-        renderScene(displayed)
-        if (!settled) playbackFrame = requestAnimationFrame(advancePlayback)
-        else settleFocus()
-        return
-      }
-      const playbackStep = delta / 1000 * (heroTouchPlayback && current === 0 ? 1.6 : 1)
-      const step = Math.sign(difference) * Math.min(Math.abs(difference), playbackStep)
-      displayed = fromPlaybackTime(currentTime + step)
-      renderScene(displayed)
-      if (Math.abs(difference) > playbackStep + 0.000001) {
-        playbackFrame = requestAnimationFrame(advancePlayback)
-      } else {
+      const difference = Math.abs(targetTime - currentTime)
+      if (difference < 0.000001) {
         displayed = requested
         renderScene(displayed)
         settleFocus()
+        return
       }
+      const control = animate(currentTime, targetTime, {
+        ...(current === 1
+          ? { type: 'tween' as const, duration: 0.24, ease: [0.22, 1, 0.36, 1] as const }
+          : { type: 'tween' as const, duration: difference / (heroTouchPlayback && current === 0 ? 1.6 : 1), ease: 'linear' as const }),
+        onUpdate: (time) => {
+          displayed = fromPlaybackTime(time)
+          renderScene(displayed)
+        },
+        onComplete: () => {
+          stopPlayback = undefined
+          displayed = requested
+          renderScene(displayed)
+          settleFocus()
+        },
+      })
+      stopPlayback = () => control.stop()
     }
     function update() {
       frame = 0
@@ -477,8 +464,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
             Math.max(y, panelBounds.height - y),
           )
           const startingRadius = index === 1 && portalBounds ? portalBounds.width / 2 : 0
-          const borderWidth = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--frame-inset')) || 12
-          const aperture = getPeriodOpening(reveal, startingRadius, radius, borderWidth)
+          const aperture = getPeriodOpening(reveal, startingRadius, radius)
           panel.style.clipPath =
             reveal === 1 ? 'none' : `circle(${aperture.innerRadius}px at ${x}px ${y}px)`
           const ring = sceneOpenings.current[index]
@@ -533,8 +519,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           if (ring) ring.style.visibility = 'hidden'
         })
         timeline.stop()
-        cancelAnimationFrame(playbackFrame)
-        playbackFrame = 0
+        stopPlayback?.()
+        stopPlayback = undefined
         panels.current.forEach((panel) => {
           if (!panel) return
           panel.style.clipPath = ''
@@ -646,7 +632,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       stopRendering()
       timeline.stop()
       cancelAnimationFrame(frame)
-      cancelAnimationFrame(playbackFrame)
+      stopPlayback?.()
       cancelAnimationFrame(initial)
       cancelSnap()
       window.removeEventListener('pointerdown', cancelSnap)
@@ -674,7 +660,10 @@ export function SceneSequence({ children }: { children: ReactNode }) {
   }, [enhanced])
 
   return (
-    <MotionConfig reducedMotion="user">
+    <MotionConfig
+      reducedMotion="user"
+      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+    >
       <div
         className="portfolio"
         data-enhanced={enhanced ? '' : undefined}
@@ -708,7 +697,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
                 ease: [0.22, 1, 0.36, 1],
               }}
             >
-              <span aria-hidden="true">JacobMoya</span>
+              <span className="wordmark-text" aria-hidden="true">JacobMoya</span>
+              <span className="wordmark-symbol" aria-hidden="true" />
             </motion.a>
           </BlendedLogo>
           <BlendedNav
@@ -719,6 +709,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
             {scenes.map((scene, index) => (
               <motion.a
                 key={scene.id}
+                whileHover={reduceMotion ? undefined : 'hover'}
+                whileFocus={reduceMotion ? undefined : 'hover'}
                 href={`#${scene.id}`}
                 data-liquid-header
                 aria-current={active === index ? 'location' : undefined}
@@ -731,7 +723,12 @@ export function SceneSequence({ children }: { children: ReactNode }) {
                   ease: [0.22, 1, 0.36, 1],
                 }}
               >
-                <span className="nav-label">
+                <motion.span
+                  className="nav-label"
+                  initial="idle"
+                  variants={{ idle: { y: 0, rotate: 0 }, hover: { y: -3, rotate: -3 } }}
+                  transition={{ type: 'spring', stiffness: 340, damping: 22, mass: 0.8 }}
+                >
                   {scene.id === 'top' ? (
                     <svg className="nav-home-icon" viewBox="0 0 24 24" aria-hidden="true">
                       <path d="M3.5 10.7 12 3.8l8.5 6.9v9.1h-6v-5.6h-5v5.6h-6Z" />
@@ -739,7 +736,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
                   ) : (
                     scene.label
                   )}
-                </span>
+                </motion.span>
               </motion.a>
             ))}
           </BlendedNav>

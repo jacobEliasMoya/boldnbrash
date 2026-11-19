@@ -81,11 +81,11 @@ function SkillCategoryPill({
       }}
     >
       <div className="skills-category-current" data-skill={skill.name}>
-        <p className="eyebrow">
-          0{index + 1} / 0{skills.length} &mdash; What I build
-        </p>
-        <h3>{skill.name}</h3>
-        <p className="skills-technologies">{skill.technologies.join(' \u00b7 ')}</p>
+        <span className="skills-category-number" aria-hidden="true">0{index + 1}</span>
+        <div className="skills-category-copy">
+          <p className="skills-technologies">{skill.technologies.join(' \u00b7 ')}</p>
+          <h3>{skill.name}</h3>
+        </div>
         {skill.note && <p className="skills-category-note">{skill.note}</p>}
         {animated && (
           <button
@@ -150,7 +150,11 @@ function SkillProjects({
             key={`${skill.name}-${project.title}`}
             className="scene-project skill-project-card"
             aria-label={project.title}
-            data-visible={!animated || first + position === outgoing || first + position === incoming ? 'true' : undefined}
+            data-visible={
+              !animated || first + position === outgoing || first + position === incoming
+                ? 'true'
+                : undefined
+            }
             aria-hidden={animated && (!active || position !== projectIndex)}
             inert={animated && (!active || position !== projectIndex)}
             style={
@@ -162,10 +166,11 @@ function SkillProjects({
             }
           >
             <div className="card-scoop" aria-hidden="true" />
-            <p className="eyebrow">0{position + 1} — Project</p>
-            <h4>{project.title}</h4>
-            {'status' in project && <p className="skill-project-status">{project.status}</p>}
-            <p className="project-category">{project.category}</p>
+            <header className="skill-project-heading">
+              <h4>{project.title}</h4>
+              <p className="project-category">{project.category}</p>
+              {'status' in project && <p className="skill-project-status">{project.status}</p>}
+            </header>
             <div className="artwork-frame">
               {project.artwork === 'system' ? (
                 <SystemArtwork />
@@ -194,18 +199,20 @@ function SkillProjects({
                 </div>
               )}
             </div>
-            <p className="skill-project-information">{project.description}</p>
-            <button
-              type="button"
-              className="project-open"
-              aria-haspopup="dialog"
-              onClick={(event) => {
-                onOpenProject(project, event.currentTarget)
-              }}
-            >
-              Read project <span className="sr-only">— {project.title}</span>
-              <b aria-hidden="true">↗</b>
-            </button>
+            <div className="skill-project-footer">
+              <p className="skill-project-information">{project.description}</p>
+              <button
+                type="button"
+                className="project-open"
+                aria-haspopup="dialog"
+                onClick={(event) => {
+                  onOpenProject(project, event.currentTarget)
+                }}
+              >
+                Read project <span className="sr-only">— {project.title}</span>
+                <b aria-hidden="true">↗</b>
+              </button>
+            </div>
           </article>
         ))}
       </div>
@@ -243,8 +250,9 @@ export function SkillsScene() {
   const period = useRef<HTMLSpanElement>(null)
   const [portal, setPortal] = useState({ x: 0, y: 0, radius: 0, dot: 0, borderWidth: 12 })
   const expansion = animated ? clamp((selection.intro - 0.4) / 0.6) : 1
-  const entrance = expansion === 1 ? 1 : 0
-  const opening = getPeriodOpening(expansion, portal.dot, portal.radius, portal.borderWidth)
+  const { innerRadius: openingRadius } = getPeriodOpening(expansion, portal.dot, portal.radius)
+  const contentProgress = clamp((expansion - 0.82) / 0.18)
+  const entrance = contentProgress * contentProgress * (3 - 2 * contentProgress)
   useLayoutEffect(() => {
     const element = scene.current
     const dot = period.current
@@ -318,7 +326,9 @@ export function SkillsScene() {
       style={{
         '--skills-portal-x': `${portal.x}px`,
         '--skills-portal-y': `${portal.y}px`,
-        '--skills-portal-radius': `${opening.innerRadius}px`,
+        '--skills-portal-radius': `${openingRadius}px`,
+        '--skills-content-opacity': entrance,
+        '--skills-content-offset': `${(1 - entrance) * 12}px`,
       } as CSSProperties}
     >
       <div className="skills-heading" aria-hidden={animated && expansion === 1}>
@@ -338,11 +348,6 @@ export function SkillsScene() {
         </div>
         <p className="skills-intro">Check out how I spend my time when I’m not working, being a dad, or playing guitar.</p>
       </div>
-      {animated && expansion > 0 && expansion < 1 && (
-        <svg className="skills-period-opening" aria-hidden="true" focusable="false">
-          <circle cx={portal.x} cy={portal.y} r={opening.ringRadius} strokeWidth={opening.ringWidth} />
-        </svg>
-      )}
       {animated ? (
         <div className="skills-reveal" inert={entrance < 1} aria-hidden={entrance < 1}>
         <div className="skills-performance">

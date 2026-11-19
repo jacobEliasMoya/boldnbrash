@@ -73,7 +73,7 @@ test('project cards stay fixed during a circular reveal and settle completely', 
   expect(radius).toBeGreaterThan(149)
   await moveTo(page, skillStart + projectStops[0].position + 0.3)
   await expect.poll(() => progress(page)).toBeCloseTo(skillStart + projectStops[0].position, 2)
-  await expect(page.getByRole('article', { name: 'Multi-state Astro platform', exact: true })).toBeVisible()
+  await expect(page.getByRole('article', { name: 'Astro platform', exact: true })).toBeVisible()
 })
 
 

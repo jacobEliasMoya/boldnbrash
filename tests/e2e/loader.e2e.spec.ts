@@ -10,6 +10,8 @@ for (const width of [1440, 390]) {
     await page.goto(baseURL)
     const loader = page.locator('.portfolio-loader')
     await expect(loader).toBeVisible()
+    const copyLines = page.locator('.portfolio-loader-copy-line')
+    await expect(copyLines.last()).toHaveCSS('opacity', '0')
     await expect.poll(() => loader.evaluate((el) => parseFloat(getComputedStyle(el).getPropertyValue('--title-fill')))).toBe(0)
     await expect(page.locator('.site-header')).toHaveCSS('opacity', '0')
     await expect(page.locator('.site-header .wordmark')).toHaveCSS('opacity', '0')
@@ -25,9 +27,7 @@ for (const width of [1440, 390]) {
       'none',
     )
     await expect(page.locator('.portfolio')).toHaveJSProperty('inert', true)
-    const copyLines = page.locator('.portfolio-loader-copy-line')
     await expect(copyLines).toHaveText(['Im Jake'])
-    await expect(copyLines.last()).toHaveCSS('opacity', '0')
     await expect(loader).toHaveAttribute('data-phase', 'copy', { timeout: 7000 })
     await expect(copyLines.last()).toHaveCSS('opacity', '1')
     await expect(loader).toHaveAttribute('data-phase', 'catch')

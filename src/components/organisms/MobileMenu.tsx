@@ -31,7 +31,7 @@ export function MobileMenu({
   const openingRing = useRef<SVGCircleElement>(null)
   const entryRing = useRef<SVGCircleElement>(null)
   const entryOrigin = useRef({ x: 0, y: 0, radius: 0 })
-  const entryGeometry = useRef({ reach: 0, borderWidth: 12 })
+  const entryGeometry = useRef({ reach: 0 })
   const stopEntering = useRef<(() => void) | null>(null)
   const stopGathering = useRef<(() => void) | null>(null)
   const stopOpening = useRef<(() => void) | null>(null)
@@ -111,14 +111,13 @@ export function MobileMenu({
     const { x, y } = entryOrigin.current
     entryGeometry.current = {
       reach: Math.hypot(Math.max(x, panel.clientWidth - x), Math.max(y, panel.clientHeight - y)),
-      borderWidth: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--frame-inset')) || 12,
     }
   }, [])
 
   const renderEntry = useCallback((progress: number) => {
     const { x, y, radius } = entryOrigin.current
-    const { reach, borderWidth } = entryGeometry.current
-    const aperture = getPeriodOpening(progress, radius, reach, borderWidth)
+    const { reach } = entryGeometry.current
+    const aperture = getPeriodOpening(progress, radius, reach)
     panelClip.set(`circle(${aperture.innerRadius}px at ${x}px ${y}px)`)
     if (entryRing.current) {
       entryRing.current.style.visibility = 'visible'
@@ -237,14 +236,13 @@ export function MobileMenu({
       finishClose(scenes[index].id)
       return
     }
-    const borderWidth = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--frame-inset')) || 12
     const reach = Math.hypot(Math.max(x, panel.clientWidth - x), Math.max(y, panel.clientHeight - y))
     const dotRadius = (bounds.width * panel.clientWidth) / panelBounds.width / 2
     const control = animate(0, 1, {
       duration: 0.65,
       ease: 'linear',
       onUpdate: (progress) => {
-        const aperture = getPeriodOpening(progress, dotRadius, reach, borderWidth)
+        const aperture = getPeriodOpening(progress, dotRadius, reach)
         if (menuPanel.current) {
           const r = aperture.innerRadius
           const hole = `M${x - r},${y} A${r},${r} 0 1 0 ${x + r},${y} A${r},${r} 0 1 0 ${x - r},${y} Z`
@@ -279,12 +277,11 @@ export function MobileMenu({
           aria-haspopup="dialog"
           aria-controls="mobile-menu"
           aria-expanded={open}
-          initial={reduceMotion ? false : { opacity: 0, y: -14 }}
-          animate={introReady ? { opacity: 1, y: 0 } : { opacity: 0, y: -14 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: introReady ? 1 : 0 }}
           transition={{
-            duration: reduceMotion ? 0 : 0.5,
+            duration: reduceMotion ? 0 : 0.18,
             delay: reduceMotion ? 0 : 0.22,
-            ease: [0.22, 1, 0.36, 1],
           }}
           onClick={(event) => {
             if (gathering || open) return
@@ -315,11 +312,20 @@ export function MobileMenu({
             stopGathering.current = () => control.stop()
           }}
         >
-          <span className="mobile-menu-dots" aria-hidden="true">
+          <motion.span
+            className="mobile-menu-dots"
+            aria-hidden="true"
+            initial={{ scaleX: reduceMotion ? 1 : 0, scaleY: reduceMotion ? 1 : 0 }}
+            animate={{ scaleX: introReady ? 1 : 0, scaleY: introReady ? 1 : 0 }}
+            transition={reduceMotion ? { duration: 0 } : {
+              scaleX: { type: 'spring', stiffness: 340, damping: 17, mass: 0.8, delay: 0.22 },
+              scaleY: { type: 'spring', stiffness: 260, damping: 14, mass: 0.8, delay: 0.22 },
+            }}
+          >
             <motion.i style={{ x: 0, y: topY, scale: dotScale }} />
             <motion.i style={{ x: leftX, y: bottomY, scale: dotScale }} />
             <motion.i style={{ x: rightX, y: bottomY, scale: dotScale }} />
-          </span>
+          </motion.span>
         </motion.button>
       </BlendedLogo>
       {open &&

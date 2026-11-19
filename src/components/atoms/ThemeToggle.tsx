@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
+import { motion, useMotionValue, useReducedMotion } from 'motion/react'
 import { useBlendBounds } from './BlendedNav'
 import { useIntroReady } from '@/hooks/useIntroReady'
 
@@ -22,6 +23,8 @@ export function ThemeToggle() {
   )
 
   const introReady = useIntroReady()
+  const reduceMotion = useReducedMotion()
+  const entranceOpacity = useMotionValue(0)
   const { anchor: thumb, bounds } = useBlendBounds<HTMLSpanElement>(introReady, dark, true)
 
   function toggleTheme() {
@@ -37,8 +40,16 @@ export function ThemeToggle() {
 
   return (
     <>
-      <button
+      <motion.button
         className="theme-toggle"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: introReady ? 1 : 0 }}
+        style={{ opacity: entranceOpacity }}
+        transition={{
+          duration: reduceMotion ? 0 : 0.7,
+          delay: reduceMotion ? 0 : 0.12,
+          ease: [0.22, 1, 0.36, 1],
+        }}
         data-liquid-header
         type="button"
         aria-label="Night mode"
@@ -69,14 +80,15 @@ export function ThemeToggle() {
           </svg>
           <span ref={thumb} className="theme-toggle-thumb" style={{ opacity: 0 }} />
         </span>
-      </button>
+      </motion.button>
       {introReady &&
         bounds &&
         createPortal(
-          <span
+          <motion.span
             className="theme-toggle-floating-thumb"
             aria-hidden="true"
             style={{
+              opacity: entranceOpacity,
               left: bounds.left,
               top: bounds.top,
               width: bounds.width,
@@ -102,7 +114,7 @@ export function ThemeToggle() {
                 </>
               )}
             </svg>
-          </span>,
+          </motion.span>,
           document.body,
         )}
     </>
