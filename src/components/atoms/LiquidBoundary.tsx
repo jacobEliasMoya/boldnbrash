@@ -137,6 +137,36 @@ export function LiquidBoundary() {
       for (const control of document.querySelectorAll<HTMLElement>('[data-liquid-header]')) {
         const label = control.querySelector('.nav-label, .theme-toggle-track, span') ?? control
         const rect = label.getBoundingClientRect()
+        const contrast = control.querySelector<HTMLElement>('.nav-label-contrast')
+        if (contrast) {
+          // Clip the contrast copy to the actual liquid edge instead of flipping
+          // the whole label when a single corner touches it.
+          const contains = (x: number, y: number) => path!.isPointInFill(new DOMPoint(
+            rect.left + x - bounds.left - frameInset,
+            rect.top + y - bounds.top - frameInset,
+          ))
+          const hidden = media.matches || !rect.width || !!control.closest('[inert]') ||
+            getComputedStyle(control).visibility === 'hidden'
+          if (hidden) contrast.style.clipPath = 'inset(0 0 100% 0)'
+          else {
+            const edge = Array.from({ length: 25 }, (_, index) => {
+              const x = rect.width * index / 24
+              let low = 0
+              let high = rect.height
+              if (!contains(x, 0)) high = 0
+              else if (contains(x, rect.height)) low = rect.height
+              else for (let step = 0; step < 7; step++) {
+                const middle = (low + high) / 2
+                if (contains(x, middle)) low = middle
+                else high = middle
+              }
+              return `${x}px ${(low + high) / 2}px`
+            })
+            contrast.style.clipPath = `polygon(0 0, 100% 0, ${edge.reverse().join(', ')})`
+          }
+          control.dataset.liquidCovered = 'false'
+          continue
+        }
         // Check the edges as well as the centre; contrast must change before a letter disappears.
         const covered =
           !media.matches &&

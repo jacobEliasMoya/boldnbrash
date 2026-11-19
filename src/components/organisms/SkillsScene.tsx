@@ -10,6 +10,7 @@ import {
   type MotionValue,
 } from 'motion/react'
 import { ProjectCover } from '@/components/atoms/ProjectCover'
+import { ProjectCTA } from '@/components/atoms/ProjectCTA'
 import { getPeriodOpening } from '@/components/atoms/periodOpening'
 import { clamp, getSkillFrame, projectStops, skills } from './skillsTimeline'
 
@@ -118,7 +119,6 @@ function SkillProjects({
 }) {
   const skill = skills[index]
   const first = projectStops.findIndex((stop) => stop.skillIndex === index)
-  const reduceMotion = useReducedMotion()
   const localPosition = projectPosition - first
   const projectIndex = Math.round(clamp(localPosition, 0, skill.projects.length - 1))
   const outgoing = Math.floor(projectPosition)
@@ -170,22 +170,11 @@ function SkillProjects({
               <ProjectCover artwork={project.artwork} title={project.title} />
             </div>
             <div className="skill-project-ribbon">
-            <motion.button
-              type="button"
-              className="skill-project-band"
-              aria-haspopup="dialog"
-              aria-label={`Read project - ${project.title}`}
-              onClick={(event) => onOpenProject(project, event.currentTarget)}
-              whileHover={reduceMotion ? undefined : { '--band-arrow-x': '3px', '--band-arrow-y': '-3px' }}
-              whileFocus={reduceMotion ? undefined : { '--band-arrow-x': '3px', '--band-arrow-y': '-3px' }}
-              transition={{ type: 'spring', stiffness: 340, damping: 22 }}
-            >
-              <span className="skill-project-band-copy">
-                <span className="skill-project-title" role="heading" aria-level={4}>{project.title}</span>
-                <span className="skill-project-information">{project.description}</span>
-              </span>
-              <span className="skill-project-band-arrow" aria-hidden="true">{'\u2197'}</span>
-            </motion.button>
+              <ProjectCTA
+                title={project.title}
+                description={project.description}
+                onOpen={(trigger) => onOpenProject(project, trigger)}
+              />
             </div>
           </article>
         ))}

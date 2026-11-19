@@ -7,13 +7,14 @@ import { useIntroReady } from '@/hooks/useIntroReady'
 const entrance = { opacity: 0, y: 10 }
 const entered = { opacity: 1, y: 0 }
 const letterStep = 0.055
+const entranceTempo = 0.65
 
 function entranceTransition(delay: number, reduceMotion: boolean | null) {
   return {
     type: 'spring' as const,
-    duration: reduceMotion ? 0 : 0.65,
+    duration: reduceMotion ? 0 : 0.65 * entranceTempo,
     bounce: reduceMotion ? 0 : 0.12,
-    delay: reduceMotion ? 0 : delay,
+    delay: reduceMotion ? 0 : Math.max(0, delay - 0.72) * entranceTempo * 0.9,
   }
 }
 

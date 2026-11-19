@@ -72,9 +72,9 @@ export function HeroMark() {
       }
       lastCenter = walking ? center : null
       // Advance the gait forward by distance, even when the scroll timeline reverses.
-      // A full left/right cycle spans 340 sprite pixels (previously 200).
+      // Match stride distance to the rendered character size on mobile.
       // Hold the two extended-leg contacts longer than the passing poses.
-      const cycle = walkingDistance / 340
+      const cycle = walkingDistance / (340 * characterScale)
       const phase = cycle % 1
       const poseIndex = phase < 0.3 ? 0 : phase < 0.5 ? 1 : phase < 0.8 ? 2 : 3
       const walkingStep = Math.floor(cycle) * heroWalkFrames.length + poseIndex

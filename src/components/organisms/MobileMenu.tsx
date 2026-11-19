@@ -170,7 +170,8 @@ export function MobileMenu({
       finishClose()
       return
     }
-    beginNavigation(highlighted, link)
+    const centerDot = closeToggle.current?.querySelector<HTMLElement>('.mobile-menu-close-dots i:nth-child(3)')
+    beginNavigation(highlighted, link, centerDot ?? undefined)
   }
 
   useEffect(() => {
@@ -199,8 +200,8 @@ export function MobileMenu({
     }
   }
 
-  function beginNavigation(index: number, link: HTMLAnchorElement) {
-    const period = link.querySelector<HTMLElement>('.mobile-menu-number')!
+  function beginNavigation(index: number, link: HTMLAnchorElement, origin?: HTMLElement) {
+    const period = origin ?? link.querySelector<HTMLElement>('.mobile-menu-number')!
     const panel = link.closest<HTMLElement>('.mobile-menu-panel')!
     const bounds = period.getBoundingClientRect()
     const panelBounds = panel.getBoundingClientRect()

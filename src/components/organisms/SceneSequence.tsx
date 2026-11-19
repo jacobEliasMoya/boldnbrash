@@ -363,7 +363,16 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         return
       }
       const currentTime = toPlaybackTime(displayed)
-      const targetTime = toPlaybackTime(requested)
+      // Native scroll can reach Skills before the visible walk finishes.
+      // Cross the hero boundary on its own clock before switching to Skills easing.
+      const heroPlayback = displayed < heroAnimationTravel ||
+        (displayed === heroAnimationTravel && requested < heroAnimationTravel)
+      const segmentTarget = heroPlayback && requested > heroAnimationTravel
+        ? heroAnimationTravel
+        : displayed > heroAnimationTravel && requested < heroAnimationTravel
+          ? heroAnimationTravel
+          : requested
+      const targetTime = toPlaybackTime(segmentTarget)
       const difference = Math.abs(targetTime - currentTime)
       if (difference < 0.000001) {
         displayed = requested
@@ -372,18 +381,19 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         return
       }
       const control = animate(currentTime, targetTime, {
-        ...(current === 1
+        ...(current === 1 && !heroPlayback
           ? { type: 'tween' as const, duration: 0.24, ease: [0.22, 1, 0.36, 1] as const }
-          : { type: 'tween' as const, duration: difference / (heroTouchPlayback && current === 0 ? 1.6 : 1), ease: 'linear' as const }),
+          : { type: 'tween' as const, duration: difference / (heroTouchPlayback && heroPlayback ? 1.6 : 1), ease: 'linear' as const }),
         onUpdate: (time) => {
           displayed = fromPlaybackTime(time)
           renderScene(displayed)
         },
         onComplete: () => {
           stopPlayback = undefined
-          displayed = requested
+          displayed = segmentTarget
           renderScene(displayed)
-          settleFocus()
+          if (segmentTarget !== requested) render(requested)
+          else settleFocus()
         },
       })
       stopPlayback = () => control.stop()
@@ -697,7 +707,10 @@ export function SceneSequence({ children }: { children: ReactNode }) {
                 ease: [0.22, 1, 0.36, 1],
               }}
             >
-              <span className="wordmark-text" aria-hidden="true">JacobMoya</span>
+              <span className="wordmark-text" aria-hidden="true">
+                JacobMoya
+                <span className="nav-label-contrast">JacobMoya</span>
+              </span>
               <span className="wordmark-symbol" aria-hidden="true" />
             </motion.a>
           </BlendedLogo>
@@ -736,6 +749,13 @@ export function SceneSequence({ children }: { children: ReactNode }) {
                   ) : (
                     scene.label
                   )}
+                  <span className="nav-label-contrast" aria-hidden="true">
+                    {scene.id === 'top' ? (
+                      <svg className="nav-home-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M3.5 10.7 12 3.8l8.5 6.9v9.1h-6v-5.6h-5v5.6h-6Z" />
+                      </svg>
+                    ) : scene.label}
+                  </span>
                 </motion.span>
               </motion.a>
             ))}

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { projectStops, skillStart } from '../../src/components/organisms/skillsTimeline'
+import { heroAnimationTravel } from '../../src/components/atoms/heroFrames'
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000'
 
@@ -63,6 +64,30 @@ test('vertical touch input advances and reverses the scene clock', async ({ page
   if (await page.evaluate(() => CSS.supports('overscroll-behavior-y', 'none'))) {
     await expect(page.locator('html')).toHaveCSS('overscroll-behavior-y', 'none')
   }
+})
+
+test('a fast mobile scroll keeps the walk clock until the hero animation finishes', async ({ page }) => {
+  await swipe(page, '.hero-copy', 620, 500)
+  const samples = await page.evaluate(async (destination) => {
+    const track = document.querySelector<HTMLElement>('.scene-track')!
+    const stage = track.firstElementChild as HTMLElement
+    const top = scrollY + track.getBoundingClientRect().top
+    window.scrollTo({
+      top: top + (track.offsetHeight - stage.clientHeight) * destination / Number(track.dataset.duration),
+      behavior: 'instant',
+    })
+    const samples: number[] = []
+    const started = performance.now()
+    while (performance.now() - started < 450) {
+      await new Promise(requestAnimationFrame)
+      samples.push(Number(track.dataset.playbackProgress))
+    }
+    return samples
+  }, skillStart + projectStops[0].position)
+  expect(samples.at(-1)!).toBeGreaterThan(samples[0])
+  expect(Math.max(...samples)).toBeLessThan(heroAnimationTravel)
+  await expect.poll(async () => Number(await page.locator('.scene-track').getAttribute('data-playback-progress')),
+    { timeout: 10000 }).toBeGreaterThan(heroAnimationTravel)
 })
 
 test('skills introduction fill responds to mobile wheel input and vertical swipes', async ({ page }) => {
