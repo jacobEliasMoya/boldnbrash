@@ -15,7 +15,7 @@ function subscribe(onChange: () => void) {
   }
 }
 
-export function ThemeToggle() {
+export function ThemeToggle({ inline = false }: { inline?: boolean }) {
   const dark = useSyncExternalStore(
     subscribe,
     () => document.documentElement.dataset.theme === 'dark',
@@ -25,7 +25,7 @@ export function ThemeToggle() {
   const introReady = useIntroReady()
   const reduceMotion = useReducedMotion()
   const entranceOpacity = useMotionValue(0)
-  const { anchor: thumb, bounds } = useBlendBounds<HTMLSpanElement>(introReady, dark, true)
+  const { anchor: thumb, bounds } = useBlendBounds<HTMLSpanElement>(introReady && !inline, dark, true)
 
   function toggleTheme() {
     const theme = dark ? 'light' : 'dark'
@@ -78,10 +78,18 @@ export function ThemeToggle() {
           >
             <path d="M20.5 14.1A8.7 8.7 0 0 1 9.9 3.5a8.7 8.7 0 1 0 10.6 10.6Z" />
           </svg>
-          <span ref={thumb} className="theme-toggle-thumb" style={{ opacity: 0 }} />
+          {inline ? (
+            <motion.span
+              className="theme-toggle-thumb"
+              initial={false}
+              animate={{ x: dark ? 28 : 0 }}
+              style={{ transition: 'none' }}
+              transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 340, damping: 26 }}
+            />
+          ) : <span ref={thumb} className="theme-toggle-thumb" style={{ opacity: 0 }} />}
         </span>
       </motion.button>
-      {introReady &&
+      {!inline && introReady &&
         bounds &&
         createPortal(
           <motion.span

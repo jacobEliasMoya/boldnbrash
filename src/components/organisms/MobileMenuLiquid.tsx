@@ -65,7 +65,7 @@ export function MobileMenuLiquid({ panel, index, reduced, onCovered }: {
     const measure = () => {
       const bounds = element.getBoundingClientRect()
       if (!bounds.height) return
-      const numbers = Array.from(element.querySelectorAll<HTMLElement>('.mobile-menu-number')).map((number) => {
+      const numbers = Array.from(element.querySelectorAll<HTMLElement>('.mobile-menu-links .mobile-menu-number')).map((number) => {
         // Measure the stable layout position, never a previous liquid displacement.
         number.style.transform = ''
         const rect = number.getBoundingClientRect()

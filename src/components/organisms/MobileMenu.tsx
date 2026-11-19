@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom'
 import { BlendedLogo } from '@/components/atoms/BlendedLogo'
 import { getPeriodOpening } from '@/components/atoms/periodOpening'
 import { MobileMenuLiquid } from './MobileMenuLiquid'
+import { ThemeToggle } from '@/components/atoms/ThemeToggle'
 
 type Scene = { id: string; label: string }
 type Phase = 'opening' | 'menu' | 'closing' | 'expanding'
@@ -353,7 +354,18 @@ export function MobileMenu({
               >
                 <MobileMenuLiquid panel={menuPanel} index={highlighted} reduced={!!reduceMotion} onCovered={handleCovered} />
                 <div className="mobile-menu-heading">
-                  <span>Jacob Moya / Menu</span>
+                  <a
+                    className="wordmark"
+                    href="#top"
+                    aria-label="Jacob Moya home"
+                    onClick={(event) => {
+                      event.preventDefault()
+                      beginNavigation(0, event.currentTarget)
+                    }}
+                  >
+                    <span className="wordmark-symbol mobile-menu-number" aria-hidden="true" />
+                  </a>
+                  <ThemeToggle inline />
                   <button
                     ref={closeToggle}
                     type="button"
@@ -466,7 +478,6 @@ export function MobileMenu({
                     </motion.a>
                   ))}
                 </nav>
-                <p className="mobile-menu-footnote">Interfaces. Systems. Experiments.</p>
                 {selection && (
                   <svg className="mobile-menu-reveal" data-destination={scenes[selection.index].id} aria-hidden="true" focusable="false">
                     <circle ref={openingRing} cx={selection.x} cy={selection.y} />

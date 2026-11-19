@@ -9,7 +9,7 @@ import {
   useTransform,
   type MotionValue,
 } from 'motion/react'
-import { PlatformArtwork, SystemArtwork } from '@/components/atoms/ProjectArtwork'
+import { ProjectCover } from '@/components/atoms/ProjectCover'
 import { getPeriodOpening } from '@/components/atoms/periodOpening'
 import { clamp, getSkillFrame, projectStops, skills } from './skillsTimeline'
 
@@ -118,6 +118,7 @@ function SkillProjects({
 }) {
   const skill = skills[index]
   const first = projectStops.findIndex((stop) => stop.skillIndex === index)
+  const reduceMotion = useReducedMotion()
   const localPosition = projectPosition - first
   const projectIndex = Math.round(clamp(localPosition, 0, skill.projects.length - 1))
   const outgoing = Math.floor(projectPosition)
@@ -165,53 +166,26 @@ function SkillProjects({
               } as CSSProperties
             }
           >
-            <div className="card-scoop" aria-hidden="true" />
-            <header className="skill-project-heading">
-              <h4>{project.title}</h4>
-              <p className="project-category">{project.category}</p>
-              {'status' in project && <p className="skill-project-status">{project.status}</p>}
-            </header>
-            <div className="artwork-frame">
-              {project.artwork === 'system' ? (
-                <SystemArtwork />
-              ) : project.artwork === 'platform' ? (
-                <PlatformArtwork />
-              ) : (
-                <div className="skill-project-specimen" aria-hidden="true">
-                  <span>
-                    {project.artwork === 'terminal'
-                      ? 'Go / CLI'
-                      : project.artwork === 'model'
-                        ? 'Blender / Low-poly'
-                        : project.artwork === 'automation'
-                          ? 'Python / Image tools'
-                          : 'Ollama / Local models'}
-                  </span>
-                  <strong>
-                    {project.artwork === 'terminal'
-                      ? `> ${project.title}_`
-                      : project.artwork === 'model'
-                        ? '3D'
-                        : project.artwork === 'automation'
-                          ? 'Batch / Images'
-                          : 'Local / AI'}
-                  </strong>
-                </div>
-              )}
+            <div className="artwork-frame project-cover" data-artwork={project.artwork}>
+              <ProjectCover artwork={project.artwork} title={project.title} />
             </div>
-            <div className="skill-project-footer">
-              <p className="skill-project-information">{project.description}</p>
-              <button
-                type="button"
-                className="project-open"
-                aria-haspopup="dialog"
-                onClick={(event) => {
-                  onOpenProject(project, event.currentTarget)
-                }}
-              >
-                Read project <span className="sr-only">— {project.title}</span>
-                <b aria-hidden="true">↗</b>
-              </button>
+            <div className="skill-project-ribbon">
+            <motion.button
+              type="button"
+              className="skill-project-band"
+              aria-haspopup="dialog"
+              aria-label={`Read project - ${project.title}`}
+              onClick={(event) => onOpenProject(project, event.currentTarget)}
+              whileHover={reduceMotion ? undefined : { '--band-arrow-x': '3px', '--band-arrow-y': '-3px' }}
+              whileFocus={reduceMotion ? undefined : { '--band-arrow-x': '3px', '--band-arrow-y': '-3px' }}
+              transition={{ type: 'spring', stiffness: 340, damping: 22 }}
+            >
+              <span className="skill-project-band-copy">
+                <span className="skill-project-title" role="heading" aria-level={4}>{project.title}</span>
+                <span className="skill-project-information">{project.description}</span>
+              </span>
+              <span className="skill-project-band-arrow" aria-hidden="true">{'\u2197'}</span>
+            </motion.button>
             </div>
           </article>
         ))}
@@ -251,8 +225,6 @@ export function SkillsScene() {
   const [portal, setPortal] = useState({ x: 0, y: 0, radius: 0, dot: 0, borderWidth: 12 })
   const expansion = animated ? clamp((selection.intro - 0.4) / 0.6) : 1
   const { innerRadius: openingRadius } = getPeriodOpening(expansion, portal.dot, portal.radius)
-  const contentProgress = clamp((expansion - 0.82) / 0.18)
-  const entrance = contentProgress * contentProgress * (3 - 2 * contentProgress)
   useLayoutEffect(() => {
     const element = scene.current
     const dot = period.current
@@ -327,8 +299,6 @@ export function SkillsScene() {
         '--skills-portal-x': `${portal.x}px`,
         '--skills-portal-y': `${portal.y}px`,
         '--skills-portal-radius': `${openingRadius}px`,
-        '--skills-content-opacity': entrance,
-        '--skills-content-offset': `${(1 - entrance) * 12}px`,
       } as CSSProperties}
     >
       <div className="skills-heading" aria-hidden={animated && expansion === 1}>
@@ -349,7 +319,7 @@ export function SkillsScene() {
         <p className="skills-intro">Check out how I spend my time when I’m not working, being a dad, or playing guitar.</p>
       </div>
       {animated ? (
-        <div className="skills-reveal" inert={entrance < 1} aria-hidden={entrance < 1}>
+        <div className="skills-reveal" inert={expansion < 1} aria-hidden={expansion < 1}>
         <div className="skills-performance">
           <div className="skills-projects" aria-label="Related projects">
             {skills.map((skill, index) => (
