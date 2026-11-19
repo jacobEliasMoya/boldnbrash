@@ -1,7 +1,8 @@
 'use client'
 
+import { DotIcon } from '@/components/atoms/DotIcon'
 import { useRef } from 'react'
-import { motion, useMotionValue, useReducedMotion, useSpring, useTransform } from 'motion/react'
+import { motion, useAnimationControls, useMotionValue, useReducedMotion, useSpring, useTransform } from 'motion/react'
 
 export function ProjectCTA({ title, description, onOpen }: {
   title: string
@@ -9,6 +10,8 @@ export function ProjectCTA({ title, description, onOpen }: {
   onOpen: (trigger: HTMLButtonElement) => void
 }) {
   const reduced = useReducedMotion()
+  const arrowControls = useAnimationControls()
+  const opening = useRef(false)
   const hovered = useRef(false)
   const focused = useRef(false)
   const target = useMotionValue(0)
@@ -40,10 +43,22 @@ export function ProjectCTA({ title, description, onOpen }: {
       className="skill-project-band"
       aria-haspopup="dialog"
       aria-label={`Read project - ${title}`}
-      onClick={(event) => onOpen(event.currentTarget)}
+      onClick={async (event) => {
+        if (opening.current) return
+        opening.current = true
+        const button = event.currentTarget
+        if (!reduced) await arrowControls.start('gather')
+        onOpen(button)
+      }}
       onHoverStart={() => { hovered.current = true; update() }}
       onHoverEnd={() => { hovered.current = false; update() }}
-      onFocus={() => { focused.current = true; pointer.set(0.5); update() }}
+      onFocus={() => {
+        opening.current = false
+        arrowControls.set('idle')
+        focused.current = true
+        pointer.set(0.5)
+        update()
+      }}
       onBlur={() => { focused.current = false; update() }}
       onPointerMove={(event) => {
         if (event.pointerType !== 'mouse') return
@@ -61,7 +76,7 @@ export function ProjectCTA({ title, description, onOpen }: {
         <span className="skill-project-title" role="heading" aria-level={4}>{title}</span>
         <span className="skill-project-information">{description}</span>
       </span>
-      <span className="skill-project-band-arrow" aria-hidden="true">{'\u2197'}</span>
+      <span className="skill-project-band-arrow" aria-hidden="true"><DotIcon controls={arrowControls} /></span>
     </motion.button>
   )
 }

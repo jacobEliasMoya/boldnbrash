@@ -188,6 +188,7 @@ export function SkillsScene() {
   const [selection, setSelection] = useState({ ...getSkillFrame(0), intro: 0 })
   const [pinned, setPinned] = useState(false)
   const [openedProject, setOpenedProject] = useState<Project | null>(null)
+  const [projectOrigin, setProjectOrigin] = useState<{ x: number; y: number } | null>(null)
   const trigger = useRef<HTMLButtonElement | null>(null)
   const reduceMotion = useReducedMotion()
   const animated = pinned && !reduceMotion
@@ -212,7 +213,8 @@ export function SkillsScene() {
   const period = useRef<HTMLSpanElement>(null)
   const [portal, setPortal] = useState({ x: 0, y: 0, radius: 0, dot: 0, borderWidth: 12 })
   const expansion = animated ? clamp((selection.intro - 0.4) / 0.6) : 1
-  const { innerRadius: openingRadius } = getPeriodOpening(expansion, portal.dot, portal.radius)
+  const { innerRadius: solidRadius } = getPeriodOpening(clamp(expansion / 0.55), portal.dot, portal.radius)
+  const { innerRadius: openingRadius } = getPeriodOpening(clamp((expansion - 0.55) / 0.45), 0, portal.radius)
   useLayoutEffect(() => {
     const element = scene.current
     const dot = period.current
@@ -267,6 +269,8 @@ export function SkillsScene() {
   }
   function openProject(project: Project, button: HTMLButtonElement) {
     trigger.current = button
+    const bounds = (button.querySelector('.skill-project-band-arrow .dot-icon') ?? button).getBoundingClientRect()
+    setProjectOrigin({ x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 })
     setOpenedProject(project)
   }
   return (
@@ -278,6 +282,7 @@ export function SkillsScene() {
         '--skills-portal-x': `${portal.x}px`,
         '--skills-portal-y': `${portal.y}px`,
         '--skills-portal-radius': `${openingRadius}px`,
+        '--skills-period-radius': `${solidRadius}px`,
       } as CSSProperties}
     >
       <div className="skills-heading" aria-hidden={animated && expansion === 1}>
@@ -297,6 +302,7 @@ export function SkillsScene() {
         </div>
         <p className="skills-intro">Check out how I spend my time when I’m not working, being a dad, or playing guitar.</p>
       </div>
+      {animated && <div className="skills-period-fill" aria-hidden="true" />}
       {animated ? (
         <div className="skills-reveal" inert={expansion < 1} aria-hidden={expansion < 1}>
         <div className="skills-performance">
@@ -354,6 +360,7 @@ export function SkillsScene() {
       <span className="skills-index-portal" data-portal="about" aria-hidden="true" />
       <ProjectDialog
         project={openedProject}
+        origin={projectOrigin}
         onClose={() => {
           setOpenedProject(null)
           trigger.current?.focus({ preventScroll: true })

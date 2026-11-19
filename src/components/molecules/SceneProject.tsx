@@ -1,5 +1,6 @@
 'use client'
 
+import { DotIcon } from '@/components/atoms/DotIcon'
 import { useRef, type ReactNode } from 'react'
 
 export function SceneProject({
@@ -35,7 +36,7 @@ export function SceneProject({
         <div className="artwork-frame">{artwork}</div>
         <button className="project-open" onClick={open} aria-haspopup="dialog">
           View project <span className="sr-only">— {title}</span>
-          <b aria-hidden="true">↗</b>
+          <b aria-hidden="true"><DotIcon /></b>
         </button>
       </article>
       <dialog
@@ -51,7 +52,7 @@ export function SceneProject({
       >
         <div className="dialog-sheet">
           <button className="dialog-close" onClick={close} autoFocus>
-            Close <span aria-hidden="true">×</span>
+            Close <DotIcon kind="close" />
           </button>
           <p className="eyebrow">{number} / Selected work</p>
           <h2>{title}</h2>

@@ -1,3 +1,4 @@
+import { DotIcon } from '@/components/atoms/DotIcon'
 export function Correspondence() {
   return (
     <div className="contact-scene scene-content">
@@ -8,7 +9,7 @@ export function Correspondence() {
         in mind?
       </h2>
       <a className="email-link" href="mailto:jemoya1994@gmail.com">
-        Get in touch <span aria-hidden="true">↗</span>
+        Get in touch <span aria-hidden="true"><DotIcon /></span>
       </a>
       <p className="contact-email">jemoya1994@gmail.com</p>
       <div className="contact-arches" aria-hidden="true">
@@ -16,10 +17,10 @@ export function Correspondence() {
         <span />
       </div>
       <footer className="contact-footer">
-        <a href="#top">Jacob Moya ↑</a>
+        <a href="#top">Jacob Moya <DotIcon kind="up" /></a>
         <nav aria-label="Social links">
-          <a href="https://github.com/jacobEliasMoya">GitHub ↗</a>
-          <a href="https://www.linkedin.com/in/jacob-moya-317998174">LinkedIn ↗</a>
+          <a href="https://github.com/jacobEliasMoya">GitHub <DotIcon /></a>
+          <a href="https://www.linkedin.com/in/jacob-moya-317998174">LinkedIn <DotIcon /></a>
         </nav>
         <span>{new Date().getFullYear()}</span>
       </footer>

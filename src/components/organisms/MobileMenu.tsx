@@ -1,4 +1,6 @@
-﻿'use client'
+'use client'
+
+import { DotIcon } from '@/components/atoms/DotIcon'
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react'
 import { animate, motion, useMotionValue, useReducedMotion, useTransform } from 'motion/react'
@@ -172,7 +174,16 @@ export function MobileMenu({
       return
     }
     const centerDot = closeToggle.current?.querySelector<HTMLElement>('.mobile-menu-close-dots i:nth-child(3)')
-    beginNavigation(highlighted, link, centerDot ?? undefined)
+    if (reduceMotion) {
+      beginNavigation(highlighted, link, centerDot ?? undefined)
+      return
+    }
+    setPhase('expanding')
+    const control = animate(closeGather, 1, {
+      type: 'spring', duration: 0.3, bounce: 0.15,
+      onComplete: () => beginNavigation(highlighted, link, centerDot ?? undefined),
+    })
+    stopGathering.current = () => control.stop()
   }
 
   useEffect(() => {
@@ -292,7 +303,7 @@ export function MobileMenu({
             }
             setGathering(true)
             const control = animate(gather, 1, {
-              duration: mergeDuration, ease: [0.4, 0, 0.2, 1],
+              type: 'spring', duration: 0.3, bounce: 0.15,
               onComplete: openMenu,
             })
             stopGathering.current = () => control.stop()
@@ -463,7 +474,7 @@ export function MobileMenu({
                         />
                       </span>
                       <span className="mobile-menu-current" aria-hidden="true">
-                        {active === index ? '↗' : ''}
+                        {active === index ? <DotIcon /> : null}
                       </span>
                     </motion.a>
                   ))}
