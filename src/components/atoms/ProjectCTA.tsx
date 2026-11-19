@@ -1,6 +1,7 @@
 'use client'
 
 import { DotIcon } from '@/components/atoms/DotIcon'
+import { playDotClick } from './dotMotion'
 import { useRef } from 'react'
 import { motion, useAnimationControls, useMotionValue, useReducedMotion, useSpring, useTransform } from 'motion/react'
 
@@ -47,7 +48,7 @@ export function ProjectCTA({ title, description, onOpen }: {
         if (opening.current) return
         opening.current = true
         const button = event.currentTarget
-        if (!reduced) await arrowControls.start('gather')
+        if (!reduced) await playDotClick(arrowControls)
         onOpen(button)
       }}
       onHoverStart={() => { hovered.current = true; update() }}

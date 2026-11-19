@@ -387,7 +387,7 @@ ul {
   font-size: clamp(72px, 8.2vw, 144px);
   line-height: 0.94;
   letter-spacing: -0.035em;
-  text-transform: uppercase;
+  text-transform: none;
 }
 .hero-line {
   display: block;
@@ -565,7 +565,7 @@ ul {
   font-size: clamp(45px, 4.8vw, 78px);
   line-height: 0.97;
   letter-spacing: -0.04em;
-  text-transform: uppercase;
+  text-transform: none;
   margin: 27px 0 22px;
 }
 .skills-intro {
@@ -3214,7 +3214,7 @@ ul {
   opacity: 0.14;
   font: 900 min(12.5vw, 190px)/1.08 var(--display);
   letter-spacing: -0.055em;
-  text-transform: uppercase;
+  text-transform: none;
   white-space: nowrap;
   pointer-events: none;
 }

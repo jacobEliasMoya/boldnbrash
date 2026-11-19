@@ -65,7 +65,7 @@ test('every resting position snaps to an item and further input interrupts settl
 test('project cards stay fixed during a circular reveal and settle completely', async ({ page }) => {
   const stop = skillStart + projectStops[1].position
   await moveTo(page, stop - 0.4)
-  const incoming = page.locator('.skill-project-card[aria-label="This portfolio"]')
+  const incoming = page.locator('.skill-project-card[aria-label="This Portfolio"]')
   await expect(incoming).toHaveCSS('transform', 'none')
   await expect(incoming).toHaveCSS('opacity', '1')
   await expect.poll(() => progress(page)).toBeCloseTo(stop, 2)
@@ -73,7 +73,7 @@ test('project cards stay fixed during a circular reveal and settle completely', 
   expect(radius).toBeGreaterThan(149)
   await moveTo(page, skillStart + projectStops[0].position + 0.3)
   await expect.poll(() => progress(page)).toBeCloseTo(skillStart + projectStops[0].position, 2)
-  await expect(page.getByRole('article', { name: 'Astro platform', exact: true })).toBeVisible()
+  await expect(page.getByRole('article', { name: 'Astro Platform', exact: true })).toBeVisible()
 })
 
 

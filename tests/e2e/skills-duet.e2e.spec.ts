@@ -50,7 +50,7 @@ for (const viewport of [
       await expect(page.locator('.skills-reveal')).toHaveAttribute('inert', '')
       await page.screenshot({ path: `test-results/duet-intro-${viewport.width}.png` })
       await expect(page.locator('.skills-scroll-cue')).toHaveCount(0)
-      await expect(page.getByRole('heading', { name: 'My tech. And stuff.' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'My Tech. And Stuff.' })).toBeVisible()
       await scrollToPhase(page, 1.4 + (skillStart - 1.4) * 0.46)
       await expect(intro).toHaveCSS('opacity', '1')
       await expect(page.locator('.skills-title-letter')).toHaveCount(0)
@@ -77,7 +77,7 @@ for (const viewport of [
       await expect(currentSkill).toContainText('Frontend Development')
       await expect(page.locator('.skills-category-pill .skill-project-card')).toHaveCount(0)
       const firstProject = page.getByRole('article', {
-        name: 'Multi-state Astro platform',
+        name: 'Astro Platform',
         exact: true,
       })
       await expect(firstProject).toBeVisible()
@@ -87,12 +87,12 @@ for (const viewport of [
       else expect(left.y).toBeGreaterThan(right.y + right.height)
       await page.screenshot({ path: `test-results/duet-project-${viewport.width}.png` })
       await scrollToPhase(page, skillStart + 1.45)
-      const incomingCard = page.locator('.skill-project-card[aria-label="This portfolio"]')
+      const incomingCard = page.locator('.skill-project-card[aria-label="This Portfolio"]')
       await expect(incomingCard).toHaveCSS('transform', 'none')
       await expect(incomingCard).toHaveCSS('opacity', '1')
       await expect(incomingCard).toHaveCSS('filter', 'none')
       const incomingBounds = (await incomingCard.boundingBox())!
-      const outgoingBounds = (await page.locator('.skill-project-card[aria-label="Multi-state Astro platform"]').boundingBox())!
+      const outgoingBounds = (await page.locator('.skill-project-card[aria-label="Astro Platform"]').boundingBox())!
       for (const key of ['x', 'y', 'width', 'height'] as const) {
         expect(Math.abs(incomingBounds[key] - outgoingBounds[key])).toBeLessThan(1)
       }
@@ -102,7 +102,7 @@ for (const viewport of [
       await page.screenshot({ path: `test-results/card-circle-${viewport.width}.png` })
       await scrollToPhase(page, skillStart + 2.1)
       await expect(currentSkill).toContainText('Frontend Development')
-      const second = page.getByRole('article', { name: 'This portfolio', exact: true })
+      const second = page.getByRole('article', { name: 'This Portfolio', exact: true })
       await expect(second).toBeVisible()
       await second.getByRole('button', { name: /Read project/ }).click()
       await expect(page.getByRole('dialog')).toBeVisible()

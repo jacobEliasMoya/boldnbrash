@@ -1,6 +1,7 @@
 'use client'
 
 import { DotIcon } from '@/components/atoms/DotIcon'
+import { mergeDots } from '@/components/atoms/dotMotion'
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react'
 import { animate, motion, useMotionValue, useReducedMotion, useTransform } from 'motion/react'
@@ -64,6 +65,8 @@ export function MobileMenu({
   const reduceMotion = useReducedMotion()
   const gather = useMotionValue(0)
   const closeGather = useMotionValue(0)
+  const menuRebound = useMotionValue(1)
+  const closeRebound = useMotionValue(1)
   const entryProgress = useMotionValue(0)
   const panelClip = useMotionValue('none')
   const topY = useTransform(gather, (progress) => -7 * (1 - progress))
@@ -86,6 +89,8 @@ export function MobileMenu({
       stopEntering.current?.()
       stopGathering.current?.()
       closeGather.set(0)
+      menuRebound.jump(1)
+      closeRebound.jump(1)
       if (spreadDots) {
         const control = animate(gather, 0, { duration: mergeDuration, ease: [0.4, 0, 0.2, 1] })
         stopGathering.current = () => control.stop()
@@ -106,7 +111,7 @@ export function MobileMenu({
         target?.focus({ preventScroll: true })
       })
     },
-    [onOpenChange, gather, closeGather],
+    [onOpenChange, gather, closeGather, menuRebound, closeRebound],
   )
 
   const measureEntry = useCallback(() => {
@@ -179,11 +184,8 @@ export function MobileMenu({
       return
     }
     setPhase('expanding')
-    const control = animate(closeGather, 1, {
-      type: 'spring', duration: 0.3, bounce: 0.15,
-      onComplete: () => beginNavigation(highlighted, link, centerDot ?? undefined),
-    })
-    stopGathering.current = () => control.stop()
+    stopGathering.current = mergeDots(closeGather, closeRebound,
+      () => beginNavigation(highlighted, link, centerDot ?? undefined))
   }
 
   useEffect(() => {
@@ -302,16 +304,13 @@ export function MobileMenu({
               return
             }
             setGathering(true)
-            const control = animate(gather, 1, {
-              type: 'spring', duration: 0.3, bounce: 0.15,
-              onComplete: openMenu,
-            })
-            stopGathering.current = () => control.stop()
+            stopGathering.current = mergeDots(gather, menuRebound, openMenu)
           }}
         >
           <motion.span
             className="mobile-menu-dots"
             aria-hidden="true"
+            style={{ scale: menuRebound }}
             onAnimationComplete={() => {
               if (!introReady || !window.matchMedia('(max-width: 760px)').matches) return
               document.documentElement.dataset.mobileNavReady = 'true'
@@ -376,13 +375,13 @@ export function MobileMenu({
                     autoFocus
                     onClick={closeMenu}
                   >
-                    <span className="mobile-menu-close-dots" aria-hidden="true">
+                    <motion.span className="mobile-menu-close-dots" aria-hidden="true" style={{ scale: closeRebound }}>
                       <motion.i style={{ x: closeNegative, y: closeNegative, scale: closeDotScale }} />
                       <motion.i style={{ x: closePositive, y: closeNegative, scale: closeDotScale }} />
                       <motion.i style={{ x: 0, y: 0, scale: closeDotScale }} />
                       <motion.i style={{ x: closeNegative, y: closePositive, scale: closeDotScale }} />
                       <motion.i style={{ x: closePositive, y: closePositive, scale: closeDotScale }} />
-                    </span>
+                    </motion.span>
                   </button>
                 </div>
                 <nav

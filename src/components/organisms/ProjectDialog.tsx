@@ -1,6 +1,7 @@
 'use client'
 
 import { DotIcon } from '@/components/atoms/DotIcon'
+import { playDotClick } from '@/components/atoms/dotMotion'
 import { useEffect, useRef } from 'react'
 import { animate, motion, useAnimationControls, useReducedMotion } from 'motion/react'
 import { ProjectCover } from '@/components/atoms/ProjectCover'
@@ -54,7 +55,7 @@ export function ProjectDialog({ project, origin, onClose }: {
     if (!element || closing.current) return
     closing.current = true
     stopAnimation.current?.()
-    if (!reduced) await closeIconControls.start('gather')
+    if (!reduced) await playDotClick(closeIconControls)
     const control = animate(element, {
       opacity: 0,
     }, { duration: reduced ? 0 : 0.18, ease: [0.4, 0, 1, 1] })

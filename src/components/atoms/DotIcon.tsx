@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { motion, useAnimationControls, useReducedMotion } from 'motion/react'
+import { dotGatherDuration, dotReboundScale, dotReboundTransition, playDotClick } from './dotMotion'
 
 export function DotIcon({ kind = 'arrow', controls }: {
   kind?: 'arrow' | 'up' | 'close'
@@ -19,7 +20,7 @@ export function DotIcon({ kind = 'arrow', controls }: {
     async function pulse() {
       if (busy) return
       busy = true
-      await localControls.start('gather')
+      await playDotClick(localControls)
       await localControls.start('idle')
       busy = false
     }
@@ -40,14 +41,18 @@ export function DotIcon({ kind = 'arrow', controls }: {
       initial="idle" animate={animation} variants={{
         idle: { scale: 1, transition: { duration: reduced ? 0 : 0.16 } },
         gather: {
-          scale: reduced ? 1 : [1, 0.86, 1.08, 1],
-          transition: { duration: reduced ? 0 : 0.28, times: [0, 0.45, 0.75, 1], ease: 'easeInOut' },
+          scale: reduced ? 1 : 0.86,
+          transition: { duration: reduced ? 0 : dotGatherDuration },
+        },
+        rebound: {
+          scale: reduced ? 1 : dotReboundScale,
+          transition: reduced ? { duration: 0 } : dotReboundTransition,
         },
       }}>
       {dots.map(([cx, cy]) => (
         <motion.circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="2.3"
-          variants={{ idle: { cx, cy, r: 2.3 }, gather: { cx: 12, cy: 12, r: 3.8 } }}
-          transition={{ duration: reduced ? 0 : 0.18, ease: [0.4, 0, 0.2, 1] }} />
+          variants={{ idle: { cx, cy, r: 2.3 }, gather: { cx: 12, cy: 12, r: 3.8 }, rebound: { cx: 12, cy: 12, r: 3.8 } }}
+          transition={{ duration: reduced ? 0 : dotGatherDuration, ease: [0.4, 0, 0.2, 1] }} />
       ))}
     </motion.svg>
   )

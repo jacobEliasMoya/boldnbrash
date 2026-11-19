@@ -5,7 +5,7 @@ export const skills = [
     note: '',
     projects: [
       {
-        title: 'Astro platform',
+        title: 'Astro Platform',
         category: 'Astro',
         description:
           'One build. 50+ sites.',
@@ -16,7 +16,7 @@ export const skills = [
         artwork: 'platform',
       },
       {
-        title: 'This portfolio',
+        title: 'This Portfolio',
         category: 'Next.js / TypeScript',
         description:
           'Scroll and motion.',
@@ -77,7 +77,7 @@ export const skills = [
     note: '',
     projects: [
       {
-        title: 'Low-poly ship',
+        title: 'Low-Poly Ship',
         category: 'Blender',
         description: 'Modeled in Blender.',
         details: ['A low-poly spaceship modeled in Blender.'],
@@ -107,7 +107,7 @@ export const skills = [
     note: '',
     projects: [
       {
-        title: 'Design system',
+        title: 'Design System',
         category: 'React / UI components',
         description:
           'Shared React components.',
@@ -125,7 +125,7 @@ export const skills = [
     note: '',
     projects: [
       {
-        title: 'Reviews template',
+        title: 'Reviews Template',
         category: 'BIZIQ / WordPress',
         description:
           'Custom WordPress reviews.',
@@ -136,7 +136,7 @@ export const skills = [
         artwork: 'platform',
       },
       {
-        title: 'VAREP migration',
+        title: 'VAREP Migration',
         category: 'VAREP / WordPress',
         description:
           'Joomla to WordPress.',

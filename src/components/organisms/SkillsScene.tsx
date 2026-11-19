@@ -288,15 +288,15 @@ export function SkillsScene() {
       <div className="skills-heading" aria-hidden={animated && expansion === 1}>
         <div className="skills-title-stack">
           <div className="skills-title-shadow" aria-hidden="true">
-            <span>My tech.</span>
-            <span>And stuff.</span>
+            <span>My Tech.</span>
+            <span>And Stuff.</span>
           </div>
-          <h2 aria-label="My tech. And stuff.">
+          <h2 aria-label="My Tech. And Stuff.">
             <span className="skills-title-line" aria-hidden="true">
-              <span className="skills-title-fill" style={{ '--title-fill': `${animated ? clamp(selection.intro / 0.18) * 100 : 0}%` } as CSSProperties}>My tech.</span>
+              <span className="skills-title-fill" style={{ '--title-fill': `${animated ? clamp(selection.intro / 0.18) * 100 : 0}%` } as CSSProperties}>My Tech.</span>
             </span>
             <span className="skills-title-line" aria-hidden="true">
-              <span className="skills-title-fill" style={{ '--title-fill': `${animated ? clamp((selection.intro - 0.18) / 0.18) * 100 : 0}%` } as CSSProperties}>And stuff</span><span ref={period} className="skills-title-period" />
+              <span className="skills-title-fill" style={{ '--title-fill': `${animated ? clamp((selection.intro - 0.18) / 0.18) * 100 : 0}%` } as CSSProperties}>And Stuff</span><span ref={period} className="skills-title-period" />
             </span>
           </h2>
         </div>
