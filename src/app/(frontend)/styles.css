@@ -3874,8 +3874,6 @@ ul {
 }
 .project-detail-summary {
   margin: 20px 0 24px;
-  padding-bottom: 24px;
-  border-bottom: 1px solid #08080926;
   font: 600 16px/1.5 'JetBrains Mono', monospace;
 }
 .project-detail-story {
@@ -3892,8 +3890,6 @@ ul {
   justify-content: space-between;
   gap: 16px;
   margin-top: 32px;
-  padding-top: 24px;
-  border-top: 1px solid #08080926;
   font: 600 12px/1.5 'JetBrains Mono', monospace;
 }
 .project-detail-source {
