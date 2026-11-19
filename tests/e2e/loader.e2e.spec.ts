@@ -2,6 +2,35 @@ import { expect, test } from '@playwright/test'
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000'
 
+test('mobile entrance runs nav, JM particles, then hero copy', async ({ page }) => {
+  test.setTimeout(30000)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(baseURL)
+  const timing = await page.evaluate(async () => {
+    const timing: Record<string, number> = {}
+    const start = performance.now()
+    while (performance.now() - start < 15000) {
+      await new Promise(requestAnimationFrame)
+      const now = performance.now() - start
+      const root = document.documentElement
+      const formation = Number(document.querySelector<HTMLElement>('.particle-logo canvas')?.dataset.formation ?? 0)
+      const copy = document.querySelector('.hero-letter')
+      const description = document.querySelector('.hero-description')
+      if (!document.querySelector('.portfolio-loader')) timing.loader ??= now
+      if (root.dataset.mobileNavReady === 'true') timing.nav ??= now
+      if (formation > 0.01) timing.particles ??= now
+      if (formation >= 0.999) timing.formed ??= now
+      if (copy && Number(getComputedStyle(copy).opacity) > 0.01) timing.copy ??= now
+      if (description && Number(getComputedStyle(description).opacity) >= 0.99) break
+    }
+    return timing
+  })
+  expect(Object.keys(timing)).toEqual(expect.arrayContaining(['loader', 'nav', 'particles', 'formed', 'copy']))
+  expect(timing.nav).toBeGreaterThanOrEqual(timing.loader)
+  expect(timing.particles).toBeGreaterThanOrEqual(timing.nav)
+  expect(timing.copy).toBeGreaterThan(timing.formed)
+})
+
 for (const width of [1440, 390]) {
   test(`the loader drops Jake before the introduction, catches it, and releases the page at ${width}px`, async ({
     page,

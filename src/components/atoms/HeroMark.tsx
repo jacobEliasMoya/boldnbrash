@@ -11,7 +11,10 @@ import {
   heroWalkFrames,
 } from './heroFrames'
 
-export function HeroMark() {
+export function HeroMark({ entranceReady, onFormationComplete }: {
+  entranceReady?: boolean
+  onFormationComplete?: () => void
+}) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const root = useRef<HTMLDivElement>(null)
   const ripples = useRef<WalkRipple[]>([])
@@ -179,7 +182,7 @@ export function HeroMark() {
 
   return (
     <div ref={root} className="hero-mark-animation" data-mode="logo">
-      <ParticleMonogram ripples={ripples} />
+      <ParticleMonogram ripples={ripples} entranceReady={entranceReady} onFormationComplete={onFormationComplete} />
       <canvas
         ref={canvas}
         className="hero-mini-jacob"

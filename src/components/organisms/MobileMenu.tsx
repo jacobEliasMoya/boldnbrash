@@ -300,6 +300,11 @@ export function MobileMenu({
           <motion.span
             className="mobile-menu-dots"
             aria-hidden="true"
+            onAnimationComplete={() => {
+              if (!introReady || !window.matchMedia('(max-width: 760px)').matches) return
+              document.documentElement.dataset.mobileNavReady = 'true'
+              window.dispatchEvent(new Event('portfolio:mobile-nav-ready'))
+            }}
             initial={{ scaleX: reduceMotion ? 1 : 0, scaleY: reduceMotion ? 1 : 0 }}
             animate={{ scaleX: introReady ? 1 : 0, scaleY: introReady ? 1 : 0 }}
             transition={reduceMotion ? { duration: 0 } : {

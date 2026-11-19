@@ -3,6 +3,13 @@
 import { HeroMark } from '@/components/atoms/HeroMark'
 import { motion, useReducedMotion } from 'motion/react'
 import { useIntroReady } from '@/hooks/useIntroReady'
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+
+function subscribeMobile(onChange: () => void) {
+  const media = window.matchMedia('(max-width: 760px)')
+  media.addEventListener('change', onChange)
+  return () => media.removeEventListener('change', onChange)
+}
 
 const entrance = { opacity: 0, y: 10 }
 const entered = { opacity: 1, y: 0 }
@@ -51,7 +58,19 @@ function AnimatedWord({
 
 export function PortfolioHero() {
   const reduceMotion = useReducedMotion()
-  const introReady = useIntroReady()
+  const loaderReady = useIntroReady()
+  const mobile = useSyncExternalStore(subscribeMobile,
+    () => window.matchMedia('(max-width: 760px)').matches, () => false)
+  const [navReady, setNavReady] = useState(false)
+  const [particlesReady, setParticlesReady] = useState(false)
+  const finishFormation = useCallback(() => setParticlesReady(true), [])
+  useEffect(() => {
+    const complete = () => setNavReady(true)
+    window.addEventListener('portfolio:mobile-nav-ready', complete)
+    if (document.documentElement.dataset.mobileNavReady === 'true') complete()
+    return () => window.removeEventListener('portfolio:mobile-nav-ready', complete)
+  }, [])
+  const introReady = loaderReady && (!mobile || reduceMotion || particlesReady)
 
   return (
     <div className="hero-scene scene-content">
@@ -125,7 +144,10 @@ export function PortfolioHero() {
         <span className="sr-only">Jacob Moya’s creative development portfolio</span>
       </div>
       <div className="hero-mark">
-        <HeroMark />
+        <HeroMark
+          entranceReady={mobile ? loaderReady && (navReady || !!reduceMotion) : undefined}
+          onFormationComplete={mobile ? finishFormation : undefined}
+        />
       </div>
     </div>
   )

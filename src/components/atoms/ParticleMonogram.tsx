@@ -113,7 +113,11 @@ function drawParticles(
   }
 }
 
-export function ParticleMonogram({ ripples }: { ripples?: RefObject<WalkRipple[]> }) {
+export function ParticleMonogram({ ripples, entranceReady, onFormationComplete }: {
+  ripples?: RefObject<WalkRipple[]>
+  entranceReady?: boolean
+  onFormationComplete?: () => void
+}) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const particles = useRef<Particle[]>([])
   const scene = useRef<HTMLElement | null>(null)
@@ -122,6 +126,7 @@ export function ParticleMonogram({ ripples }: { ripples?: RefObject<WalkRipple[]
   const painted = useRef(false)
   const ready = useRef(false)
   const formationTime = useRef(0)
+  const formationComplete = useRef(false)
   const reducedPreference = useRef(false)
   const geometry = useRef({ x: 0, y: 0, width: 500, height: 500, size: 500 })
   const reduceMotion = useReducedMotion()
@@ -199,7 +204,10 @@ export function ParticleMonogram({ ripples }: { ripples?: RefObject<WalkRipple[]
       const sampling = document.createElement('canvas')
       sampling.width = sampling.height = 500
       const context = sampling.getContext('2d', { willReadFrequently: true })
-      if (!context) return
+      if (!context) {
+        onFormationComplete?.()
+        return
+      }
       context.drawImage(image, 0, 0, 500, 500)
       const pixels = context.getImageData(0, 0, 500, 500).data
       const points: Particle[] = []
@@ -244,6 +252,9 @@ export function ParticleMonogram({ ripples }: { ripples?: RefObject<WalkRipple[]
       painted.current = false
       resize()
     }
+    image.onerror = () => {
+      if (!disposed) onFormationComplete?.()
+    }
     image.src = '/jm-symbol.svg'
     return () => {
       disposed = true
@@ -255,7 +266,7 @@ export function ParticleMonogram({ ripples }: { ripples?: RefObject<WalkRipple[]
       resetPointer()
       ready.current = false
     }
-  }, [reduceMotion, rotationX, rotationY])
+  }, [reduceMotion, rotationX, rotationY, onFormationComplete])
 
   useAnimationFrame((_time, delta) => {
     const time = performance.now()
@@ -270,12 +281,14 @@ export function ParticleMonogram({ ripples }: { ripples?: RefObject<WalkRipple[]
     const bounds = element.getBoundingClientRect()
     const dot = period ? getPortalBounds(period) : undefined
     const unit = geometry.current.size / 500
-    const origin = dot ? { x: (dot.left + dot.width / 2 - bounds.left) / unit,
+    const origin = dot && entranceReady === undefined ? { x: (dot.left + dot.width / 2 - bounds.left) / unit,
       y: (dot.top + dot.height / 2 - bounds.top) / unit, radius: dot.width / 2 / unit }
       : { x: 250, y: 250, radius: 4 }
-    if (scene.current?.dataset.periodReady === 'true' && !document.documentElement.dataset.introLoading)
-      formationTime.current = Math.min(1600, formationTime.current + Math.min(delta, 50))
-    const entrance = formationTime.current / 1600
+    const canForm = entranceReady ?? (scene.current?.dataset.periodReady === 'true')
+    const formationDuration = entranceReady === undefined ? 1600 : 900
+    if (canForm && !document.documentElement.dataset.introLoading)
+      formationTime.current = Math.min(formationDuration, formationTime.current + Math.min(delta, 50))
+    const entrance = formationTime.current / formationDuration
     const gather = Number(scene.current?.dataset.particleGather ?? 0)
     const formation = reduceMotion ? 1 : entrance * (1 - gather)
     element.dataset.formation = formation.toFixed(3)
@@ -288,7 +301,7 @@ export function ParticleMonogram({ ripples }: { ripples?: RefObject<WalkRipple[]
     context.clearRect(0, 0, element.width, element.height)
     // Keep the packed origin invisible until the period has finished entering.
     if (!reduceMotion && !reducedPreference.current &&
-      (scene.current?.dataset.periodReady !== 'true' || document.documentElement.dataset.introLoading))
+      (!canForm || document.documentElement.dataset.introLoading))
       return
     context.setTransform(scale.current, 0, 0, scale.current, 0, 0)
     drawParticles(
@@ -307,6 +320,10 @@ export function ParticleMonogram({ ripples }: { ripples?: RefObject<WalkRipple[]
     )
     context.globalAlpha = 1
     painted.current = true
+    if (canForm && entrance === 1 && !formationComplete.current) {
+      formationComplete.current = true
+      onFormationComplete?.()
+    }
   })
 
   return (
