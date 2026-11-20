@@ -2410,9 +2410,6 @@ ul {
 :root[data-theme='dark'] .scene-skills {
   --skills-blue: #23115e;
 }
-:root[data-theme='dark'] .scene-skills::after {
-  background: #202027;
-}
 :root[data-theme='dark'] .hero-greeting > .name-pill,
 :root[data-theme='dark'] .circle-portal,
 :root[data-theme='dark'] .portal-core,
@@ -3310,28 +3307,10 @@ ul {
   display: block;
   white-space: nowrap;
 }
-.skills-title-shadow {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  display: grid;
-  align-content: center;
-  justify-items: center;
-  color: #77777f;
-  opacity: 0.14;
-  font: 900 min(calc(var(--skills-heading-size) * 1.2), 16cqw)/1.08 var(--display);
-  letter-spacing: -0.055em;
-  text-transform: none;
-  white-space: nowrap;
-  pointer-events: none;
-}
 @media (max-width: 900px) {
   .skills-duet .skills-heading {
     --skills-heading-size: min(14cqw, 138px);
   }
-}
-.portfolio:not([data-enhanced]) .skills-title-shadow {
-  display: none;
 }
 .skills-duet .skills-heading .skills-intro {
   font-size: clamp(16px, 1.65vw, 24px);
@@ -3461,8 +3440,10 @@ ul {
     mask-size: min(224vw, 960px);
   }
 }
+:root[data-theme='dark'] .scene-skills::after,
 :root[data-theme='dark'] .skills-reveal::before {
-  background: #202027;
+  background: var(--blue);
+  opacity: 0.12;
 }
 
 /* The white introduction opens from its period into the skills canvas. */

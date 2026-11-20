@@ -295,10 +295,6 @@ export function SkillsScene() {
     >
       <div className="skills-heading" aria-hidden={animated && expansion === 1}>
         <div className="skills-title-stack">
-          <div className="skills-title-shadow" aria-hidden="true">
-            <span>Here’s What</span>
-            <span>I’m Building.</span>
-          </div>
           <h2 aria-label="Here’s What I’m Building.">
             <span className="skills-title-line" aria-hidden="true">
               <span className="skills-title-fill" style={{ '--title-fill': `${titleFill(0)}%` } as CSSProperties}>Here’s What</span>
