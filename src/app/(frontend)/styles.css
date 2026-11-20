@@ -3765,7 +3765,7 @@ ul {
   align-self: center;
   flex-wrap: nowrap;
   margin-block: 8px calc(var(--frame-inset) - var(--menu-bottom-padding));
-  padding: 7px 14px max(2px, calc(env(safe-area-inset-bottom) - var(--frame-inset)));
+  padding: 6px 12px max(2px, calc(env(safe-area-inset-bottom) - var(--frame-inset)));
 }
 @media (max-width: 760px) {
   .profile-links-about a {
@@ -3783,8 +3783,8 @@ ul {
   color: var(--menu-frame-ink);
 }
 .profile-links-menu svg {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   stroke: currentColor;
   stroke-width: 0.65;
   stroke-linejoin: round;

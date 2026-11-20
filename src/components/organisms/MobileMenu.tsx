@@ -10,7 +10,7 @@ import { BlendedLogo } from '@/components/atoms/BlendedLogo'
 import { getPeriodOpening } from '@/components/atoms/periodOpening'
 import { MobileMenuLiquid } from './MobileMenuLiquid'
 import { ThemeToggle } from '@/components/atoms/ThemeToggle'
-import { ProfileLinks } from '@/components/molecules/ProfileLinks'
+import { menuSocialStartOffset, ProfileLinks } from '@/components/molecules/ProfileLinks'
 
 type Scene = { id: string; label: string }
 type Phase = 'opening' | 'menu' | 'expanding'
@@ -85,7 +85,7 @@ export function MobileMenu({
   const closeRebound = useMotionValue(1)
   const entryProgress = useMotionValue(0)
   const panelClip = useMotionValue('none')
-  const socialOffset = useMotionValue(58)
+  const socialOffset = useMotionValue(menuSocialStartOffset)
   const topY = useTransform(gather, (progress) => -7 * (1 - progress))
   const bottomY = useTransform(gather, (progress) => 3.5 * (1 - progress))
   const leftX = useTransform(gather, (progress) => -6 * (1 - progress))
@@ -306,7 +306,7 @@ export function MobileMenu({
             entryOrigin.current = origin
             const openMenu = () => {
               const { x, y } = entryOrigin.current
-              socialOffset.jump(reduceMotion ? 0 : 58)
+              socialOffset.jump(reduceMotion ? 0 : menuSocialStartOffset)
               panelClip.set(reduceMotion ? 'none' : `circle(0px at ${x}px ${y}px)`)
               setGathering(false)
               setHighlighted(active)

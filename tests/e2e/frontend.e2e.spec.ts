@@ -516,6 +516,8 @@ test('mobile night mode shares the header and menu styling', async ({ page }) =>
   const track = '.theme-toggle-track'
   await expect(headerToggle.locator(track)).toHaveCSS('background-color', 'rgb(33, 29, 41)')
   await page.getByRole('button', { name: 'Open menu' }).click()
+  const hiddenTray = page.locator('.profile-links-menu')
+  await expect.poll(async () => (await hiddenTray.boundingBox())?.y ?? 0).toBeGreaterThan(844)
   const socials = page.getByRole('navigation', { name: 'Social profiles' })
   const closeButton = page.getByRole('button', { name: 'Close menu' })
   const closeDots = closeButton.locator('.mobile-menu-close-dots i')
@@ -526,7 +528,7 @@ test('mobile night mode shares the header and menu styling', async ({ page }) =>
   await expect(footerLiquid).toHaveAttribute('d', /^M.+Z$/)
   await expect(footerLiquid).toHaveCSS('fill', 'rgb(0, 0, 0)')
   await expect(socials.getByRole('link', { name: /GitHub/ })).toHaveCSS('color', 'rgb(255, 255, 255)')
-  await expect(socials.getByRole('link', { name: /GitHub/ }).locator('svg')).toHaveCSS('width', '28px')
+  await expect(socials.getByRole('link', { name: /GitHub/ }).locator('svg')).toHaveCSS('width', '26px')
   await expect(socials.getByRole('link', { name: /LinkedIn/ })).toBeVisible()
   const panelBounds = (await page.locator('.mobile-menu-panel').boundingBox())!
   const socialBounds = (await socials.boundingBox())!

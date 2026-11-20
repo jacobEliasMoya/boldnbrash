@@ -15,8 +15,15 @@ export async function playDotClick(controls: ReturnType<typeof useAnimationContr
 
 export function mergeDots(gather: MotionValue<number>, scale: MotionValue<number>, complete: () => void) {
   let stopped = false
-  const merge = animate(gather, 1, { duration: dotGatherDuration, ease: [0.4, 0, 0.2, 1] })
-  const compress = animate(scale, 0.86, { duration: dotGatherDuration })
+  const spreadDuration = 0.07
+  const duration = spreadDuration + dotGatherDuration
+  // Negative gather progress moves the outer dots away from the center.
+  const merge = animate(gather, [gather.get(), -0.24, 1], {
+    duration,
+    times: [0, spreadDuration / duration, 1],
+    ease: ['easeOut', [0.4, 0, 0.2, 1]],
+  })
+  const compress = animate(scale, 0.86, { duration: dotGatherDuration, delay: spreadDuration })
   const stop = [() => merge.stop(), () => compress.stop()]
   void (async () => {
     await Promise.all([merge, compress])

@@ -6,6 +6,7 @@ const socials = [
   { label: 'GitHub', href: 'https://github.com/jacobEliasMoya' },
   { label: 'LinkedIn', href: 'https://www.linkedin.com/in/jacob-moya-317998174' },
 ]
+export const menuSocialStartOffset = 100
 
 export function ProfileLinks({ placement, inactive = false, onSlide, onRaised }: {
   placement: 'about' | 'menu'
@@ -20,8 +21,8 @@ export function ProfileLinks({ placement, inactive = false, onSlide, onRaised }:
       className={`profile-links profile-links-${placement}`}
       aria-label={placement === 'about' ? 'About social profiles' : 'Social profiles'}
       inert={inactive}
-      initial={menu && !reduced ? { y: 58 } : false}
-      animate={menu ? { y: inactive && !reduced ? 58 : 0 } : undefined}
+      initial={menu && !reduced ? { y: menuSocialStartOffset } : false}
+      animate={menu ? { y: inactive && !reduced ? menuSocialStartOffset : 0 } : undefined}
       onUpdate={({ y }) => {
         if (typeof y === 'number') onSlide?.(y)
       }}
