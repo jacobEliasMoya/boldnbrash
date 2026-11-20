@@ -69,6 +69,7 @@ export function MobileMenu({
   const closeRebound = useMotionValue(1)
   const entryProgress = useMotionValue(0)
   const panelClip = useMotionValue('none')
+  const socialOffset = useMotionValue(58)
   const topY = useTransform(gather, (progress) => -7 * (1 - progress))
   const bottomY = useTransform(gather, (progress) => 3.5 * (1 - progress))
   const leftX = useTransform(gather, (progress) => -6 * (1 - progress))
@@ -290,6 +291,7 @@ export function MobileMenu({
             setClosePosition({ left: origin.x - 24, top: origin.y - 24 })
             const openMenu = () => {
               const { x, y } = entryOrigin.current
+              socialOffset.jump(reduceMotion ? 0 : 58)
               panelClip.set(reduceMotion ? 'none' : `circle(0px at ${x}px ${y}px)`)
               setGathering(false)
               setHighlighted(active)
@@ -352,7 +354,7 @@ export function MobileMenu({
                 initial={false}
                 style={{ clipPath: panelClip }}
               >
-                <MobileMenuLiquid panel={menuPanel} index={highlighted} reduced={!!reduceMotion} onCovered={handleCovered} />
+                <MobileMenuLiquid panel={menuPanel} index={highlighted} reduced={!!reduceMotion} onCovered={handleCovered} socialOffset={socialOffset} />
                 <div className="mobile-menu-heading">
                   <a
                     className="wordmark"
@@ -478,7 +480,7 @@ export function MobileMenu({
                     </motion.a>
                   ))}
                 </nav>
-                <ProfileLinks placement="menu" inactive={phase !== 'menu'} />
+                <ProfileLinks placement="menu" inactive={phase !== 'menu'} onSlide={(offset) => socialOffset.set(offset)} />
                 {selection && (
                   <svg className="mobile-menu-reveal" data-destination={scenes[selection.index].id} aria-hidden="true" focusable="false">
                     <circle ref={openingRing} cx={selection.x} cy={selection.y} />

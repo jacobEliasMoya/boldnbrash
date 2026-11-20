@@ -101,8 +101,6 @@ export function ThemeToggle({ inline = false }: { inline?: boolean }) {
               top: bounds.top,
               width: bounds.width,
               height: bounds.height,
-              background: dark ? '#a28aff' : '#3814ff',
-              color: dark ? '#101014' : '#fff',
             }}
           >
             <svg

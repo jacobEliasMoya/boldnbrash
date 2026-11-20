@@ -69,7 +69,7 @@ test('Jake turns toward his travel direction and keeps his gait forward when scr
       expect(facing === 'right' ? center > previousCenter : center < previousCenter).toBe(true)
     const step = Number(await avatar.getAttribute('data-walk-step'))
     expect(step).toBeGreaterThan(previousStep)
-    await expect(avatar).toHaveAttribute('data-source-frame', String([4, 5, 6, 5][step % 4]))
+    await expect(avatar).toHaveAttribute('data-source-frame', String([4, 5, 6, 7][step % 4]))
     previousStep = step
     previousCenter = center
   }
@@ -151,7 +151,7 @@ test('scroll plays the original entrance and wave then mirrors the walk out', as
   let previousCenter = 289
   for (const step of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
     await scrollTimeline(page, 0.42 + ((0.65 - 0.42) * (step + 0.2)) / 10)
-    await expect(avatar).toHaveAttribute('data-frame', String([4, 5, 6, 5][step % 4]))
+    await expect(avatar).toHaveAttribute('data-frame', String([4, 5, 6, 7][step % 4]))
     await expect(avatar).toHaveAttribute('data-direction', 'out')
     const center = Number(await avatar.getAttribute('data-center'))
     expect(center).toBeGreaterThan(previousCenter)
@@ -162,10 +162,34 @@ test('scroll plays the original entrance and wave then mirrors the walk out', as
   await expect(mark).toHaveAttribute('data-mode', 'gone')
   await expect(avatar).toHaveCSS('opacity', '0')
   await expect(firstLetter).toHaveCSS('--letter-fill', '100%')
+  const secondLine = page.locator('.hero-letter').nth(6)
+  await expect(secondLine).toHaveCSS('--letter-fill', '100%')
+  await expect(page.locator('.hero-letter').last()).toHaveCSS('--letter-fill', '0%')
+  const supportingCopy = () => page.locator('.hero-copy-fill').evaluateAll((elements) =>
+    elements.map((element) => parseFloat(getComputedStyle(element).getPropertyValue('--letter-fill'))),
+  )
+  await expect.poll(supportingCopy).toEqual(
+    Array.from({ length: 3 }, () => expect.closeTo(43, -1)),
+  )
+  await scrollTimeline(page, 0.7)
+  await expect(secondLine).toHaveCSS('--letter-fill', '0%')
   await scrollTimeline(page, 0.4)
+  await expect.poll(supportingCopy).toEqual([0, 0, 0])
   await expect(mark).toHaveAttribute('data-mode', 'idle')
   await expect(avatar).toHaveAttribute('data-direction', 'in')
   await expect(avatar).toHaveCSS('opacity', '1')
+})
+
+test('the desktop wordmark drip enters with the wordmark', async ({ page }) => {
+  await page.goto(baseURL)
+  const drip = page.locator('.liquid-wordmark-parked')
+  const wordmark = page.locator('.liquid-blended-logo .wordmark')
+  await expect(drip).not.toHaveAttribute('d')
+  await expect.poll(async () => (await wordmark.boundingBox())?.y).toBeLessThan(-40)
+  await expect(wordmark).toHaveCSS('opacity', '1')
+  await expect(wordmark).toHaveCSS('transform', 'none', { timeout: 15000 })
+  await expect(drip).not.toHaveAttribute('opacity')
+  await expect(drip).toHaveAttribute('d', /^M/)
 })
 
 test('header controls stay readable over a solid liquid boundary', async ({ page }) => {
@@ -486,6 +510,35 @@ test('mobile category controls stay usable and project information fits the card
         .toBe(true)
     }
   }
+})
+
+test('mobile night mode shares the header and menu styling', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(baseURL)
+  await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 15000 })
+  const headerToggle = page.locator('.liquid-blended-control .theme-toggle')
+  const track = '.theme-toggle-track'
+  await expect(headerToggle.locator(track)).toHaveCSS('background-color', 'rgb(33, 29, 41)')
+  await page.getByRole('button', { name: 'Open menu' }).click()
+  const socials = page.getByRole('navigation', { name: 'Social profiles' })
+  const footerLiquid = page.locator('.mobile-menu-liquid-footer')
+  await expect(socials).toHaveCSS('transform', 'none')
+  await expect(footerLiquid).toHaveAttribute('d', /^M.+Z$/)
+  await expect(footerLiquid).toHaveCSS('fill', 'rgb(0, 0, 0)')
+  await expect(socials.getByRole('link', { name: /GitHub/ })).toHaveCSS('color', 'rgb(255, 255, 255)')
+  await expect(socials.getByRole('link', { name: /GitHub/ }).locator('svg')).toHaveCSS('width', '28px')
+  await expect(socials.getByRole('link', { name: /LinkedIn/ })).toBeVisible()
+  const panelBounds = (await page.locator('.mobile-menu-panel').boundingBox())!
+  const socialBounds = (await socials.boundingBox())!
+  expect(panelBounds.y + panelBounds.height - socialBounds.y - socialBounds.height).toBeCloseTo(12, 0)
+  const menuToggle = page.locator('.mobile-menu-heading .theme-toggle')
+  await expect(menuToggle.locator(track)).toHaveCSS('background-color', 'rgb(33, 29, 41)')
+  await expect(menuToggle.locator('.theme-toggle-thumb')).toHaveCSS('width', '24px')
+  await menuToggle.click()
+  await expect(menuToggle).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator('.mobile-menu-liquid')).toHaveCSS('fill', 'rgb(255, 255, 255)')
+  await expect(footerLiquid).toHaveCSS('fill', 'rgb(255, 255, 255)')
+  await expect(socials.getByRole('link', { name: /GitHub/ })).toHaveCSS('color', 'rgb(16, 16, 20)')
 })
 
 test('mobile menu opens from the toggle, traps navigation, and restores focus after dismissal', async ({

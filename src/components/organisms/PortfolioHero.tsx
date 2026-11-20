@@ -81,7 +81,8 @@ export function PortfolioHero() {
           animate={introReady ? entered : entrance}
           transition={entranceTransition(0.82, reduceMotion)}
         >
-          Hi, I’m <span className="name-pill">Jake</span>
+          <span className="hero-copy-fill">Hi, I’m</span>
+          <span className="name-pill"><span className="hero-copy-fill">Jake</span></span>
         </motion.p>
         <h1 aria-label="Build. Break. Repeat.">
           <AnimatedWord
@@ -126,7 +127,7 @@ export function PortfolioHero() {
                 if (hero) hero.dataset.periodReady = 'true'
               }}
             >
-              <span className="hero-period-glyph" aria-hidden="true">
+              <span className="hero-period-glyph hero-letter" data-fill-index={18} aria-hidden="true">
                 .
               </span>
               <span data-portal="skills" aria-hidden="true" />
@@ -139,7 +140,9 @@ export function PortfolioHero() {
           animate={introReady ? entered : entrance}
           transition={entranceTransition(2.18, reduceMotion)}
         >
-          I build for the web. Half the fun is finding out why it broke.
+          <span className="hero-copy-fill">
+            I build for the web. Half the fun is finding out why it broke.
+          </span>
         </motion.p>
         <span className="sr-only">Jacob Moya’s creative development portfolio</span>
       </div>

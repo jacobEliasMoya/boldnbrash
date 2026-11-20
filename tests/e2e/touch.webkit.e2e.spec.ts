@@ -145,8 +145,13 @@ test('skills introduction fill responds to mobile wheel input and vertical swipe
   expect(consumed.every(Boolean)).toBe(true)
   await expect(first).toHaveCSS('--title-fill', '100%')
   await swipe(page, '.skills-title-fill', 320, 620)
-  await expect.poll(async () => parseFloat(await first.evaluate((line) =>
-    getComputedStyle(line).getPropertyValue('--title-fill')))).toBeLessThan(70)
+  // Returning from the project reveal finishes at the full title before the
+  // next gesture scrubs its fill backward.
+  await expect(page.locator('.skills-reveal')).toHaveAttribute('aria-hidden', 'true')
+  await swipe(page, '.skills-title-fill', 320, 620)
+  const second = page.locator('.skills-title-fill').nth(1)
+  await expect.poll(async () => parseFloat(await second.evaluate((line) =>
+    getComputedStyle(line).getPropertyValue('--title-fill')))).toBeLessThan(100)
 })
 
 test('a short thumb swipe advances a project and reverses across category gaps', async ({ page }) => {

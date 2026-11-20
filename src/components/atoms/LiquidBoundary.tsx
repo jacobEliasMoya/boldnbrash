@@ -1,16 +1,25 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import type { MotionValue } from 'motion/react'
 import { introCompleteEvent } from '@/hooks/useIntroReady'
 
-export function LiquidBoundary() {
+export function LiquidBoundary({
+  headerY,
+  wordmarkY,
+}: {
+  headerY: MotionValue<number>
+  wordmarkY: MotionValue<number>
+}) {
   const root = useRef<SVGSVGElement>(null)
   const surround = useRef<SVGSVGElement>(null)
+  const parked = useRef<SVGPathElement>(null)
 
   useEffect(() => {
     const svg = root.current
     const path = svg?.querySelector('path')
     const surroundPath = surround.current?.querySelector('path')
+    const parkedPath = parked.current
     if (!svg || !path) return
     const media = window.matchMedia('(prefers-reduced-motion: reduce), (pointer: coarse)')
     let frameInset = 12
@@ -31,6 +40,7 @@ export function LiquidBoundary() {
     let previous = 0
     let idle = false
     let idleTimer = 0
+    let parkedGeometry = ''
     svg.dataset.mode = media.matches ? 'static' : 'pointer'
 
     function armIdle() {
@@ -84,7 +94,7 @@ export function LiquidBoundary() {
         edge: ['top-right', 'bottom-right', 'bottom-left', 'top-left'][quadrant],
       }
     }
-    function contour() {
+    function contour(position: number, depth: number, radius: number, power: number, updateSurround = false) {
       const direction = pointAt(position)
       const count = Math.ceil(perimeter / 5)
       const basePoints = Array.from({ length: count }, (_, i) => pointAt((perimeter * i) / count))
@@ -107,7 +117,7 @@ export function LiquidBoundary() {
       const outside = `M${-frameInset},${-frameInset} H${width + frameInset} V${height + frameInset} H${-frameInset} Z `
       // Keep the outer surround solid in the theme colour. A subpixel overlap
       // covers the antialiased join without restoring a separate outline stroke.
-      surroundPath?.setAttribute(
+      if (updateSurround) surroundPath?.setAttribute(
         'd',
         outside +
           closedCurve(
@@ -132,8 +142,24 @@ export function LiquidBoundary() {
       depth += (targetDepth - depth) * ease
       radius += (targetRadius - radius) * ease
       power += (targetPower - power) * ease
-      path!.setAttribute('d', contour())
-      const bounds = svg!.getBoundingClientRect()
+      path!.setAttribute('d', contour(position, depth, radius, power, true))
+      const bounds = (surround.current ?? svg!).getBoundingClientRect()
+      const wordmark = window.innerWidth > 760
+        ? document.querySelector<HTMLElement>('.site-header .wordmark-text')?.getBoundingClientRect()
+        : undefined
+      const parkedDepth = 68 + headerY.get() + wordmarkY.get()
+      const parkedVisible = !!wordmark?.width && parkedDepth > 0
+      if (wordmark?.width && parkedVisible) {
+        const anchor = wrap(wordmark.left + wordmark.width / 2 - bounds.left - frameInset - corner)
+        const key = `${width}:${height}:${anchor}:${wordmark.width}:${parkedDepth}`
+        if (key !== parkedGeometry) {
+          parkedPath?.setAttribute('d', contour(anchor, parkedDepth, wordmark.width * 0.7 + 20, 4))
+          parkedGeometry = key
+        }
+      } else if (parkedGeometry) {
+        parkedPath?.removeAttribute('d')
+        parkedGeometry = ''
+      }
       for (const control of document.querySelectorAll<HTMLElement>('[data-liquid-header]')) {
         const label = control.querySelector('.nav-label, .theme-toggle-track, span') ?? control
         const rect = label.getBoundingClientRect()
@@ -141,11 +167,11 @@ export function LiquidBoundary() {
         if (contrast) {
           // Clip the contrast copy to the actual liquid edge instead of flipping
           // the whole label when a single corner touches it.
-          const contains = (x: number, y: number) => path!.isPointInFill(new DOMPoint(
-            rect.left + x - bounds.left - frameInset,
-            rect.top + y - bounds.top - frameInset,
-          ))
-          const hidden = media.matches || !rect.width || !!control.closest('[inert]') ||
+          const contains = (x: number, y: number) => {
+            const point = new DOMPoint(rect.left + x - bounds.left - frameInset, rect.top + y - bounds.top - frameInset)
+            return !!(parkedVisible && parkedPath?.isPointInFill(point)) || (!media.matches && path!.isPointInFill(point))
+          }
+          const hidden = (media.matches && !parkedVisible) || !rect.width || !!control.closest('[inert]') ||
             getComputedStyle(control).visibility === 'hidden'
           if (hidden) contrast.style.clipPath = 'inset(0 0 100% 0)'
           else {
@@ -207,6 +233,7 @@ export function LiquidBoundary() {
       height = Math.max(1, bounds.height - 2 * frameInset)
       path!.setAttribute('transform', `translate(${frameInset} ${frameInset})`)
       surroundPath?.setAttribute('transform', `translate(${frameInset} ${frameInset})`)
+      parkedPath?.setAttribute('transform', `translate(${frameInset} ${frameInset})`)
       corner = Math.min(25, width / 2, height / 2)
       const quarter = (Math.PI * corner) / 2
       segments = [
@@ -348,6 +375,11 @@ export function LiquidBoundary() {
     const observer = new ResizeObserver(measure)
     observer.observe(svg)
     if (surround.current) observer.observe(surround.current)
+    const wordmarkAnchor = document.querySelector('.site-header .logo-anchor')
+    if (wordmarkAnchor) observer.observe(wordmarkAnchor)
+    const stopFollowingEntrance = [headerY, wordmarkY].map((value) =>
+      value.on('change', schedule),
+    )
     measure()
     armIdle()
     window.addEventListener('pointermove', move, { passive: true })
@@ -363,6 +395,7 @@ export function LiquidBoundary() {
     media.addEventListener('change', preferenceChanged)
     return () => {
       cancelAnimationFrame(frame)
+      stopFollowingEntrance.forEach((unsubscribe) => unsubscribe())
       document.querySelectorAll<HTMLElement>('[data-liquid-covered]').forEach((control) => {
         delete control.dataset.liquidCovered
       })
@@ -380,7 +413,7 @@ export function LiquidBoundary() {
       document.removeEventListener('focusout', unfocus)
       media.removeEventListener('change', preferenceChanged)
     }
-  }, [])
+  }, [headerY, wordmarkY])
 
   return (
     <>
@@ -389,6 +422,7 @@ export function LiquidBoundary() {
       </svg>
       <svg ref={surround} className="liquid-surround" aria-hidden="true" focusable="false">
         <path fillRule="evenodd" />
+        <path ref={parked} className="liquid-wordmark-parked" fillRule="evenodd" />
       </svg>
     </>
   )

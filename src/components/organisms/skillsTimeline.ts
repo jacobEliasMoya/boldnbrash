@@ -185,6 +185,8 @@ export const sceneStops = [
   skillStart + skillTravel + 2,
 ]
 export const sceneDuration = sceneStops[sceneStops.length - 1]
+export const skillTitleFillPortion = 0.5
+export const skillTitleFillEnd = sceneStops[1] + (skillStart - sceneStops[1]) * skillTitleFillPortion
 
 export const clamp = (value: number, min = 0, max = 1) => Math.max(min, Math.min(max, value))
 

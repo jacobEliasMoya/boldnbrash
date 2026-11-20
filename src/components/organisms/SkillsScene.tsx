@@ -13,7 +13,7 @@ import { ProjectCover } from '@/components/atoms/ProjectCover'
 import { ProjectCTA } from '@/components/atoms/ProjectCTA'
 import { ProjectDialog } from './ProjectDialog'
 import { getPeriodOpening } from '@/components/atoms/periodOpening'
-import { clamp, getSkillFrame, projectStops, skills } from './skillsTimeline'
+import { clamp, getSkillFrame, projectStops, skills, skillTitleFillPortion } from './skillsTimeline'
 
 type Project = (typeof skills)[number]['projects'][number]
 type OpenProject = (project: Project, trigger: HTMLButtonElement) => void
@@ -212,9 +212,14 @@ export function SkillsScene() {
   const scene = useRef<HTMLDivElement>(null)
   const period = useRef<HTMLSpanElement>(null)
   const [portal, setPortal] = useState({ x: 0, y: 0, radius: 0, dot: 0, borderWidth: 12 })
-  const expansion = animated ? clamp((selection.intro - 0.4) / 0.6) : 1
-  const { innerRadius: solidRadius } = getPeriodOpening(clamp(expansion / 0.55), portal.dot, portal.radius)
-  const { innerRadius: openingRadius } = getPeriodOpening(clamp((expansion - 0.55) / 0.45), 0, portal.radius)
+  const revealStart = skillTitleFillPortion
+  const fillDuration = revealStart * 0.7
+  const fillStart = [0, revealStart - fillDuration]
+  const expansion = animated ? clamp((selection.intro - revealStart) / (1 - revealStart)) : 1
+  const titleFill = (line: number) => animated ? clamp((selection.intro - fillStart[line]) / fillDuration) * 100 : 0
+  const openingRadius = expansion > 0
+    ? getPeriodOpening(expansion, portal.dot, portal.radius).innerRadius
+    : 0
   useLayoutEffect(() => {
     const element = scene.current
     const dot = period.current
@@ -282,7 +287,6 @@ export function SkillsScene() {
         '--skills-portal-x': `${portal.x}px`,
         '--skills-portal-y': `${portal.y}px`,
         '--skills-portal-radius': `${openingRadius}px`,
-        '--skills-period-radius': `${solidRadius}px`,
       } as CSSProperties}
     >
       <div className="skills-heading" aria-hidden={animated && expansion === 1}>
@@ -293,16 +297,15 @@ export function SkillsScene() {
           </div>
           <h2 aria-label="My Tech. And Stuff.">
             <span className="skills-title-line" aria-hidden="true">
-              <span className="skills-title-fill" style={{ '--title-fill': `${animated ? clamp(selection.intro / 0.18) * 100 : 0}%` } as CSSProperties}>My Tech.</span>
+              <span className="skills-title-fill" style={{ '--title-fill': `${titleFill(0)}%` } as CSSProperties}>My Tech.</span>
             </span>
             <span className="skills-title-line" aria-hidden="true">
-              <span className="skills-title-fill" style={{ '--title-fill': `${animated ? clamp((selection.intro - 0.18) / 0.18) * 100 : 0}%` } as CSSProperties}>And Stuff</span><span ref={period} className="skills-title-period" />
+              <span className="skills-title-fill" style={{ '--title-fill': `${titleFill(1)}%` } as CSSProperties}>And Stuff</span><span ref={period} className="skills-title-period" />
             </span>
           </h2>
         </div>
         <p className="skills-intro">Check out how I spend my time when I’m not working, being a dad, or playing guitar.</p>
       </div>
-      {animated && <div className="skills-period-fill" aria-hidden="true" />}
       {animated ? (
         <div className="skills-reveal" inert={expansion < 1} aria-hidden={expansion < 1}>
         <div className="skills-performance">

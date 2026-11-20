@@ -7,6 +7,7 @@ import {
   sceneStops,
   skillSegments,
   skillStart,
+  skillTitleFillEnd,
   skillTravel,
   projectStops,
 } from './skillsTimeline'
@@ -18,7 +19,7 @@ import { MobileMenu } from './MobileMenu'
 import { heroAnimationTravel } from '@/components/atoms/heroFrames'
 import { getPortalBounds } from '@/components/atoms/portalBounds'
 import { getPeriodOpening } from '@/components/atoms/periodOpening'
-import { toPlaybackTime, fromPlaybackTime } from './scrollPlayback'
+import { toPlaybackTime, fromPlaybackTime, heroFillEnd } from './scrollPlayback'
 import { useIntroReady } from '@/hooks/useIntroReady'
 
 const scenes = [
@@ -27,8 +28,8 @@ const scenes = [
   { id: 'about', label: 'About' },
   { id: 'contact', label: 'Contact' },
 ]
-const heroFillTravel = 1
-const heroRevealTravel = sceneStops[1] - heroFillTravel
+const heroRevealTravel = sceneStops[1] - heroFillEnd
+const wordmarkDropStart = -100
 
 const origins = [
   [50, 50],
@@ -39,6 +40,8 @@ const origins = [
 export function SceneSequence({ children }: { children: ReactNode }) {
   const reduceMotion = useReducedMotion()
   const introReady = useIntroReady()
+  const headerEntranceY = useMotionValue(-24)
+  const wordmarkEntranceY = useMotionValue(wordmarkDropStart)
   const timeline = useMotionValue(0)
   const track = useRef<HTMLDivElement>(null)
   const panels = useRef<(HTMLElement | null)[]>([])
@@ -154,14 +157,16 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     let snapExpectedY = 0
 
     const transitionRanges = [
-      { start: heroFillTravel, end: sceneStops[1] },
-      { start: sceneStops[1], end: skillStart },
+      { start: heroFillEnd, end: sceneStops[1] },
+      { start: skillTitleFillEnd, end: skillStart },
       ...sceneStops.slice(2).map((end) => ({ start: end - 1, end })),
     ]
     let sceneTransition: { range: (typeof transitionRanges)[number]; direction: number; stop?: () => void } | null = null
     let transitionLatch: { direction: number; lastInput: number } | null = null
     let transitionIntent = { direction: 0, pixels: 0, time: 0 }
     let transitionExpectedY = 0
+    let lastSkillProgress = -1
+    let lastSkillIntro = -1
 
     function cancelSceneTransition() {
       sceneTransition?.stop?.()
@@ -173,10 +178,14 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     function triggerSceneTransition(pixels: number, proposed: number, start: number, distance: number) {
       const direction = Math.sign(pixels)
       const now = performance.now()
-      if (!sceneTransition && transitionLatch && transitionLatch.direction === direction &&
-        now - transitionLatch.lastInput < 320) {
-        transitionLatch.lastInput = now
-        return true
+      if (!sceneTransition && transitionLatch) {
+        const gap = now - transitionLatch.lastInput
+        const freshWheelTick = Math.abs(pixels) >= 100 && gap >= 60
+        if (transitionLatch.direction === direction && gap < 500 && !freshWheelTick) {
+          transitionLatch.lastInput = now
+          return true
+        }
+        transitionLatch = null
       }
       const ranges = direction > 0 ? transitionRanges : [...transitionRanges].reverse()
       const range = sceneTransition?.range ?? ranges.find((range) =>
@@ -204,8 +213,9 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       sceneTransition = transition
       transitionLatch = { direction, lastInput: now }
       track.current?.setAttribute('data-transitioning', direction > 0 ? 'forward' : 'backward')
+      const duration = range.end === skillStart ? 0.65 : 0.85
       const control = animate(displayed, target, {
-        duration: Math.max(0.24, 0.85 * Math.abs(target - displayed) / (range.end - range.start)),
+        duration: Math.max(0.24, duration * Math.abs(target - displayed) / (range.end - range.start)),
         ease: [0.22, 1, 0.36, 1],
         onUpdate: (value) => {
           displayed = requested = value
@@ -249,7 +259,9 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           node.closest('[data-menu-open]')
         )
           return
-        if (displayed < skillStart || displayed > skillStart + skillTravel) return
+        // The reveal's final scroll position can round up by a fraction of a pixel.
+        // Leave the first card at the reveal boundary until the visitor scrolls again.
+        if (requested <= skillStart + 0.01 || displayed > skillStart + skillTravel) return
         const nearest = projectStops.reduce((best, stop) =>
           Math.abs(skillStart + stop.position - requested) <
           Math.abs(skillStart + best.position - requested)
@@ -343,7 +355,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         Math.min(sceneDuration, ((window.scrollY - start) / distance) * sceneDuration),
       )
       const currentClock = toPlaybackTime(displayed)
-      if (touchInput && inputDirection && inputDirection !== direction) {
+      if (inputDirection && inputDirection !== direction) {
         // Reverse immediately rather than inheriting forward spring momentum.
         playbackClock.jump(currentClock)
       }
@@ -358,7 +370,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         0,
         Math.min(
           toPlaybackTime(sceneDuration),
-          touchInput ? desired : Math.max(currentClock - 0.9, Math.min(currentClock + 0.9, desired)),
+          desired,
         ),
       )
       if (triggerSceneTransition(pixels, fromPlaybackTime(bounded), start, distance)) return true
@@ -373,12 +385,12 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     }
 
     function normalizeWheel(event: WheelEvent) {
+      if (event.ctrlKey || event.defaultPrevented || !event.deltaY || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return
       cancelSnap()
       if (document.documentElement.dataset.introLoading === 'true') {
         event.preventDefault()
         return
       }
-      if (event.ctrlKey || event.defaultPrevented) return
       const pixels =
         event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1)
       const target = event.target instanceof Element ? event.target : null
@@ -456,20 +468,21 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       const currentTime = toPlaybackTime(displayed)
       const targetTime = toPlaybackTime(requested)
       const difference = Math.abs(targetTime - currentTime)
+      const heroPlayback = Math.min(displayed, requested) < heroFillEnd
       if (difference < 0.000001) {
         displayed = requested
         renderScene(displayed)
         settleFocus()
         return
       }
-      // Animate the same MotionValue on every retarget so drag velocity survives.
-      // A critically damped spring follows the finger without a fixed-speed queue.
+      // Keep velocity when a new gesture target arrives. Use the same spring for
+      // wheel and touch through the walk and text fill so a wheel notch cannot restart an ease-out.
       const control = animate(playbackClock, targetTime, {
-        ...(gesturePlayback
+        ...(gesturePlayback || heroPlayback
           ? { type: 'spring' as const, stiffness: 420, damping: 42, mass: 0.9, restDelta: 0.0005, restSpeed: 0.005 }
           : current === 1
             ? { type: 'tween' as const, duration: 0.24, ease: [0.22, 1, 0.36, 1] as const }
-            : { type: 'tween' as const, duration: difference, ease: 'linear' as const }),
+            : { type: 'tween' as const, duration: Math.min(difference, 0.3), ease: [0.22, 1, 0.36, 1] as const }),
         onUpdate: (time) => {
           displayed = fromPlaybackTime(time)
           renderScene(displayed)
@@ -484,6 +497,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       stopPlayback = () => control.stop()
     }
     function update() {
+      if (frame) cancelAnimationFrame(frame)
       frame = 0
       if (sceneTransition) return
       const node = track.current
@@ -493,7 +507,10 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         1,
         node.offsetHeight - (node.firstElementChild?.clientHeight ?? window.innerHeight),
       )
-      const progress = Math.max(0, Math.min(sceneDuration, (-bounds.top / travel) * sceneDuration))
+      const rawProgress = Math.max(0, Math.min(sceneDuration, (-bounds.top / travel) * sceneDuration))
+      const boundary = transitionRanges.flatMap(({ start, end }) => [start, end])
+        .find((stop) => Math.abs(stop - rawProgress) * travel / sceneDuration < 1)
+      const progress = boundary ?? rawProgress
       timeline.set(progress)
       render(timeline.get())
     }
@@ -512,26 +529,26 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       )
       const heroFill = Math.max(
         0,
-        Math.min(1, (progress - heroAnimationTravel) / (heroFillTravel - heroAnimationTravel)),
+        Math.min(1, (progress - heroAnimationTravel) / (heroFillEnd - heroAnimationTravel)),
       )
-      if (panels.current[0]) panels.current[0].dataset.particleGather = String(heroFill)
+      if (panels.current[0]) {
+        panels.current[0].dataset.particleGather = String(heroFill)
+        panels.current[0].style.setProperty('--hero-copy-fill', `${heroFill * 100}%`)
+      }
       panels.current[0]?.querySelectorAll<HTMLElement>('.hero-letter').forEach((letter) => {
         const index = Number(letter.dataset.fillIndex ?? 0)
-        const letterFill = Math.max(0, Math.min(1, heroFill * 18 - index))
+        const letterFill = Math.max(0, Math.min(1, heroFill * 19 - index))
         letter.style.setProperty('--letter-fill', `${letterFill * 100}%`)
       })
       const skillProgress = Math.max(0, Math.min(1, (progress - skillStart) / skillTravel))
-      window.dispatchEvent(
-        new CustomEvent('portfolio:skills-progress', {
-          detail: {
-            progress: skillProgress,
-            intro: Math.max(
-              0,
-              Math.min(1, (progress - sceneStops[1]) / (skillStart - sceneStops[1])),
-            ),
-          },
-        }),
-      )
+      const skillIntro = Math.max(0, Math.min(1, (progress - sceneStops[1]) / (skillStart - sceneStops[1])))
+      if (skillProgress !== lastSkillProgress || skillIntro !== lastSkillIntro) {
+        lastSkillProgress = skillProgress
+        lastSkillIntro = skillIntro
+        window.dispatchEvent(new CustomEvent('portfolio:skills-progress', {
+          detail: { progress: skillProgress, intro: skillIntro },
+        }))
+      }
       let visible = 0
       panels.current.forEach((panel, index) => {
         if (!panel) return
@@ -539,9 +556,13 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           index === 0
             ? 1
             : index === 1
-              ? Math.max(0, Math.min(1, (progress - heroFillTravel) / heroRevealTravel))
+              ? Math.max(0, Math.min(1, (progress - heroFillEnd) / heroRevealTravel))
               : Math.max(0, Math.min(1, progress - sceneStops[index] + 1))
-        if (index > 0) {
+        if (index > 0 && (reveal === 0 || reveal === 1)) {
+          panel.style.clipPath = reveal === 1 ? 'none' : 'circle(0px)'
+          const ring = sceneOpenings.current[index]
+          if (ring) ring.style.visibility = 'hidden'
+        } else if (index > 0) {
           const portal = panels.current[index - 1]?.querySelector(
             `[data-portal="${scenes[index].id}"]`,
           )
@@ -774,7 +795,10 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         data-enhanced={enhanced ? '' : undefined}
         data-menu-open={menuOpen ? '' : undefined}
       >
-        <LiquidBoundary />
+        <LiquidBoundary
+          headerY={headerEntranceY}
+          wordmarkY={wordmarkEntranceY}
+        />
         <a className="skip-link" href="#skills">
           Skip to selected work
         </a>
@@ -782,6 +806,9 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           className={`site-header tone-${scenes[active]?.id === 'contact' ? 'dark' : 'paper'}`}
           initial={reduceMotion ? false : { opacity: 0, y: -24 }}
           animate={introReady ? { opacity: 1, y: 0 } : { opacity: 0, y: -24 }}
+          onUpdate={({ y }) => {
+            if (typeof y === 'number') headerEntranceY.set(y)
+          }}
           transition={{ duration: reduceMotion ? 0 : 0.7, ease: [0.22, 1, 0.36, 1] }}
         >
           <BlendedLogo
@@ -794,12 +821,15 @@ export function SceneSequence({ children }: { children: ReactNode }) {
               data-liquid-header
               href="#top"
               aria-label="Jacob Moya home"
-              initial={reduceMotion ? false : { opacity: 0, y: -14 }}
-              animate={introReady ? { opacity: 1, y: 0 } : { opacity: 0, y: -14 }}
+              initial={reduceMotion ? false : { y: wordmarkDropStart }}
+              animate={{ y: introReady ? 0 : wordmarkDropStart }}
+              onUpdate={({ y }) => {
+                if (typeof y === 'number') wordmarkEntranceY.set(y)
+              }}
               transition={{
-                duration: reduceMotion ? 0 : 0.5,
+                duration: reduceMotion ? 0 : 0.7,
                 delay: reduceMotion ? 0 : 0.08,
-                ease: [0.22, 1, 0.36, 1],
+                ease: [0.32, 0, 0.24, 1],
               }}
             >
               <span className="wordmark-text" aria-hidden="true">
