@@ -209,6 +209,18 @@ ul {
   display: grid;
   place-items: center;
 }
+.desktop-section-marker {
+  position: absolute;
+  bottom: 1px;
+  left: 50%;
+  translate: -50% 0;
+  width: 18px;
+  height: 9px;
+  clip-path: path('M0 1 Q4 0 6 3 C7 5 6 9 9 9 C12 9 11 5 12 3 Q14 0 18 1 Q9 4 0 1Z');
+  transform-origin: center top;
+  background: currentColor;
+  pointer-events: none;
+}
 .nav-home-icon {
   width: 20px;
   height: 20px;
@@ -385,7 +397,7 @@ ul {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
   align-items: center;
-  gap: clamp(20px, 2vw, 40px);
+  gap: clamp(14px, 1.4vw, 24px);
   padding-inline: var(--content-inset);
 }
 .hero-copy {
@@ -468,6 +480,12 @@ ul {
   align-self: center;
   justify-self: center;
   width: min(100%, calc(100svh - 210px), 720px);
+}
+@media (min-width: 901px) {
+  .hero-mark {
+    justify-self: start;
+    translate: clamp(-36px, -2.5vw, -16px) 0;
+  }
 }
 .hero-mark img {
   width: 100%;
@@ -2846,7 +2864,7 @@ ul {
     min-height: 0;
     grid-template-rows: minmax(0, min(82vw, 36svh, 340px)) auto;
     align-content: center;
-    gap: clamp(12px, 2svh, 24px);
+    gap: clamp(6px, 1.2svh, 14px);
     padding-top: max(90px, calc(env(safe-area-inset-top) + 76px));
     padding-bottom: max(46px, calc(env(safe-area-inset-bottom) + 30px));
   }

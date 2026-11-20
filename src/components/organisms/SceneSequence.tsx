@@ -548,7 +548,21 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       frame = 0
       if (sceneTransition) return
       const node = track.current
-      if (!node || media.matches) return
+      if (!node) return
+      if (media.matches) {
+        let visible = 0
+        panels.current.forEach((panel, index) => {
+          if (panel && panel.getBoundingClientRect().top <= innerHeight * 0.4) visible = index
+        })
+        if (scrollY > 0 && scrollY + innerHeight >= document.documentElement.scrollHeight - 1) {
+          visible = scenes.length - 1
+        }
+        if (visible !== current) {
+          current = visible
+          setActive(visible)
+        }
+        return
+      }
       const bounds = node.getBoundingClientRect()
       const travel = Math.max(
         1,
@@ -979,6 +993,15 @@ export function SceneSequence({ children }: { children: ReactNode }) {
                     ) : scene.label}
                   </span>
                 </motion.span>
+                <motion.span
+                  className="desktop-section-marker"
+                  aria-hidden="true"
+                  initial={false}
+                  animate={active === index
+                    ? { opacity: 1, scaleX: 1, scaleY: 1 }
+                    : { opacity: 0, scaleX: 0.65, scaleY: 0.12 }}
+                  transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 340, damping: 26 }}
+                />
               </motion.a>
             ))}
           </BlendedNav>
