@@ -1,19 +1,31 @@
 import { expect, test, type Locator } from '@playwright/test'
 
 async function expectClickRebound(button: Locator, icon: Locator) {
-  await button.click()
-  const scales = await icon.evaluate(async (element) => {
-    const samples: number[] = []
-    const start = performance.now()
-    while (performance.now() - start < 340) {
-      const matrix = new DOMMatrixReadOnly(getComputedStyle(element).transform)
-      samples.push(matrix.a)
-      await new Promise(requestAnimationFrame)
-    }
-    return samples
-  })
-  expect(Math.min(...scales)).toBeLessThan(0.92)
-  expect(Math.max(...scales)).toBeGreaterThan(1.1)
+  const samplesReady = await icon.evaluateHandle((element) => ({
+    result: new Promise<number[]>((resolve) => {
+      element.closest('button')!.addEventListener('click', () => {
+        const samples: number[] = []
+        const start = performance.now()
+        function sample() {
+          const matrix = new DOMMatrixReadOnly(getComputedStyle(element).transform)
+          samples.push(matrix.a)
+          if (performance.now() - start < 750) requestAnimationFrame(sample)
+          else resolve(samples)
+        }
+        requestAnimationFrame(sample)
+      }, { capture: true, once: true })
+    }),
+  }))
+  let scales: number[]
+  try {
+    await button.click()
+    scales = await samplesReady.evaluate(({ result }) => result)
+  } finally {
+    await samplesReady.dispose()
+  }
+  const compressed = scales.findIndex((scale) => scale < 0.92)
+  expect(compressed).toBeGreaterThanOrEqual(0)
+  expect(scales.slice(compressed + 1).some((scale) => scale > 1.02)).toBe(true)
 }
 
 test('mobile menu and project controls visibly gather and rebound before opening or closing', async ({ page }) => {

@@ -38,11 +38,16 @@ export function ProjectDialog({ project, origin, onClose }: {
     const x = origin?.x ?? innerWidth / 2
     const y = origin?.y ?? innerHeight / 2
     const reach = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y)) + 2
-    const control = animate(element, {
-      opacity: 1,
-      clipPath: [`circle(${reduced ? reach : 4}px at ${x}px ${y}px)`, `circle(${reach}px at ${x}px ${y}px)`],
-    }, { duration: reduced ? 0 : 0.6, ease: [0.22, 1, 0.36, 1] })
-    void control.then(() => { if (element.open) element.style.clipPath = 'none' })
+    element.style.opacity = '1'
+    element.style.clipPath = reduced ? 'none' : `circle(4px at ${x}px ${y}px)`
+    const control = animate(reduced ? reach : 4, reach, {
+      duration: reduced ? 0 : 0.6,
+      ease: [0.22, 1, 0.36, 1],
+      onUpdate: (radius) => {
+        if (!reduced) element.style.clipPath = `circle(${radius}px at ${x}px ${y}px)`
+      },
+      onComplete: () => { element.style.clipPath = 'none' },
+    })
     stopAnimation.current = () => control.stop()
     return () => {
       stopAnimation.current?.()
