@@ -1738,6 +1738,9 @@ ul {
   align-items: center;
   gap: clamp(16px, 2vw, 28px);
 }
+:root[data-theme='dark'] .skills-category-pill {
+  background: #4b3b63;
+}
 .skills-category-number {
   font: 800 clamp(32px, 3.6vw, 54px)/1.2 'JetBrains Mono', monospace;
   letter-spacing: 0;
@@ -2186,7 +2189,7 @@ ul {
   justify-content: center;
   flex: 1;
   min-height: 0;
-  gap: clamp(20px, 4svh, 40px);
+  gap: clamp(26px, 5svh, 48px);
 }
 .mobile-menu-links a {
   display: flex;
@@ -2324,7 +2327,7 @@ ul {
     --menu-bottom-padding: max(12px, env(safe-area-inset-bottom));
   }
   .mobile-menu-links {
-    gap: 12px;
+    gap: clamp(12px, 3.5svh, 20px);
   }
   .mobile-menu-links a {
     font-size: clamp(30px, min(8.5svh, 14.25cqw), 49px);
@@ -3764,6 +3767,7 @@ ul {
   flex-shrink: 0;
   align-self: center;
   flex-wrap: nowrap;
+  gap: 0;
   margin-block: 8px calc(var(--frame-inset) - var(--menu-bottom-padding));
   padding: 6px 12px max(2px, calc(env(safe-area-inset-bottom) - var(--frame-inset)));
 }

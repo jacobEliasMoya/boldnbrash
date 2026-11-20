@@ -51,7 +51,8 @@ export function MobileMenu({
   const openingRing = useRef<SVGCircleElement>(null)
   const entryRing = useRef<SVGCircleElement>(null)
   const entryOrigin = useRef({ x: 0, y: 0, radius: 0 })
-  const entryGeometry = useRef({ reach: 0 })
+  const entryGeometry = useRef({ reach: 0, firstNumberReach: Infinity })
+  const numbersStarted = useRef(false)
   const stopEntering = useRef<(() => void) | null>(null)
   const stopGathering = useRef<(() => void) | null>(null)
   const stopOpening = useRef<(() => void) | null>(null)
@@ -71,7 +72,8 @@ export function MobileMenu({
   const wheelInput = useRef({ delta: 0, time: 0 })
   const [gathering, setGathering] = useState(false)
   const [phase, setPhase] = useState<Phase>('menu')
-  const [entrance, setEntrance] = useState<'numbers' | 'labels' | 'socials'>('numbers')
+  const [entrance, setEntrance] = useState<'waiting' | 'numbers' | 'labels' | 'socials'>('waiting')
+  const labelsReady = entrance === 'labels' || entrance === 'socials'
   const [socialsRaised, setSocialsRaised] = useState(false)
   const [selection, setSelection] = useState<{
     index: number
@@ -135,16 +137,26 @@ export function MobileMenu({
     const panel = menuPanel.current
     if (!panel) return
     const { x, y } = entryOrigin.current
+    const firstNumber = panel.querySelector('.mobile-menu-links .mobile-menu-number')
+    const numberBounds = firstNumber?.getBoundingClientRect()
+    const panelBounds = panel.getBoundingClientRect()
     entryGeometry.current = {
       reach: Math.hypot(Math.max(x, panel.clientWidth - x), Math.max(y, panel.clientHeight - y)),
+      firstNumberReach: numberBounds
+        ? Math.hypot(x - (numberBounds.right - panelBounds.left), y - (numberBounds.top - panelBounds.top))
+        : Infinity,
     }
   }, [])
 
   const renderEntry = useCallback((progress: number) => {
     const { x, y, radius } = entryOrigin.current
-    const { reach } = entryGeometry.current
+    const { reach, firstNumberReach } = entryGeometry.current
     const aperture = getPeriodOpening(progress, radius, reach)
     panelClip.set(`circle(${aperture.innerRadius}px at ${x}px ${y}px)`)
+    if (!numbersStarted.current && aperture.innerRadius >= firstNumberReach) {
+      numbersStarted.current = true
+      setEntrance('numbers')
+    }
     if (entryRing.current) {
       entryRing.current.style.visibility = 'visible'
       entryRing.current.setAttribute('cx', String(x))
@@ -172,6 +184,7 @@ export function MobileMenu({
         onComplete: () => {
           panelClip.set('none')
           if (entryRing.current) entryRing.current.style.visibility = 'hidden'
+          setEntrance((stage) => stage === 'waiting' ? 'numbers' : stage)
           setPhase('menu')
         },
       })
@@ -312,7 +325,8 @@ export function MobileMenu({
               setHighlighted(active)
               drag.current = null
               setPhase(reduceMotion ? 'menu' : 'opening')
-              setEntrance(reduceMotion ? 'socials' : 'numbers')
+              numbersStarted.current = false
+              setEntrance(reduceMotion ? 'socials' : 'waiting')
               setSocialsRaised(false)
               setSelection(null)
               setOpen(true)
@@ -445,7 +459,7 @@ export function MobileMenu({
                   onPointerCancel={() => { drag.current = null }}
                 >
                   {scenes.map((scene, index) => (
-                    <motion.a
+                    <a
                       key={scene.id}
                       href={`#${scene.id}`}
                       aria-label={`${scene.label}.`}
@@ -456,14 +470,6 @@ export function MobileMenu({
                       }}
                       onFocus={() => setHighlighted(index)}
                       onClick={(event) => choose(event, index)}
-                      initial={false}
-                      animate={{
-                        opacity: !selection || selection.index === index ? 1 : 0,
-                        color: 'var(--ink)',
-                      }}
-                      transition={{
-                        duration: reduceMotion ? 0 : 0.2,
-                      }}
                     >
                       <span className="mobile-menu-number" aria-hidden="true">
                         {[false, true].map((contrast) => (
@@ -471,7 +477,7 @@ export function MobileMenu({
                             key={String(contrast)}
                             className={contrast ? 'mobile-menu-number-contrast' : undefined}
                             initial={reduceMotion ? false : menuPopStart}
-                            animate={phase === 'opening' && !reduceMotion ? menuPopStart : menuPopEnd}
+                            animate={entrance === 'waiting' ? menuPopStart : menuPopEnd}
                             transition={reduceMotion ? { duration: 0 } : { ...menuPop, delay: index * 0.07 }}
                             onAnimationComplete={(definition) => {
                               if (contrast && index === scenes.length - 1 &&
@@ -487,7 +493,7 @@ export function MobileMenu({
                       <motion.span
                         className="mobile-menu-label"
                         initial={reduceMotion ? false : linkPopStart}
-                        animate={entrance === 'numbers' ? linkPopStart : linkPopEnd}
+                        animate={labelsReady ? linkPopEnd : linkPopStart}
                         transition={linkPopTransition(index, reduceMotion)}
                         onAnimationComplete={(definition) => {
                           if (index === scenes.length - 1 &&
@@ -527,17 +533,18 @@ export function MobileMenu({
                         className="mobile-menu-current"
                         aria-hidden="true"
                         initial={reduceMotion ? false : linkPopStart}
-                        animate={entrance === 'numbers' ? linkPopStart : linkPopEnd}
+                        animate={labelsReady ? linkPopEnd : linkPopStart}
                         transition={linkPopTransition(index, reduceMotion)}
                       >
                         {active === index ? <DotIcon /> : null}
                       </motion.span>
-                    </motion.a>
+                    </a>
                   ))}
                 </nav>
                 <ProfileLinks
                   placement="menu"
                   inactive={phase !== 'menu' || entrance !== 'socials'}
+                  raised={entrance === 'socials'}
                   onSlide={(offset) => socialOffset.set(offset)}
                   onRaised={() => setSocialsRaised(true)}
                 />

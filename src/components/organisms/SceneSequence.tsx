@@ -215,7 +215,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       if (touchInput && touch) touch.transitionDirection = direction
       transitionLatch = { direction, lastInput: now }
       track.current?.setAttribute('data-transitioning', direction > 0 ? 'forward' : 'backward')
-      const duration = range.end === skillStart ? 0.65 : 0.85
+      const duration = range.end === skillStart ? 0.72 : 0.94
       const control = animate(displayed, target, {
         duration: Math.max(0.24, duration * Math.abs(target - displayed) / (range.end - range.start)),
         ease: [0.22, 1, 0.36, 1],

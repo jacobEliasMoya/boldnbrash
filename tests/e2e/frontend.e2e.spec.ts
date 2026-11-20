@@ -518,7 +518,7 @@ test('mobile night mode shares the header and menu styling', async ({ page }) =>
   await page.getByRole('button', { name: 'Open menu' }).click()
   const hiddenTray = page.locator('.profile-links-menu')
   await expect.poll(async () => (await hiddenTray.boundingBox())?.y ?? 0).toBeGreaterThan(844)
-  const socials = page.getByRole('navigation', { name: 'Social profiles' })
+  const socials = page.getByRole('navigation', { name: 'Social and contact links' })
   const closeButton = page.getByRole('button', { name: 'Close menu' })
   const closeDots = closeButton.locator('.mobile-menu-close-dots i')
   await expect(closeDots).toHaveCount(5)
@@ -530,6 +530,12 @@ test('mobile night mode shares the header and menu styling', async ({ page }) =>
   await expect(socials.getByRole('link', { name: /GitHub/ })).toHaveCSS('color', 'rgb(255, 255, 255)')
   await expect(socials.getByRole('link', { name: /GitHub/ }).locator('svg')).toHaveCSS('width', '26px')
   await expect(socials.getByRole('link', { name: /LinkedIn/ })).toBeVisible()
+  await expect(socials.getByRole('link', { name: 'Email', exact: true })).toHaveAttribute(
+    'href', 'mailto:jemoya1994@gmail.com',
+  )
+  await expect(socials.getByRole('link', { name: 'Call', exact: true })).toHaveAttribute(
+    'href', 'tel:+19096446073',
+  )
   const panelBounds = (await page.locator('.mobile-menu-panel').boundingBox())!
   const socialBounds = (await socials.boundingBox())!
   expect(panelBounds.y + panelBounds.height - socialBounds.y - socialBounds.height).toBeCloseTo(12, 0)
@@ -544,6 +550,11 @@ test('mobile night mode shares the header and menu styling', async ({ page }) =>
   await expect(footerLiquid).toHaveCSS('fill', 'rgb(255, 255, 255)')
   await expect(socials.getByRole('link', { name: /GitHub/ })).toHaveCSS('color', 'rgb(16, 16, 20)')
   await closeButton.click()
+  const closingMenu = page.locator('.mobile-menu-dialog[data-transitioning]')
+  await expect(closingMenu.locator('.profile-links-menu')).toHaveCSS('transform', 'none')
+  for (const link of await closingMenu.locator('.mobile-menu-links > a').all()) {
+    await expect(link).toHaveCSS('opacity', '1')
+  }
   await expect(page.getByRole('dialog', { name: 'Mobile navigation' })).not.toBeVisible()
 })
 
