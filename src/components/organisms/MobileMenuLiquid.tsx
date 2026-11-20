@@ -8,17 +8,19 @@ type NumberBox = { left: number; top: number; width: number; height: number; ele
 const liquidFalloff = (distance: number, radius: number, power = 2) =>
   Math.exp(-((Math.abs(distance) / radius) ** power))
 
-export function MobileMenuLiquid({ panel, index, reduced, onCovered, socialOffset }: {
+export function MobileMenuLiquid({ panel, index, reduced, onCovered, socialOffset, selectionReady }: {
   panel: RefObject<HTMLDivElement | null>
   index: number
   reduced: boolean
   onCovered: (index: number | null) => void
   socialOffset: MotionValue<number>
+  selectionReady: boolean
 }) {
   const geometry = useRef({ height: 0, depth: 64, radius: 36, numbers: [] as NumberBox[] })
   const target = useMotionValue(0)
   const position = useSpring(target, { stiffness: 190, damping: 24, mass: 0.9 })
   const trailing = useSpring(target, { stiffness: 115, damping: 22, mass: 1.1 })
+  const selectionDepth = useSpring(0, { stiffness: 230, damping: 30, mass: 0.9 })
   const path = useMotionValue('')
   const socialPath = useMotionValue('')
   const footer = useRef({ width: 0, bottom: 0, center: 0, radius: 1, depth: 0 })
@@ -29,7 +31,8 @@ export function MobileMenuLiquid({ panel, index, reduced, onCovered, socialOffse
     const { height, depth, radius, numbers } = geometry.current
     const tail = trailing.get()
     const stretch = Math.min(Math.abs(center - tail) * 0.25, 12)
-    const edgeAt = (y: number) => depth * (
+    const reach = reduced ? 1 : Math.min(1, Math.max(0, selectionDepth.get()))
+    const edgeAt = (y: number) => depth * reach * (
       0.78 * liquidFalloff(y - center, radius + stretch) +
       0.22 * liquidFalloff(y - tail, radius * 1.15)
     )
@@ -38,7 +41,7 @@ export function MobileMenuLiquid({ panel, index, reduced, onCovered, socialOffse
       return `${edgeAt(y)},${y}`
     })
     path.set(`M0,0 L${points.join(' L')} L0,${height} Z`)
-    const motionAmount = reduced ? 0 : Math.min(Math.abs(center - tail) / 18, 1)
+    const motionAmount = reduced ? 0 : reach * Math.min(Math.abs(center - tail) / 18, 1)
     const displaced = numbers.map((number) => {
       const distance = center - (number.top + number.height / 2)
       const influence = Math.exp(-((distance / (radius * 1.8)) ** 2))
@@ -61,10 +64,14 @@ export function MobileMenuLiquid({ panel, index, reduced, onCovered, socialOffse
       covered.current = index
       onCovered(index)
     }
-  }, [path, trailing, index, onCovered, reduced])
+  }, [path, trailing, selectionDepth, index, onCovered, reduced])
 
   useMotionValueEvent(position, 'change', draw)
   useMotionValueEvent(trailing, 'change', () => draw(position.get()))
+  useMotionValueEvent(selectionDepth, 'change', () => draw(position.get()))
+  useEffect(() => {
+    if (selectionReady) selectionDepth.set(1)
+  }, [selectionReady, selectionDepth])
   const drawFooter = useCallback((offset: number) => {
     const { width, bottom, center, radius, depth } = footer.current
     const points = Array.from({ length: Math.ceil(width / 2) + 1 }, (_, index) => {

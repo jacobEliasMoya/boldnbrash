@@ -398,23 +398,15 @@ ul {
   margin-inline: -0.045em;
 }
 .portfolio[data-enhanced] .hero-letter,
-.portfolio[data-enhanced] .hero-copy-fill,
 .mobile-menu-label-fill {
   color: transparent;
   background: linear-gradient(
     90deg,
-    var(--text-fill-color, var(--blue)) 0 var(--letter-fill, 0%),
-    var(--text-base-color, var(--ink)) var(--letter-fill, 0%) 100%
+    var(--blue) 0 var(--letter-fill, 0%),
+    var(--ink) var(--letter-fill, 0%) 100%
   );
   background-clip: text;
   -webkit-background-clip: text;
-}
-.hero-copy-fill {
-  --letter-fill: var(--hero-copy-fill, 0%);
-}
-.name-pill > .hero-copy-fill {
-  --text-base-color: #211d29;
-  --text-fill-color: #361292;
 }
 .hero-period {
   position: relative;
@@ -2152,6 +2144,10 @@ ul {
   pointer-events: none;
 }
 .mobile-menu-close {
+  position: absolute;
+  top: 50%;
+  right: -2px;
+  translate: 0 -50%;
   touch-action: manipulation;
   display: grid;
   place-items: center;
@@ -2195,9 +2191,9 @@ ul {
 .mobile-menu-links a {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 18px;
   width: 100%;
-  font: 900 clamp(28px, 10.5cqw, 68px)/1.08 var(--display);
+  font: 900 clamp(32px, 12.5cqw, 76px)/1.08 var(--display);
   letter-spacing: -0.04em;
   transform-origin: center;
 }
@@ -2233,6 +2229,9 @@ ul {
   font: 800 24px/1.2 'JetBrains Mono', monospace;
   color: var(--ink);
   letter-spacing: 0;
+}
+.mobile-menu-links .mobile-menu-number {
+  font-size: 26px;
 }
 .mobile-menu-number-contrast {
   position: absolute;
@@ -2328,7 +2327,7 @@ ul {
     gap: 10px;
   }
   .mobile-menu-links a {
-    font-size: clamp(25px, 7svh, 40px);
+    font-size: clamp(28px, min(8svh, 12.5cqw), 46px);
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -3386,7 +3385,7 @@ ul {
   background: var(--canvas);
 }
 
-/* Amber connects small details across the purple and neutral scenes. */
+/* Accent details across the purple and neutral scenes. */
 ::selection {
   background: var(--accent);
   color: #211d29;
@@ -3684,7 +3683,7 @@ ul {
 }
 .mobile-menu-heading {
   position: absolute;
-  z-index: 3;
+  z-index: 5;
   top: calc(max(18px, env(safe-area-inset-top)) + 6px);
   left: var(--gutter);
   right: var(--gutter);
@@ -3895,7 +3894,7 @@ ul {
 .project-detail-status {
   padding: 5px 9px;
   border-radius: 999px;
-  background: #ffc857;
+  background: var(--accent);
   color: #080809;
 }
 .project-detail-content h2 {
@@ -3935,7 +3934,7 @@ ul {
   color: #efebe1;
 }
 .project-detail-source span {
-  color: #ffc857;
+  color: var(--accent);
   font-size: 22px;
 }
 .project-detail-back {

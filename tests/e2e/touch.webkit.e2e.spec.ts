@@ -90,13 +90,14 @@ test('walking follows short swipes at different speeds without a playback queue'
         await new Promise((resolve) => setTimeout(resolve, interval))
       }
       send('touchend', 250)
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
       const released = read()
       await new Promise((resolve) => setTimeout(resolve, 600))
       return { released, settled: read() }
     }, { steps, interval })
     // The same thumb travel must not be dropped when events arrive in larger chunks.
-    expect(result.released.target).toBeGreaterThan(0.47)
-    expect(result.released.target).toBeLessThan(0.52)
+    expect(result.released.target).toBeGreaterThan(0.39)
+    expect(result.released.target).toBeLessThan(0.43)
     expect(result.released.visible).toBeGreaterThan(steps === 2 ? 0.08 : 0.12)
     expect(Math.abs(result.settled.visible - result.settled.target)).toBeLessThan(0.005)
   }
@@ -154,7 +155,7 @@ test('skills introduction fill responds to mobile wheel input and vertical swipe
     getComputedStyle(line).getPropertyValue('--title-fill')))).toBeLessThan(100)
 })
 
-test('a short thumb swipe advances a project and reverses across category gaps', async ({ page }) => {
+test('long and short swipes advance one project and reverse across category gaps', async ({ page }) => {
   test.setTimeout(60000)
   const boundary = projectStops.findIndex((stop, index) => index > 0 && stop.skillIndex !== projectStops[index - 1].skillIndex) - 1
   for (const index of [0, boundary]) {
@@ -165,7 +166,7 @@ test('a short thumb swipe advances a project and reverses across category gaps',
     const progress = () => page.locator('.scene-track').getAttribute('data-playback-progress').then(Number)
     const initial = skillStart + stop.position
     await expect.poll(async () => Math.abs(await progress() - initial)).toBeLessThan(0.01)
-    await swipe(page, '.skills-browser', 600, 480)
+    await swipe(page, '.skills-browser', 600, index === 0 ? 170 : 480)
     await expect.poll(async () => Math.abs(await progress() - (skillStart + projectStops[index + 1].position)), { timeout: 5000 }).toBeLessThan(0.01)
     await swipe(page, '.skills-browser', 480, 600)
     await expect.poll(async () => Math.abs(await progress() - initial), { timeout: 5000 }).toBeLessThan(0.01)

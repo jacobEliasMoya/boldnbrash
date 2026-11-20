@@ -16,7 +16,22 @@ type Scene = { id: string; label: string }
 type Phase = 'opening' | 'menu' | 'expanding'
 const mergedDotRadius = 3.5 * Math.sqrt(3)
 const mergeDuration = 0.26
-const openingDuration = 0.72
+const openingDuration = 0.65
+const menuPopStart = { opacity: 0, scale: 0.84 }
+const menuPopEnd = { opacity: 1, scale: 1 }
+const menuPop = { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const }
+const linkPopStart = { opacity: 0, scale: 0.78, y: 8 }
+const linkPopEnd = { opacity: 1, scale: 1, y: 0 }
+const linkPopDuration = 0.23
+
+function linkPopTransition(index: number, reduced: boolean | null) {
+  if (reduced) return { duration: 0 }
+  const delay = index * linkPopDuration
+  return {
+    default: { type: 'spring' as const, duration: linkPopDuration, bounce: 0.35, delay },
+    opacity: { duration: 0.12, delay },
+  }
+}
 
 export function MobileMenu({
   scenes,
@@ -55,8 +70,9 @@ export function MobileMenu({
   const drag = useRef<{ y: number; index: number; moved: boolean } | null>(null)
   const wheelInput = useRef({ delta: 0, time: 0 })
   const [gathering, setGathering] = useState(false)
-  const [closePosition, setClosePosition] = useState({ left: 0, top: 0 })
   const [phase, setPhase] = useState<Phase>('menu')
+  const [entrance, setEntrance] = useState<'numbers' | 'labels' | 'socials'>('numbers')
+  const [socialsRaised, setSocialsRaised] = useState(false)
   const [selection, setSelection] = useState<{
     index: number
     x: number
@@ -239,7 +255,7 @@ export function MobileMenu({
     const reach = Math.hypot(Math.max(x, panel.clientWidth - x), Math.max(y, panel.clientHeight - y))
     const dotRadius = (bounds.width * panel.clientWidth) / panelBounds.width / 2
     const control = animate(0, 1, {
-      duration: 0.65,
+      duration: 0.59,
       ease: 'linear',
       onUpdate: (progress) => {
         const aperture = getPeriodOpening(progress, dotRadius, reach)
@@ -288,7 +304,6 @@ export function MobileMenu({
             const bounds = event.currentTarget.getBoundingClientRect()
             const origin = { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2, radius: mergedDotRadius }
             entryOrigin.current = origin
-            setClosePosition({ left: origin.x - 24, top: origin.y - 24 })
             const openMenu = () => {
               const { x, y } = entryOrigin.current
               socialOffset.jump(reduceMotion ? 0 : 58)
@@ -297,6 +312,8 @@ export function MobileMenu({
               setHighlighted(active)
               drag.current = null
               setPhase(reduceMotion ? 'menu' : 'opening')
+              setEntrance(reduceMotion ? 'socials' : 'numbers')
+              setSocialsRaised(false)
               setSelection(null)
               setOpen(true)
               onOpenChange(true)
@@ -354,7 +371,14 @@ export function MobileMenu({
                 initial={false}
                 style={{ clipPath: panelClip }}
               >
-                <MobileMenuLiquid panel={menuPanel} index={highlighted} reduced={!!reduceMotion} onCovered={handleCovered} socialOffset={socialOffset} />
+                <MobileMenuLiquid
+                  panel={menuPanel}
+                  index={highlighted}
+                  reduced={!!reduceMotion}
+                  onCovered={handleCovered}
+                  socialOffset={socialOffset}
+                  selectionReady={!!reduceMotion || socialsRaised}
+                />
                 <div className="mobile-menu-heading">
                   <a
                     className="wordmark"
@@ -372,7 +396,6 @@ export function MobileMenu({
                     ref={closeToggle}
                     type="button"
                     className="mobile-menu-close"
-                    style={{ position: 'fixed', left: closePosition.left, top: closePosition.top }}
                     aria-label="Close menu"
                     autoFocus
                     onClick={closeMenu}
@@ -389,7 +412,7 @@ export function MobileMenu({
                 <nav
                   className="mobile-menu-links"
                   aria-label="Mobile portfolio"
-                  inert={phase !== 'menu'}
+                  inert={phase !== 'menu' || entrance !== 'socials'}
                   onWheel={(event) => {
                     if (phase !== 'menu') return
                     event.stopPropagation()
@@ -443,15 +466,41 @@ export function MobileMenu({
                       }}
                     >
                       <span className="mobile-menu-number" aria-hidden="true">
-                        <span>0{index + 1}</span>
-                        <span className="mobile-menu-number-contrast">0{index + 1}</span>
+                        {[false, true].map((contrast) => (
+                          <motion.span
+                            key={String(contrast)}
+                            className={contrast ? 'mobile-menu-number-contrast' : undefined}
+                            initial={reduceMotion ? false : menuPopStart}
+                            animate={phase === 'opening' && !reduceMotion ? menuPopStart : menuPopEnd}
+                            transition={reduceMotion ? { duration: 0 } : { ...menuPop, delay: index * 0.07 }}
+                            onAnimationComplete={(definition) => {
+                              if (contrast && index === scenes.length - 1 &&
+                                typeof definition === 'object' && 'opacity' in definition && definition.opacity === 1) {
+                                setEntrance((stage) => stage === 'numbers' ? 'labels' : stage)
+                              }
+                            }}
+                          >
+                            0{index + 1}
+                          </motion.span>
+                        ))}
                       </span>
-                      <span className="mobile-menu-label">
+                      <motion.span
+                        className="mobile-menu-label"
+                        initial={reduceMotion ? false : linkPopStart}
+                        animate={entrance === 'numbers' ? linkPopStart : linkPopEnd}
+                        transition={linkPopTransition(index, reduceMotion)}
+                        onAnimationComplete={(definition) => {
+                          if (index === scenes.length - 1 &&
+                            typeof definition === 'object' && 'opacity' in definition && definition.opacity === 1) {
+                            setEntrance((stage) => stage === 'labels' ? 'socials' : stage)
+                          }
+                        }}
+                      >
                         <motion.span
                           className="mobile-menu-label-fill"
                           initial={false}
                           animate={{ '--letter-fill': highlighted === index && covered === index ? '100%' : '0%' }}
-                          transition={{ duration: reduceMotion ? 0 : 0.36, ease: [0.22, 1, 0.36, 1] }}
+                          transition={{ duration: reduceMotion ? 0 : 0.33, ease: [0.22, 1, 0.36, 1] }}
                           onAnimationStart={() => {
                             if (filled.current === index) filled.current = null
                           }}
@@ -473,14 +522,25 @@ export function MobileMenu({
                           aria-hidden="true"
                           style={{ backgroundColor: 'var(--ink)' }}
                         />
-                      </span>
-                      <span className="mobile-menu-current" aria-hidden="true">
+                      </motion.span>
+                      <motion.span
+                        className="mobile-menu-current"
+                        aria-hidden="true"
+                        initial={reduceMotion ? false : linkPopStart}
+                        animate={entrance === 'numbers' ? linkPopStart : linkPopEnd}
+                        transition={linkPopTransition(index, reduceMotion)}
+                      >
                         {active === index ? <DotIcon /> : null}
-                      </span>
+                      </motion.span>
                     </motion.a>
                   ))}
                 </nav>
-                <ProfileLinks placement="menu" inactive={phase !== 'menu'} onSlide={(offset) => socialOffset.set(offset)} />
+                <ProfileLinks
+                  placement="menu"
+                  inactive={phase !== 'menu' || entrance !== 'socials'}
+                  onSlide={(offset) => socialOffset.set(offset)}
+                  onRaised={() => setSocialsRaised(true)}
+                />
                 {selection && (
                   <svg className="mobile-menu-reveal" data-destination={scenes[selection.index].id} aria-hidden="true" focusable="false">
                     <circle ref={openingRing} cx={selection.x} cy={selection.y} />

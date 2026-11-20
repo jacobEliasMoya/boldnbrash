@@ -7,10 +7,11 @@ const socials = [
   { label: 'LinkedIn', href: 'https://www.linkedin.com/in/jacob-moya-317998174' },
 ]
 
-export function ProfileLinks({ placement, inactive = false, onSlide }: {
+export function ProfileLinks({ placement, inactive = false, onSlide, onRaised }: {
   placement: 'about' | 'menu'
   inactive?: boolean
   onSlide?: (offset: number) => void
+  onRaised?: () => void
 }) {
   const reduced = useReducedMotion()
   const menu = placement === 'menu'
@@ -24,7 +25,10 @@ export function ProfileLinks({ placement, inactive = false, onSlide }: {
       onUpdate={({ y }) => {
         if (typeof y === 'number') onSlide?.(y)
       }}
-      transition={reduced ? { duration: 0 } : { duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+      onAnimationComplete={(definition) => {
+        if (typeof definition === 'object' && 'y' in definition && definition.y === 0) onRaised?.()
+      }}
+      transition={reduced ? { duration: 0 } : { duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
     >
       {socials.map((link) => (
           <motion.a

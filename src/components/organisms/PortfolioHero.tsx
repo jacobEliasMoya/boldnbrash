@@ -81,8 +81,7 @@ export function PortfolioHero() {
           animate={introReady ? entered : entrance}
           transition={entranceTransition(0.82, reduceMotion)}
         >
-          <span className="hero-copy-fill">Hi, I’m</span>
-          <span className="name-pill"><span className="hero-copy-fill">Jake</span></span>
+          Hi, I’m <span className="name-pill">Jake</span>
         </motion.p>
         <h1 aria-label="Build. Break. Repeat.">
           <AnimatedWord
@@ -140,9 +139,7 @@ export function PortfolioHero() {
           animate={introReady ? entered : entrance}
           transition={entranceTransition(2.18, reduceMotion)}
         >
-          <span className="hero-copy-fill">
-            I build for the web. Half the fun is finding out why it broke.
-          </span>
+          I build for the web. Half the fun is finding out why it broke.
         </motion.p>
         <span className="sr-only">Jacob Moya’s creative development portfolio</span>
       </div>

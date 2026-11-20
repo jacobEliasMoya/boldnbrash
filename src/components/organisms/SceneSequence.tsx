@@ -24,7 +24,7 @@ import { useIntroReady } from '@/hooks/useIntroReady'
 
 const scenes = [
   { id: 'top', label: 'Home' },
-  { id: 'skills', label: 'Skills & Work' },
+  { id: 'skills', label: 'Work' },
   { id: 'about', label: 'About' },
   { id: 'contact', label: 'Contact' },
 ]
@@ -175,9 +175,10 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       track.current?.removeAttribute('data-transitioning')
     }
 
-    function triggerSceneTransition(pixels: number, proposed: number, start: number, distance: number) {
+    function triggerSceneTransition(pixels: number, proposed: number, start: number, distance: number, touchInput: boolean) {
       const direction = Math.sign(pixels)
       const now = performance.now()
+      if (touchInput && touch?.transitionDirection === direction && !sceneTransition) return true
       if (!sceneTransition && transitionLatch) {
         const gap = now - transitionLatch.lastInput
         const freshWheelTick = Math.abs(pixels) >= 100 && gap >= 60
@@ -211,6 +212,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       const target = direction > 0 ? range.end : range.start
       const transition = { range, direction, stop: undefined as (() => void) | undefined }
       sceneTransition = transition
+      if (touchInput && touch) touch.transitionDirection = direction
       transitionLatch = { direction, lastInput: now }
       track.current?.setAttribute('data-transitioning', direction > 0 ? 'forward' : 'backward')
       const duration = range.end === skillStart ? 0.65 : 0.85
@@ -326,25 +328,35 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       // Forward the same travel to the document after nested scroll areas have
       // had a chance to handle it; keep the skills timeline free of a queue.
       if (current === 1) {
-        let travel = touchInput ? pixels * 1.6 : pixels
-        if (touchInput && displayed >= skillStart && displayed <= skillStart + skillTravel && touch) {
-          if (touch.skillsGain === null) {
+        let travel = touchInput ? pixels * 1.25 : pixels
+        if (touchInput && touch && displayed >= skillStart && displayed <= skillStart + skillTravel) {
+          if (touch.projectSwipe?.direction !== direction) {
             const position = requested - skillStart
             const next = direction > 0
               ? projectStops.findIndex((stop) => stop.position > position + 0.01)
               : projectStops.reduce((last, stop, index) => stop.position < position - 0.01 ? index : last, -1)
-            const interval = Math.max(1, Math.min(projectStops.length - 1,
-              direction > 0 ? (next < 0 ? projectStops.length - 1 : next) : next + 1))
-            const gap = projectStops[interval].position - projectStops[interval - 1].position
-            // A short thumb swipe travels one project interval, even across categories.
-            // Small adjustments stay proportional and release still snaps smoothly.
-            const swipeTravel = Math.max(120, Math.min(160, innerHeight * 0.2))
-            touch.skillsGain = Math.max(1, (gap * distance) / sceneDuration / swipeTravel)
+            const destination = projectStops[next]
+            if (destination) {
+              const interval = Math.max(1, Math.min(projectStops.length - 1, direction > 0 ? next : next + 1))
+              const gap = projectStops[interval].position - projectStops[interval - 1].position
+              const swipeTravel = Math.max(120, Math.min(160, innerHeight * 0.2))
+              touch.projectSwipe = {
+                direction,
+                gain: (gap * distance) / sceneDuration / swipeTravel,
+                limit: start + (skillStart + destination.position) * distance / sceneDuration,
+              }
+            } else {
+              touch.projectSwipe = null
+            }
           }
-          travel = pixels * touch.skillsGain
+          if (touch.projectSwipe) {
+            const remaining = Math.max(0, direction * (touch.projectSwipe.limit - scrollY))
+            travel = direction * Math.min(Math.abs(pixels) * touch.projectSwipe.gain, remaining)
+            if (!travel) return true
+          }
         }
         const proposed = ((window.scrollY + travel - start) / distance) * sceneDuration
-        if (triggerSceneTransition(pixels, proposed, start, distance)) return true
+        if (triggerSceneTransition(pixels, proposed, start, distance, touchInput)) return true
         window.scrollTo({ top: window.scrollY + travel, behavior: 'instant' })
         update()
         if (touchInput) gestureTargetClock = toPlaybackTime(requested)
@@ -364,7 +376,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           ? currentClock
           : touchInput ? gestureTargetClock : toPlaybackTime(nativeProgress)
       inputDirection = direction
-      const inputGain = touchInput ? (current === 0 ? 0.006 : 0.004) : 0.0015
+      const inputGain = touchInput ? (current === 0 ? 0.005 : 0.003) : 0.0015
       const desired = base + direction * (touchInput ? Math.abs(pixels) : Math.min(Math.abs(pixels), 120)) * inputGain
       const bounded = Math.max(
         0,
@@ -373,7 +385,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           desired,
         ),
       )
-      if (triggerSceneTransition(pixels, fromPlaybackTime(bounded), start, distance)) return true
+      if (triggerSceneTransition(pixels, fromPlaybackTime(bounded), start, distance, touchInput)) return true
       // Accumulate fractional gesture travel before the browser rounds scrollY.
       if (touchInput) gestureTargetClock = bounded
       window.scrollTo({
@@ -404,7 +416,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       lastY: number
       axis: 'vertical' | 'horizontal' | null
       target: Element | null
-      skillsGain: number | null
+      projectSwipe: { direction: number; gain: number; limit: number } | null
+      transitionDirection: number
     } | null = null
     function startTouch(event: TouchEvent) {
       cancelSnap()
@@ -414,13 +427,15 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       }
       const point = event.touches[0]
       gestureTargetClock = toPlaybackTime(requested)
+      transitionLatch = null
       touch = {
         x: point.clientX,
         y: point.clientY,
         lastY: point.clientY,
         axis: null,
         target: event.target instanceof Element ? event.target : null,
-        skillsGain: null,
+        projectSwipe: null,
+        transitionDirection: 0,
       }
     }
     function moveTouch(event: TouchEvent) {
@@ -531,10 +546,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         0,
         Math.min(1, (progress - heroAnimationTravel) / (heroFillEnd - heroAnimationTravel)),
       )
-      if (panels.current[0]) {
-        panels.current[0].dataset.particleGather = String(heroFill)
-        panels.current[0].style.setProperty('--hero-copy-fill', `${heroFill * 100}%`)
-      }
+      if (panels.current[0]) panels.current[0].dataset.particleGather = String(heroFill)
       panels.current[0]?.querySelectorAll<HTMLElement>('.hero-letter').forEach((letter) => {
         const index = Number(letter.dataset.fillIndex ?? 0)
         const letterFill = Math.max(0, Math.min(1, heroFill * 19 - index))

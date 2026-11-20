@@ -213,10 +213,9 @@ export function SkillsScene() {
   const period = useRef<HTMLSpanElement>(null)
   const [portal, setPortal] = useState({ x: 0, y: 0, radius: 0, dot: 0, borderWidth: 12 })
   const revealStart = skillTitleFillPortion
-  const fillDuration = revealStart * 0.7
-  const fillStart = [0, revealStart - fillDuration]
+  const fillDuration = revealStart / 2
   const expansion = animated ? clamp((selection.intro - revealStart) / (1 - revealStart)) : 1
-  const titleFill = (line: number) => animated ? clamp((selection.intro - fillStart[line]) / fillDuration) * 100 : 0
+  const titleFill = (line: number) => animated ? clamp(selection.intro / fillDuration - line) * 100 : 0
   const openingRadius = expansion > 0
     ? getPeriodOpening(expansion, portal.dot, portal.radius).innerRadius
     : 0

@@ -165,16 +165,12 @@ test('scroll plays the original entrance and wave then mirrors the walk out', as
   const secondLine = page.locator('.hero-letter').nth(6)
   await expect(secondLine).toHaveCSS('--letter-fill', '100%')
   await expect(page.locator('.hero-letter').last()).toHaveCSS('--letter-fill', '0%')
-  const supportingCopy = () => page.locator('.hero-copy-fill').evaluateAll((elements) =>
-    elements.map((element) => parseFloat(getComputedStyle(element).getPropertyValue('--letter-fill'))),
-  )
-  await expect.poll(supportingCopy).toEqual(
-    Array.from({ length: 3 }, () => expect.closeTo(43, -1)),
-  )
+  for (const selector of ['.hero-greeting', '.hero-greeting .name-pill', '.hero-description']) {
+    await expect(page.locator(selector)).toHaveCSS('background-image', 'none')
+  }
   await scrollTimeline(page, 0.7)
   await expect(secondLine).toHaveCSS('--letter-fill', '0%')
   await scrollTimeline(page, 0.4)
-  await expect.poll(supportingCopy).toEqual([0, 0, 0])
   await expect(mark).toHaveAttribute('data-mode', 'idle')
   await expect(avatar).toHaveAttribute('data-direction', 'in')
   await expect(avatar).toHaveCSS('opacity', '1')
@@ -219,7 +215,7 @@ test('header controls stay readable over a solid liquid boundary', async ({ page
     await expect(page.locator('.liquid-boundary')).toHaveCSS('mix-blend-mode', 'normal')
   }
   await expect(page.locator('.liquid-boundary path')).toHaveCount(1)
-  await page.getByRole('link', { name: 'Skills & Work', exact: true }).click()
+  await page.getByRole('link', { name: 'Work', exact: true }).click()
   await expect(page.locator('.liquid-blended-nav')).toHaveAttribute('data-tone', 'paper')
   await expect(page.locator('.liquid-blended-nav')).toHaveCSS('color', 'rgb(8, 8, 9)')
   await expect(page.locator('.liquid-blended-nav')).toHaveCSS('mix-blend-mode', 'normal')
@@ -521,8 +517,12 @@ test('mobile night mode shares the header and menu styling', async ({ page }) =>
   await expect(headerToggle.locator(track)).toHaveCSS('background-color', 'rgb(33, 29, 41)')
   await page.getByRole('button', { name: 'Open menu' }).click()
   const socials = page.getByRole('navigation', { name: 'Social profiles' })
+  const closeButton = page.getByRole('button', { name: 'Close menu' })
+  const closeDots = closeButton.locator('.mobile-menu-close-dots i')
+  await expect(closeDots).toHaveCount(5)
   const footerLiquid = page.locator('.mobile-menu-liquid-footer')
   await expect(socials).toHaveCSS('transform', 'none')
+  await expect(closeDots.nth(2)).toHaveCSS('background-color', 'rgb(8, 8, 9)')
   await expect(footerLiquid).toHaveAttribute('d', /^M.+Z$/)
   await expect(footerLiquid).toHaveCSS('fill', 'rgb(0, 0, 0)')
   await expect(socials.getByRole('link', { name: /GitHub/ })).toHaveCSS('color', 'rgb(255, 255, 255)')
@@ -534,11 +534,15 @@ test('mobile night mode shares the header and menu styling', async ({ page }) =>
   const menuToggle = page.locator('.mobile-menu-heading .theme-toggle')
   await expect(menuToggle.locator(track)).toHaveCSS('background-color', 'rgb(33, 29, 41)')
   await expect(menuToggle.locator('.theme-toggle-thumb')).toHaveCSS('width', '24px')
+  await expect(menuToggle.locator('.theme-toggle-thumb')).toHaveCSS('background-color', 'rgb(255, 200, 87)')
   await menuToggle.click()
   await expect(menuToggle).toHaveAttribute('aria-pressed', 'true')
+  await expect(closeDots.nth(2)).toHaveCSS('background-color', 'rgb(239, 235, 225)')
   await expect(page.locator('.mobile-menu-liquid')).toHaveCSS('fill', 'rgb(255, 255, 255)')
   await expect(footerLiquid).toHaveCSS('fill', 'rgb(255, 255, 255)')
   await expect(socials.getByRole('link', { name: /GitHub/ })).toHaveCSS('color', 'rgb(16, 16, 20)')
+  await closeButton.click()
+  await expect(page.getByRole('dialog', { name: 'Mobile navigation' })).not.toBeVisible()
 })
 
 test('mobile menu opens from the toggle, traps navigation, and restores focus after dismissal', async ({
@@ -646,7 +650,7 @@ test('every mobile menu selection expands into its section and restores scrollin
   await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 10000 })
   await expect(page.locator('.portfolio')).toHaveAttribute('data-enhanced', '')
   for (const [label, id] of [
-    ['Skills & Work', 'skills'],
+    ['Work', 'skills'],
     ['About', 'about'],
     ['Contact', 'contact'],
     ['Home', 'top'],
@@ -796,13 +800,14 @@ test.describe('mobile wheel input', () => {
     await page.mouse.wheel(0, 120)
     await expect.poll(async () => parseFloat(await lines.first().evaluate((line) =>
       getComputedStyle(line).getPropertyValue('--title-fill')))).toBeGreaterThan(20)
+    await expect(lines.nth(1)).toHaveCSS('--title-fill', '0%')
     for (let i = 0; i < 3; i++) await page.mouse.wheel(0, 120)
     await expect(lines.first()).toHaveCSS('--title-fill', '100%')
     await expect.poll(async () => parseFloat(await lines.nth(1).evaluate((line) =>
-      getComputedStyle(line).getPropertyValue('--title-fill')))).toBeGreaterThan(50)
+      getComputedStyle(line).getPropertyValue('--title-fill')))).toBeGreaterThan(25)
     await page.mouse.wheel(0, -120)
     await expect.poll(async () => parseFloat(await lines.nth(1).evaluate((line) =>
-      getComputedStyle(line).getPropertyValue('--title-fill')))).toBeLessThan(55)
+      getComputedStyle(line).getPropertyValue('--title-fill')))).toBeLessThan(20)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   })
 })
