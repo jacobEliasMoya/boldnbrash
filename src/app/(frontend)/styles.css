@@ -2186,14 +2186,14 @@ ul {
   justify-content: center;
   flex: 1;
   min-height: 0;
-  gap: clamp(16px, 3svh, 32px);
+  gap: clamp(20px, 4svh, 40px);
 }
 .mobile-menu-links a {
   display: flex;
   align-items: center;
   gap: 18px;
   width: 100%;
-  font: 900 clamp(32px, 12.5cqw, 76px)/1.08 var(--display);
+  font: 900 clamp(35px, 14.25cqw, 84px)/1.08 var(--display);
   letter-spacing: -0.04em;
   transform-origin: center;
 }
@@ -2231,7 +2231,7 @@ ul {
   letter-spacing: 0;
 }
 .mobile-menu-links .mobile-menu-number {
-  font-size: 26px;
+  font-size: 28px;
 }
 .mobile-menu-number-contrast {
   position: absolute;
@@ -2324,10 +2324,10 @@ ul {
     --menu-bottom-padding: max(12px, env(safe-area-inset-bottom));
   }
   .mobile-menu-links {
-    gap: 10px;
+    gap: 12px;
   }
   .mobile-menu-links a {
-    font-size: clamp(28px, min(8svh, 12.5cqw), 46px);
+    font-size: clamp(30px, min(8.5svh, 14.25cqw), 49px);
   }
 }
 @media (prefers-reduced-motion: reduce) {

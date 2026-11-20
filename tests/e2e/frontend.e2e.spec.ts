@@ -701,6 +701,8 @@ test('mobile menu handles reduced motion, small screens, and switching to deskto
   await toggle.click()
   const menu = page.getByRole('dialog', { name: 'Mobile navigation' })
   for (const link of await menu.getByRole('link').all()) await expect(link).toBeInViewport()
+  const longestTitle = menu.getByRole('link', { name: 'Contact.', exact: true }).locator('.mobile-menu-label')
+  await expect(longestTitle).toBeInViewport({ ratio: 1 })
   await menu.getByRole('link', { name: 'Contact.', exact: true }).click()
   await expect(menu).not.toBeVisible()
   await expect(page).toHaveURL(/#contact$/)
