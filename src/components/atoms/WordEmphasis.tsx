@@ -3,6 +3,16 @@
 import { Fragment } from 'react'
 import { motion, useReducedMotion, type MotionStyle } from 'motion/react'
 
+export function getWordEmphasis(phase: number) {
+  const lift = phase > 0 && phase < 1 ? Math.sin(Math.PI * phase) : 0
+  return {
+    y: -3 * lift,
+    scale: 1 + 0.1 * lift,
+    rotate: 5 * lift * Math.sin(2 * Math.PI * phase),
+    '--word-emphasis': `${lift * 100}%`,
+  }
+}
+
 export function WordEmphasis({ text, progress, enabled = true }: {
   text: string
   progress: number
@@ -17,13 +27,7 @@ export function WordEmphasis({ text, progress, enabled = true }: {
   return tokens.map((token, index) => {
     if (!/\S/.test(token)) return <Fragment key={index}>{token}</Fragment>
     const phase = progress * wordCount - wordIndex++
-    const lift = phase > 0 && phase < 1 ? Math.sin(Math.PI * phase) : 0
-    const style: MotionStyle & { '--word-emphasis': string } = {
-      y: -3 * lift,
-      scale: 1 + 0.1 * lift,
-      rotate: 5 * lift * Math.sin(2 * Math.PI * phase),
-      '--word-emphasis': `${lift * 100}%`,
-    }
+    const style: MotionStyle & { '--word-emphasis': string } = getWordEmphasis(phase)
     return (
       <motion.span
         key={index}

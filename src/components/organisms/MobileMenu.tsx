@@ -1,6 +1,7 @@
 'use client'
 
 import { DotIcon } from '@/components/atoms/DotIcon'
+import { getWordEmphasis } from '@/components/atoms/WordEmphasis'
 import { mergeDots } from '@/components/atoms/dotMotion'
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react'
@@ -20,21 +21,24 @@ const openingDuration = 0.65
 const menuPopStart = { opacity: 0, scale: 0.84 }
 const menuPopEnd = { opacity: 1, scale: 1 }
 const menuPop = { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const }
+const numberStagger = 0.07
 const linkPopStart = { opacity: 0, scale: 0.78, y: 8 }
 const linkPopEnd = { opacity: 1, scale: 1, y: 0 }
 const linkPopDuration = 0.23
 const labelFill = { '--letter-fill': '100%' }
-const labelFillRest = { '--letter-fill': '0%', x: 0, y: 0, scale: 1 }
+const labelFillRest = { '--letter-fill': '0%', y: 0, scale: 1, rotate: 0 }
+const labelEmphasis = [0, 0.25, 0.5, 0.75, 1].map(getWordEmphasis)
 const labelFillMotion = {
   ...labelFill,
-  x: [0, -2, 0],
-  y: [0, -2, 0],
-  scale: [1, 1.045, 1],
+  y: labelEmphasis.map(({ y }) => y),
+  scale: labelEmphasis.map(({ scale }) => scale),
+  rotate: labelEmphasis.map(({ rotate }) => rotate),
 }
 
-function linkPopTransition(index: number, reduced: boolean | null) {
+function linkPopTransition(index: number, numberCount: number, reduced: boolean | null) {
   if (reduced) return { duration: 0 }
-  const delay = index * linkPopDuration
+  const numberSequenceDuration = menuPop.duration + Math.max(0, numberCount - 1) * numberStagger
+  const delay = numberSequenceDuration * 0.32 + index * linkPopDuration
   return {
     default: { type: 'spring' as const, duration: linkPopDuration, bounce: 0.35, delay },
     opacity: { duration: 0.12, delay },
@@ -80,8 +84,8 @@ export function MobileMenu({
   const wheelInput = useRef({ delta: 0, time: 0 })
   const [gathering, setGathering] = useState(false)
   const [phase, setPhase] = useState<Phase>('menu')
-  const [entrance, setEntrance] = useState<'waiting' | 'numbers' | 'labels' | 'socials'>('waiting')
-  const labelsReady = entrance === 'labels' || entrance === 'socials'
+  const [entrance, setEntrance] = useState<'waiting' | 'links' | 'socials'>('waiting')
+  const labelsReady = entrance !== 'waiting'
   const [socialsRaised, setSocialsRaised] = useState(false)
   const [selection, setSelection] = useState<{
     index: number
@@ -163,7 +167,7 @@ export function MobileMenu({
     panelClip.set(`circle(${aperture.innerRadius}px at ${x}px ${y}px)`)
     if (!numbersStarted.current && aperture.innerRadius >= firstNumberReach) {
       numbersStarted.current = true
-      setEntrance('numbers')
+      setEntrance('links')
     }
     if (entryRing.current) {
       entryRing.current.style.visibility = 'visible'
@@ -192,7 +196,7 @@ export function MobileMenu({
         onComplete: () => {
           panelClip.set('none')
           if (entryRing.current) entryRing.current.style.visibility = 'hidden'
-          setEntrance((stage) => stage === 'waiting' ? 'numbers' : stage)
+          setEntrance((stage) => stage === 'waiting' ? 'links' : stage)
           setPhase('menu')
         },
       })
@@ -486,13 +490,7 @@ export function MobileMenu({
                             className={contrast ? 'mobile-menu-number-contrast' : undefined}
                             initial={reduceMotion ? false : menuPopStart}
                             animate={entrance === 'waiting' ? menuPopStart : menuPopEnd}
-                            transition={reduceMotion ? { duration: 0 } : { ...menuPop, delay: index * 0.07 }}
-                            onAnimationComplete={(definition) => {
-                              if (contrast && index === scenes.length - 1 &&
-                                typeof definition === 'object' && 'opacity' in definition && definition.opacity === 1) {
-                                setEntrance((stage) => stage === 'numbers' ? 'labels' : stage)
-                              }
-                            }}
+                            transition={reduceMotion ? { duration: 0 } : { ...menuPop, delay: index * numberStagger }}
                           >
                             0{index + 1}
                           </motion.span>
@@ -502,11 +500,11 @@ export function MobileMenu({
                         className="mobile-menu-label"
                         initial={reduceMotion ? false : linkPopStart}
                         animate={labelsReady ? linkPopEnd : linkPopStart}
-                        transition={linkPopTransition(index, reduceMotion)}
+                        transition={linkPopTransition(index, scenes.length, reduceMotion)}
                         onAnimationComplete={(definition) => {
-                          if (index === scenes.length - 1 &&
+                          if (index === Math.max(0, scenes.length - 2) &&
                             typeof definition === 'object' && 'opacity' in definition && definition.opacity === 1) {
-                            setEntrance((stage) => stage === 'labels' ? 'socials' : stage)
+                            setEntrance((stage) => stage === 'links' ? 'socials' : stage)
                           }
                         }}
                       >
@@ -544,7 +542,7 @@ export function MobileMenu({
                         aria-hidden="true"
                         initial={reduceMotion ? false : linkPopStart}
                         animate={labelsReady ? linkPopEnd : linkPopStart}
-                        transition={linkPopTransition(index, reduceMotion)}
+                        transition={linkPopTransition(index, scenes.length, reduceMotion)}
                       >
                         {active === index ? <DotIcon /> : null}
                       </motion.span>

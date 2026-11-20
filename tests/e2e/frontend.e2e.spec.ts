@@ -315,6 +315,32 @@ test('the edge scroll pill seeks and carries its liquid with it', async ({ page 
   await expect(page.locator('.site-scrollbar-input')).toHaveCSS('width', '24px')
 })
 
+test('a touch drag on the scroll pill follows the finger until release', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(baseURL)
+  await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 15000 })
+  await scrollTimeline(page, heroParagraphEnd / 4)
+  const slider = page.getByRole('slider', { name: 'Home scroll position' })
+  await expect(slider).toHaveAttribute('aria-valuetext', '25% of Home')
+  await expect(page.locator('.site-scrollbar')).toHaveCSS('transform', 'none')
+  const thumb = (await page.locator('.site-scrollbar-thumb').boundingBox())!
+  const travel = (await page.locator('.site-scrollbar-travel').boundingBox())!
+  const client = await page.context().newCDPSession(page)
+  await client.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [{ x: thumb.x + thumb.width / 2, y: thumb.y + thumb.height / 2 }],
+  })
+  for (const position of [0.6, 0.8, 0.4]) {
+    await client.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [{ x: thumb.x - 35, y: travel.y + travel.height * position }],
+    })
+    await expect(slider).toHaveAttribute('aria-valuetext', `${position * 100}% of Home`)
+  }
+  await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+  await expect(slider).toHaveAttribute('aria-valuetext', '40% of Home')
+})
+
 test('scenes open with scroll and close again in reverse', async ({ page }) => {
   await page.goto(baseURL)
   await expect(page).toHaveTitle(/Jacob Moya/)
@@ -577,13 +603,21 @@ test('mobile night mode shares the header and menu styling', async ({ page }) =>
   await expect(footerLiquid).toHaveAttribute('d', /^M.+Z$/)
   await expect(footerLiquid).toHaveCSS('fill', 'rgb(0, 0, 0)')
   await expect(socials.getByRole('link', { name: /GitHub/ })).toHaveCSS('color', 'rgb(255, 255, 255)')
-  await expect(socials.getByRole('link', { name: /GitHub/ }).locator('svg')).toHaveCSS('width', '26px')
+  const githubIcon = socials.getByRole('link', { name: /GitHub/ })
+  await expect(githubIcon).toHaveCSS('width', '44px')
+  await expect(githubIcon.locator('svg')).toHaveCSS('width', '24px')
   await expect(socials.getByRole('link', { name: /LinkedIn/ })).toBeVisible()
   await expect(socials.getByRole('link', { name: 'Email', exact: true })).toHaveAttribute(
     'href', 'mailto:jemoya1994@gmail.com',
   )
   await expect(socials.getByRole('link', { name: 'Call', exact: true })).toHaveAttribute(
     'href', 'tel:+19096446073',
+  )
+  const sms = new URL((await socials.getByRole('link', { name: 'Text message' }).getAttribute('href'))!)
+  expect(sms.protocol).toBe('sms:')
+  expect(sms.pathname).toBe('+19096446073')
+  expect(sms.searchParams.get('body')).toBe(
+    'Hey Jake, I came across your portfolio and would love to chat about working together.',
   )
   const panelBounds = (await page.locator('.mobile-menu-panel').boundingBox())!
   const socialBounds = (await socials.boundingBox())!

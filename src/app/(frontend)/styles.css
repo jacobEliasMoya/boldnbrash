@@ -3340,8 +3340,11 @@ ul {
 }
 .word-emphasis {
   display: inline-block;
-  color: color-mix(in srgb, var(--blue) var(--word-emphasis, 0%), currentColor);
+  color: color-mix(in srgb, var(--word-emphasis-color, var(--blue)) var(--word-emphasis, 0%), currentColor);
   transform-origin: center bottom;
+}
+:root[data-theme='dark'] {
+  --word-emphasis-color: var(--accent);
 }
 :is(.portfolio .hero-copy .hero-description, .skills-index .skills-heading .skills-intro,
     .about-copy > p, .skills-category-note) {
@@ -3891,13 +3894,15 @@ ul {
   }
 }
 .profile-links-menu a {
+  width: 44px;
+  height: 44px;
   border: 0;
   background: transparent;
   color: var(--menu-frame-ink);
 }
 .profile-links-menu svg {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   stroke: currentColor;
   stroke-width: 0.65;
   stroke-linejoin: round;

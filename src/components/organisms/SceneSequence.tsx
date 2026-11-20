@@ -448,7 +448,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     } | null = null
     function startTouch(event: TouchEvent) {
       cancelSnap()
-      if (event.touches.length !== 1 || media.matches) {
+      const target = event.target instanceof Element ? event.target : null
+      if (event.touches.length !== 1 || media.matches || target?.closest('.site-scrollbar')) {
         touch = null
         return
       }
@@ -460,7 +461,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         y: point.clientY,
         lastY: point.clientY,
         axis: null,
-        target: event.target instanceof Element ? event.target : null,
+        target,
         projectSwipe: null,
         transitionDirection: 0,
       }
@@ -489,6 +490,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       if (touch.axis === 'vertical' && advanceInput(pixels, touch.target, true)) event.preventDefault()
     }
     function endTouch() {
+      if (!touch) return
       touch = null
       armSnap()
     }
