@@ -8,6 +8,7 @@ import {
   heroParagraphEnd,
   sceneStops,
   sectionScrollRanges,
+  getScrollSection,
   skillSegments,
   skillStart,
   skillParagraphEnd,
@@ -565,7 +566,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     function renderScene(value: number) {
       if (media.matches) return
       const progress = Math.max(0, Math.min(sceneDuration, value))
-      const section = sceneStops.findLastIndex((start) => progress >= start)
+      const section = getScrollSection(progress)
       const range = sectionScrollRanges[section]
       const nextStart = sceneStops[section + 1]
       const departure = nextStart === undefined ? 0 :
@@ -791,7 +792,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       cancelSceneTransition()
       cancelSnap()
       pendingFocus = null
-      const range = sectionScrollRanges[sceneStops.findLastIndex((start) => displayed >= start)]
+      const range = sectionScrollRanges[getScrollSection(displayed)]
       const position = range.start + Math.max(0, Math.min(1, fraction)) * (range.end - range.start)
       const start = scrollY + node.getBoundingClientRect().top
       const distance = node.offsetHeight - (node.firstElementChild?.clientHeight ?? innerHeight)

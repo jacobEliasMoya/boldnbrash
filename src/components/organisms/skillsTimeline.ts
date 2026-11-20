@@ -195,6 +195,13 @@ export const sectionScrollRanges = sceneStops.map((start, index) => ({
   start,
   end: sectionEnds[index],
 }))
+
+export function getScrollSection(position: number) {
+  for (let index = sceneStops.length - 1; index > 0; index--) {
+    if (position >= sceneStops[index]) return index
+  }
+  return 0
+}
 const skillIntroTravel = skillStart - skillIntroStart
 export const skillTitleFillPortion = skillTitleTravel / skillIntroTravel
 export const skillParagraphEndPortion = (skillParagraphEnd - skillIntroStart) / skillIntroTravel
