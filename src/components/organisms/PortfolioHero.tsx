@@ -1,6 +1,7 @@
 'use client'
 
 import { HeroMark } from '@/components/atoms/HeroMark'
+import { WordEmphasis } from '@/components/atoms/WordEmphasis'
 import { motion, useReducedMotion } from 'motion/react'
 import { useIntroReady } from '@/hooks/useIntroReady'
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
@@ -15,6 +16,7 @@ const entrance = { opacity: 0, y: 10 }
 const entered = { opacity: 1, y: 0 }
 const letterStep = 0.055
 const entranceTempo = 0.65
+const heroParticlesEnabled = false
 
 function entranceTransition(delay: number, reduceMotion: boolean | null) {
   return {
@@ -63,6 +65,7 @@ export function PortfolioHero() {
     () => window.matchMedia('(max-width: 760px)').matches, () => false)
   const [navReady, setNavReady] = useState(false)
   const [particlesReady, setParticlesReady] = useState(false)
+  const [paragraphProgress, setParagraphProgress] = useState(0)
   const finishFormation = useCallback(() => setParticlesReady(true), [])
   useEffect(() => {
     const complete = () => setNavReady(true)
@@ -70,7 +73,15 @@ export function PortfolioHero() {
     if (document.documentElement.dataset.mobileNavReady === 'true') complete()
     return () => window.removeEventListener('portfolio:mobile-nav-ready', complete)
   }, [])
-  const introReady = loaderReady && (!mobile || reduceMotion || particlesReady)
+  useEffect(() => {
+    const update = (event: Event) => {
+      setParagraphProgress((event as CustomEvent<{ paragraph: number }>).detail.paragraph)
+    }
+    window.addEventListener('portfolio:hero-progress', update)
+    return () => window.removeEventListener('portfolio:hero-progress', update)
+  }, [])
+  const introReady = loaderReady && (!mobile || reduceMotion ||
+    (heroParticlesEnabled ? particlesReady : navReady))
 
   return (
     <div className="hero-scene scene-content">
@@ -139,13 +150,15 @@ export function PortfolioHero() {
           animate={introReady ? entered : entrance}
           transition={entranceTransition(2.18, reduceMotion)}
         >
-          I build for the web. Half the fun is finding out why it broke.
+          <WordEmphasis text="I build for the web. Half the fun is finding out why it broke." progress={paragraphProgress} />
         </motion.p>
         <span className="sr-only">Jacob Moya’s creative development portfolio</span>
       </div>
       <div className="hero-mark">
         <HeroMark
+          particlesEnabled={heroParticlesEnabled}
           entranceReady={mobile ? loaderReady && (navReady || !!reduceMotion) : undefined}
+          walkReady={!!introReady}
           onFormationComplete={mobile ? finishFormation : undefined}
         />
       </div>

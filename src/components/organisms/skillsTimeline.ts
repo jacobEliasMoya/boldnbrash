@@ -176,17 +176,28 @@ export const skillSegments = skills.map((skill, index) => ({
   duration: skill.projects.length + 0.8,
 }))
 export const skillTravel = skillSegments.reduce((sum, segment) => sum + segment.duration, 0)
-// Leave a full scroll beat for the centered introduction before the paired wheels arrive.
-export const skillStart = 3.2
+export const heroFillEnd = 1
+export const heroParagraphEnd = heroFillEnd + 1.08
+const skillIntroStart = heroParagraphEnd + 0.4
+const skillTitleTravel = 0.9
+const skillParagraphTravel = 1.44
+export const skillParagraphEnd = skillIntroStart + skillTitleTravel + skillParagraphTravel
+export const skillStart = skillParagraphEnd + 0.9
 export const sceneStops = [
   0,
-  1.4,
+  skillIntroStart,
   skillStart + skillTravel + 1,
-  skillStart + skillTravel + 2,
+  skillStart + skillTravel + 2.65,
 ]
-export const sceneDuration = sceneStops[sceneStops.length - 1]
-export const skillTitleFillPortion = 0.5
-export const skillTitleFillEnd = sceneStops[1] + (skillStart - sceneStops[1]) * skillTitleFillPortion
+export const sceneDuration = sceneStops[sceneStops.length - 1] + 0.65
+const sectionEnds = [heroParagraphEnd, sceneStops[2] - 1, sceneStops[3] - 1, sceneDuration]
+export const sectionScrollRanges = sceneStops.map((start, index) => ({
+  start,
+  end: sectionEnds[index],
+}))
+const skillIntroTravel = skillStart - skillIntroStart
+export const skillTitleFillPortion = skillTitleTravel / skillIntroTravel
+export const skillParagraphEndPortion = (skillParagraphEnd - skillIntroStart) / skillIntroTravel
 
 export const clamp = (value: number, min = 0, max = 1) => Math.max(min, Math.min(max, value))
 

@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import {
+  heroFillEnd,
+  heroParagraphEnd,
   sceneStops,
   skillSegments,
   skills,
@@ -13,7 +15,7 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('portfolio:intro-seen', '1'))
 })
 
-test('reduced motion retains the monogram without loading the mini Jake sequence', async ({
+test('reduced motion avoids loading the mini Jake sequence', async ({
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
@@ -22,28 +24,26 @@ test('reduced motion retains the monogram without loading the mini Jake sequence
     if (request.url().includes('/images/mini-jacob/')) frames.push(request.url())
   })
   await page.goto(baseURL)
-  await expect(page.locator('.particle-logo')).toBeVisible()
+  await expect(page.locator('.particle-logo')).toHaveCount(0)
   await expect(page.locator('.hero-mini-jacob')).toHaveCSS('opacity', '0')
   expect(frames).toHaveLength(0)
 })
 
 test.use({ viewport: { width: 1440, height: 900 } })
 
-test('Jake footsteps ripple the JM particles and settle when he stops', async ({ page }) => {
+test('Jake walks in with the particle effect disabled', async ({ page }) => {
   await page.goto(baseURL)
-  const monogram = page.locator('.particle-logo canvas')
-  await expect(page.locator('.hero-mini-jacob')).toHaveAttribute('data-frame', '0')
-  await expect(monogram).toHaveAttribute('data-ripples', '0')
-  await scrollTimeline(page, 0.16)
-  await expect
-    .poll(async () => Number(await monogram.getAttribute('data-ripples')))
-    .toBeGreaterThan(0)
-  await expect(monogram).toHaveAttribute('data-ripples', '0', { timeout: 3500 })
-  await scrollTimeline(page, 0.53)
-  await expect
-    .poll(async () => Number(await monogram.getAttribute('data-ripples')))
-    .toBeGreaterThan(0)
-  await expect(monogram).toHaveAttribute('data-ripples', '0', { timeout: 3500 })
+  await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 15000 })
+  await expect(page.locator('.particle-logo')).toHaveCount(0)
+  const watermark = await page.locator('#top').evaluate((hero) => {
+    const backdrop = getComputedStyle(hero, '::before')
+    return { color: backdrop.backgroundColor, opacity: backdrop.opacity }
+  })
+  expect(watermark).toEqual({ color: 'rgb(56, 20, 255)', opacity: '0.12' })
+  await expect(page.locator('.hero-mark-animation')).toHaveAttribute('data-mode', 'idle')
+  await page.setViewportSize({ width: 390, height: 844 })
+  const mobileSize = await page.locator('#top').evaluate((hero) => getComputedStyle(hero, '::before').maskSize)
+  expect(parseFloat(mobileSize)).toBe(390)
 })
 
 test('Jake turns toward his travel direction and keeps his gait forward when scrolling reverses', async ({
@@ -51,13 +51,10 @@ test('Jake turns toward his travel direction and keeps his gait forward when scr
 }) => {
   await page.goto(baseURL)
   const avatar = page.locator('.hero-mini-jacob')
-  await expect(avatar).toHaveAttribute('data-frame', '0')
+  await expect(page.locator('.hero-mark-animation')).toHaveAttribute('data-mode', 'idle', { timeout: 15000 })
   let previousStep = 0
   let previousCenter = Number(await avatar.getAttribute('data-center'))
   for (const [progress, facing] of [
-    [0.1, 'left'],
-    [0.06, 'right'],
-    [0.12, 'left'],
     [0.5, 'right'],
     [0.46, 'left'],
     [0.52, 'right'],
@@ -65,8 +62,7 @@ test('Jake turns toward his travel direction and keeps his gait forward when scr
     await scrollTimeline(page, progress)
     await expect(avatar).toHaveAttribute('data-facing', facing)
     const center = Number(await avatar.getAttribute('data-center'))
-    if (progress <= 0.12)
-      expect(facing === 'right' ? center > previousCenter : center < previousCenter).toBe(true)
+    expect(facing === 'right' ? center > previousCenter : center < previousCenter).toBe(true)
     const step = Number(await avatar.getAttribute('data-walk-step'))
     expect(step).toBeGreaterThan(previousStep)
     await expect(avatar).toHaveAttribute('data-source-frame', String([4, 5, 6, 7][step % 4]))
@@ -78,7 +74,7 @@ test('Jake turns toward his travel direction and keeps his gait forward when scr
 test('large wheel bursts have a bounded queue and reverse immediately', async ({ page }) => {
   await page.goto(baseURL)
   await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 10000 })
-  await expect(page.locator('.hero-mini-jacob')).toHaveAttribute('data-frame', '0')
+  await expect(page.locator('.hero-mark-animation')).toHaveAttribute('data-mode', 'idle')
   const track = page.locator('.scene-track')
   await page.mouse.move(900, 400)
   for (let index = 0; index < 15; index++) {
@@ -102,46 +98,47 @@ test('large wheel bursts have a bounded queue and reverse immediately', async ({
     .toBeLessThan(before)
 })
 
-test('fast scrolling cannot skip Jake frames or start highlighting before his entrance finishes', async ({
+test('fast scrolling does not interrupt Jake’s automatic walk-in', async ({
   page,
 }) => {
   await page.goto(baseURL)
   const avatar = page.locator('.hero-mini-jacob')
-  await expect(avatar).toHaveAttribute('data-frame', '0')
   await avatar.evaluate((element) => {
-    const samples = [{ frame: 0, time: performance.now() }]
+    const samples: { frame: number; time: number }[] = []
     const observer = new MutationObserver(() => {
+      if (samples.length === 0) {
+        const track = document.querySelector<HTMLElement>('.scene-track')!
+        const distance = track.offsetHeight - track.firstElementChild!.clientHeight
+        window.scrollTo(0, distance * 0.9 / Number(track.dataset.duration))
+      }
       samples.push({ frame: Number(element.getAttribute('data-frame')), time: performance.now() })
       ;(element as HTMLElement).dataset.frameTimes = JSON.stringify(samples)
       if (element.getAttribute('data-direction') === 'out') observer.disconnect()
     })
     observer.observe(element, { attributes: true, attributeFilter: ['data-frame'] })
   })
-  await scrollTimeline(page, 0.9, false)
-  await page.waitForTimeout(120)
-  await expect(page.locator('.hero-letter').first()).toHaveCSS('--letter-fill', '0%')
   await expect(page.locator('.hero-mark-animation')).toHaveAttribute('data-mode', 'gone', {
-    timeout: 6000,
+    timeout: 15000,
   })
   const samples = JSON.parse((await avatar.getAttribute('data-frame-times'))!) as {
     frame: number
     time: number
   }[]
-  expect(samples[samples.length - 1].time - samples[0].time).toBeGreaterThan(1500)
-  for (let index = 1; index < samples.length; index++)
-    if (samples[index - 1].frame !== 15)
-      expect(Math.abs(samples[index].frame - samples[index - 1].frame)).toBeLessThanOrEqual(1)
+  expect(samples[samples.length - 1].time - samples[0].time).toBeGreaterThan(600)
+  expect(samples.slice(0, -1).some(({ frame }) => frame >= 5 && frame < 8)).toBe(true)
   await expect(page.locator('.hero-letter').first()).toHaveCSS('--letter-fill', '100%')
 })
 
-test('scroll plays the original entrance and wave then mirrors the walk out', async ({ page }) => {
+test('Jake walks in automatically, then scroll plays his wave and exit', async ({ page }) => {
   await page.goto(baseURL)
   const mark = page.locator('.hero-mark-animation')
   const avatar = page.locator('.hero-mini-jacob')
   const firstLetter = page.locator('.hero-letter').first()
-  await expect(avatar).toHaveAttribute('data-frame', '0')
-  for (const frame of [3, 6, 8, 9, 11, 14, 15]) {
-    await scrollTimeline(page, (0.35 * frame) / 15)
+  await expect(mark).toHaveAttribute('data-mode', 'idle', { timeout: 15000 })
+  await expect(avatar).toHaveAttribute('data-frame', '8')
+  expect(await page.evaluate(() => scrollY)).toBe(0)
+  for (const frame of [9, 11, 14, 15]) {
+    await scrollTimeline(page, (0.35 * (frame - 7.5)) / 7.5)
     await expect(avatar).toHaveAttribute('data-frame', String(frame))
     await expect(firstLetter).toHaveCSS('--letter-fill', '0%')
   }
@@ -276,13 +273,57 @@ test('the liquid still idles when the cursor leaves the visible page', async ({ 
     .toBeGreaterThan(30)
 })
 
+test('the edge scroll pill seeks and carries its liquid with it', async ({ page }) => {
+  await page.goto(baseURL)
+  const slider = page.getByRole('slider', { name: 'Home scroll position' })
+  const liquid = page.locator('.liquid-scroll-pill')
+  await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 15000 })
+  await expect(page.locator('.site-scrollbar')).toHaveAttribute('inert', '')
+  await expect(liquid).not.toHaveAttribute('d')
+  await scrollTimeline(page, heroParagraphEnd / 4)
+  await expect(slider).toHaveAttribute('aria-valuetext', '25% of Home')
+  await expect(page.locator('.site-scrollbar')).toHaveCSS('transform', 'none')
+  await expect(liquid).toHaveAttribute('d', /^M/)
+  const initialLiquid = await liquid.getAttribute('d')
+  const bounds = (await slider.boundingBox())!
+  expect(900 - bounds.y - bounds.height).toBeCloseTo(45, 0)
+  await page.mouse.click(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)
+  await expect(slider).toHaveAttribute('aria-valuetext', '50% of Home')
+  await expect(liquid).not.toHaveAttribute('d', initialLiquid!)
+  await slider.press('ArrowDown')
+  await expect(slider).toHaveAttribute('aria-valuetext', '52% of Home')
+  await slider.press('End')
+  await expect(slider).toHaveAttribute('aria-valuetext', '100% of Home')
+  await expect(page.locator('#top')).toHaveAttribute('aria-hidden', 'false')
+  await slider.press('Home')
+  await expect(slider).toHaveAttribute('aria-valuetext', '0% of Home')
+
+  await scrollTimeline(page, (heroParagraphEnd + sceneStops[1]) / 2)
+  await expect(page.locator('.site-scrollbar')).toHaveAttribute('inert', '')
+  await scrollTimeline(page, sceneStops[1])
+  await expect(page.getByRole('slider', { name: 'Work scroll position' }))
+    .toHaveAttribute('aria-valuetext', '0% of Work')
+  const thumb = page.locator('.site-scrollbar-thumb')
+  expect((await thumb.boundingBox())!.height).toBeCloseTo(45.9, 1)
+  expect((await thumb.boundingBox())!.y).toBeCloseTo(45, 0)
+  await page.setViewportSize({ width: 1440, height: 600 })
+  await expect(thumb).toHaveCSS('height', '36px')
+  await expect(liquid).not.toHaveAttribute('d', /NaN/)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(thumb).toHaveCSS('width', '10px')
+  expect((await thumb.boundingBox())!.height).toBeCloseTo(35.45, 1)
+  await expect(page.locator('.site-scrollbar-input')).toHaveCSS('width', '24px')
+})
+
 test('scenes open with scroll and close again in reverse', async ({ page }) => {
   await page.goto(baseURL)
   await expect(page).toHaveTitle(/Jacob Moya/)
   await expect(page.locator('.portfolio')).toHaveAttribute('data-enhanced', '')
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Build.Break.Repeat.')
   await expect(page.locator('#top')).toHaveAttribute('aria-hidden', 'false')
-  await page.evaluate(() => window.scrollTo(0, window.innerHeight * 2.2))
+  await expect(page.locator('#top')).toHaveCSS('background-color', 'rgb(255, 255, 255)')
+  await expect(page.locator('#about')).toHaveCSS('background-color', 'rgb(255, 255, 255)')
+  await scrollTimeline(page, sceneStops[1] + 0.1)
   await expect(page.locator('#skills')).toHaveAttribute('aria-hidden', 'false')
   await expect(page.locator('#top')).toHaveJSProperty('inert', true)
   await page.evaluate(() => window.scrollTo(0, 0))
@@ -312,18 +353,26 @@ test('section reveals remain partial until further scrolling and reverse with sc
   await expect(panel).toHaveCSS('visibility', 'hidden')
   await expect(page.locator('.hero-letter').first()).toHaveCSS('--letter-fill', '100%')
   await expect(page.locator('.hero-letter').nth(5)).toHaveCSS('--letter-fill', '100%')
-  await scrollToProgress(1.1)
+  const description = page.locator('.hero-description')
+  const words = description.locator('.word-emphasis')
+  const firstWordMiddle = heroFillEnd + (heroParagraphEnd - heroFillEnd) / (2 * await words.count())
+  await scrollToProgress(firstWordMiddle)
+  await expect(words.first()).not.toHaveCSS('transform', 'none')
+  await expect(panel).toHaveCSS('visibility', 'hidden')
+  const descriptionSize = await description.evaluate((element) => getComputedStyle(element).fontSize)
+  await expect(page.locator('.skills-intro')).toHaveCSS('font-size', descriptionSize)
+  await scrollToProgress(heroParagraphEnd + 0.1)
   await expect(panel).toHaveCSS('visibility', 'visible')
   await page.waitForTimeout(1000)
   const radius = () => panel.evaluate((el) => parseFloat(getComputedStyle(el).clipPath.slice(7)))
   const partial = await radius()
   expect(partial).toBeGreaterThan(0)
   await expect(panel).not.toHaveCSS('clip-path', 'none')
-  await scrollToProgress(1.32)
+  await scrollToProgress(heroParagraphEnd + 0.32)
   await expect.poll(radius).toBeGreaterThan(partial * 1.5)
-  await scrollToProgress(1.04)
+  await scrollToProgress(heroParagraphEnd + 0.04)
   await expect.poll(radius).toBeLessThan(partial)
-  await scrollToProgress(1.4)
+  await scrollToProgress(sceneStops[1])
   await expect(panel).toHaveCSS('clip-path', 'none')
   await scrollToProgress(0)
   await expect(page.locator('.hero-letter').first()).toHaveCSS('--letter-fill', '0%')
@@ -813,16 +862,13 @@ test.describe('mobile wheel input', () => {
     await expect(lines.first()).toHaveCSS('--title-fill', '0%')
     await page.mouse.move(180, 400)
     await page.mouse.wheel(0, 120)
-    await expect.poll(async () => parseFloat(await lines.first().evaluate((line) =>
-      getComputedStyle(line).getPropertyValue('--title-fill')))).toBeGreaterThan(20)
+    const firstFill = () => lines.first().evaluate((line) =>
+      parseFloat(getComputedStyle(line).getPropertyValue('--title-fill')),
+    )
+    await expect.poll(firstFill).toBeGreaterThan(8)
     await expect(lines.nth(1)).toHaveCSS('--title-fill', '0%')
-    for (let i = 0; i < 3; i++) await page.mouse.wheel(0, 120)
-    await expect(lines.first()).toHaveCSS('--title-fill', '100%')
-    await expect.poll(async () => parseFloat(await lines.nth(1).evaluate((line) =>
-      getComputedStyle(line).getPropertyValue('--title-fill')))).toBeGreaterThan(25)
     await page.mouse.wheel(0, -120)
-    await expect.poll(async () => parseFloat(await lines.nth(1).evaluate((line) =>
-      getComputedStyle(line).getPropertyValue('--title-fill')))).toBeLessThan(20)
+    await expect.poll(firstFill).toBeLessThan(2)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   })
 })

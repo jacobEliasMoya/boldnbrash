@@ -1,8 +1,8 @@
 'use client'
 
-import { useSyncExternalStore } from 'react'
+import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
-import { motion, useMotionValue, useReducedMotion } from 'motion/react'
+import { animate, motion, useMotionValue, useReducedMotion } from 'motion/react'
 import { useBlendBounds } from './BlendedNav'
 import { useIntroReady } from '@/hooks/useIntroReady'
 
@@ -14,6 +14,7 @@ function subscribe(onChange: () => void) {
     window.removeEventListener('storage', onChange)
   }
 }
+const toggleSpring = { type: 'spring' as const, stiffness: 340, damping: 26 }
 
 export function ThemeToggle({ inline = false }: { inline?: boolean }) {
   const dark = useSyncExternalStore(
@@ -25,10 +26,13 @@ export function ThemeToggle({ inline = false }: { inline?: boolean }) {
   const introReady = useIntroReady()
   const reduceMotion = useReducedMotion()
   const entranceOpacity = useMotionValue(0)
+  const pressScale = useMotionValue(1)
+  const busy = useRef(false)
   const { anchor: thumb, bounds } = useBlendBounds<HTMLSpanElement>(introReady && !inline, dark, true)
+  useEffect(() => () => pressScale.stop(), [pressScale])
 
   function toggleTheme() {
-    const theme = dark ? 'light' : 'dark'
+    const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'
     document.documentElement.dataset.theme = theme
     try {
       localStorage.setItem('portfolio-theme', theme)
@@ -36,6 +40,19 @@ export function ThemeToggle({ inline = false }: { inline?: boolean }) {
       /* Storage is optional. */
     }
     window.dispatchEvent(new Event('portfolio:theme'))
+  }
+
+  async function pressToggle() {
+    if (busy.current) return
+    if (reduceMotion) {
+      toggleTheme()
+      return
+    }
+    busy.current = true
+    await animate(pressScale, 0.89, { duration: 0.1, ease: 'easeOut' })
+    toggleTheme()
+    await animate(pressScale, 1, toggleSpring)
+    busy.current = false
   }
 
   return (
@@ -54,7 +71,7 @@ export function ThemeToggle({ inline = false }: { inline?: boolean }) {
         type="button"
         aria-label="Night mode"
         aria-pressed={dark}
-        onClick={toggleTheme}
+        onClick={pressToggle}
       >
         <span className="theme-toggle-track" aria-hidden="true">
           <svg
@@ -78,15 +95,14 @@ export function ThemeToggle({ inline = false }: { inline?: boolean }) {
           >
             <path d="M20.5 14.1A8.7 8.7 0 0 1 9.9 3.5a8.7 8.7 0 1 0 10.6 10.6Z" />
           </svg>
-          {inline ? (
-            <motion.span
-              className="theme-toggle-thumb"
-              initial={false}
-              animate={{ x: dark ? 28 : 0 }}
-              style={{ transition: 'none' }}
-              transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 340, damping: 26 }}
-            />
-          ) : <span ref={thumb} className="theme-toggle-thumb" style={{ opacity: 0 }} />}
+          <motion.span
+            ref={inline ? undefined : thumb}
+            className="theme-toggle-thumb"
+            initial={false}
+            animate={{ x: dark ? 28 : 0 }}
+            style={inline ? { scale: pressScale } : { opacity: 0 }}
+            transition={reduceMotion ? { duration: 0 } : toggleSpring}
+          />
         </span>
       </motion.button>
       {!inline && introReady &&
@@ -97,6 +113,7 @@ export function ThemeToggle({ inline = false }: { inline?: boolean }) {
             aria-hidden="true"
             style={{
               opacity: entranceOpacity,
+              scale: pressScale,
               left: bounds.left,
               top: bounds.top,
               width: bounds.width,

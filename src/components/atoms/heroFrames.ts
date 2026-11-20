@@ -8,6 +8,15 @@ export const heroEntranceTravel = 0.35
 export const heroEntranceDuration = 1700
 export const heroExitStart = 0.42
 export const heroAnimationTravel = 0.65
+export const heroWalkInEnd = heroEntranceTravel / 2 / heroAnimationTravel
+
+export function getHeroWaveExitPose(progress: number) {
+  const waveEnd = heroEntranceTravel / heroAnimationTravel
+  const poseProgress = progress < waveEnd
+    ? heroWalkInEnd + progress * (waveEnd - heroWalkInEnd) / waveEnd
+    : progress
+  return getHeroScrollPose(poseProgress)
+}
 
 export function getHeroScrollPose(progress: number) {
   const position = Math.max(0, Math.min(1, progress)) * heroAnimationTravel
@@ -23,7 +32,7 @@ export function getHeroScrollPose(progress: number) {
         frame < 8 ? Math.min(1, ((position / heroEntranceTravel) * 15) / 7.5) : undefined,
       mirrored: false,
       center: undefined,
-      mode: frame < 9 ? 'walk' : frame < 15 ? 'wave' : 'idle',
+      mode: frame < 8 ? 'walk' : frame === 8 || frame === 15 ? 'idle' : 'wave',
     }
   }
   if (position <= heroExitStart)

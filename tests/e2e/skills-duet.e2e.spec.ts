@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { skillStart, skills, skillSegments } from '../../src/components/organisms/skillsTimeline'
+import { sceneStops, skillParagraphEnd, skillStart, skillTitleFillPortion, skills, skillSegments } from '../../src/components/organisms/skillsTimeline'
 
 async function scrollToPhase(page: Page, position: number) {
   await page.evaluate(({ value, segments, start }) => {
@@ -37,6 +37,33 @@ for (const viewport of [
 ]) {
   test.describe(`paired scroll ${viewport.width}`, () => {
     test.use({ viewport })
+    test('paragraph words lift in sequence after the heading fills', async ({ page }) => {
+      await page.addInitScript(() => sessionStorage.setItem('portfolio:intro-seen', '1'))
+      await page.goto('http://localhost:3000/#skills')
+      await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 15000 })
+      const paragraph = page.locator('.skills-intro')
+      const words = paragraph.locator('.word-emphasis')
+      await expect(words.first()).toBeVisible()
+      const count = await words.count()
+      const titleEnd = sceneStops[1] + (skillStart - sceneStops[1]) * skillTitleFillPortion
+      const activeWords = () => words.evaluateAll((elements) =>
+        elements.flatMap((element, index) => getComputedStyle(element).transform === 'none' ? [] : [index]),
+      )
+      await expect.poll(() => paragraph.textContent()).toBe(
+        'Check out how I spend my time when I’m not working, being a dad, or playing guitar.',
+      )
+      await scrollToPhase(page, titleEnd + (skillParagraphEnd - titleEnd) * 2.5 / count)
+      await expect.poll(activeWords).toEqual([2])
+      await expect(page.locator('.skills-title-fill').last()).toHaveCSS('--title-fill', '100%')
+      const playback = () => page.locator('.scene-track').getAttribute('data-playback-progress').then(Number)
+      const beforeWheel = await playback()
+      await page.locator('.scene-track').dispatchEvent('wheel', { deltaY: 1800, bubbles: true, cancelable: true })
+      await expect.poll(playback).toBeGreaterThan(beforeWheel + 0.02)
+      expect(await playback()).toBeLessThan(beforeWheel + 0.13)
+      await scrollToPhase(page, titleEnd - 0.1)
+      await expect.poll(activeWords).toEqual([])
+    })
+
     test('period expands into the canvas behind synchronized skill and project wheels', async ({ page }) => {
       test.setTimeout(60000)
       await page.addInitScript(() => sessionStorage.setItem('portfolio:intro-seen', '1'))
@@ -50,14 +77,17 @@ for (const viewport of [
       await expect(page.locator('.skills-reveal')).toHaveAttribute('inert', '')
       await page.screenshot({ path: `test-results/duet-intro-${viewport.width}.png` })
       await expect(page.locator('.skills-scroll-cue')).toHaveCount(0)
-      await expect(page.getByRole('heading', { name: 'My Tech. And Stuff.' })).toBeVisible()
-      await scrollToPhase(page, 1.4 + (skillStart - 1.4) * 0.46)
+      await expect(page.getByRole('heading', { name: 'Here’s What I’m Building.' })).toBeVisible()
+      for (const line of await intro.locator('.skills-title-fill').all()) {
+        await expect(line).toBeInViewport({ ratio: 1 })
+      }
+      await scrollToPhase(page, sceneStops[1] + (skillStart - sceneStops[1]) * 0.46)
       await expect(intro).toHaveCSS('opacity', '1')
       await expect(page.locator('.skills-title-letter')).toHaveCount(0)
       const initialRadius = Number(await page.locator('.skills-scene').evaluate(
         (el) => parseFloat(getComputedStyle(el).getPropertyValue('--skills-portal-radius')),
       ))
-      await scrollToPhase(page, 1.4 + (skillStart - 1.4) * 0.8)
+      await scrollToPhase(page, sceneStops[1] + (skillStart - sceneStops[1]) * 0.8)
       await page.screenshot({ path: 'test-results/intro-expanding-' + viewport.width + '.png' })
       const expandedRadius = Number(await page.locator('.skills-scene').evaluate(
         (el) => parseFloat(getComputedStyle(el).getPropertyValue('--skills-portal-radius')),
@@ -65,7 +95,7 @@ for (const viewport of [
       expect(expandedRadius).toBeGreaterThan(initialRadius)
       await expect(intro).toHaveCSS('opacity', '1')
       await expect(intro).toHaveCSS('transform', 'none')
-      await expect(page.locator('.skills-reveal')).toHaveCSS('background-color', 'rgb(239, 235, 225)')
+      await expect(page.locator('.skills-reveal')).toHaveCSS('background-color', 'rgb(255, 255, 255)')
       await expect(page.locator('.skills-project-deck').first()).toHaveAttribute(
         'aria-hidden',
         'false',

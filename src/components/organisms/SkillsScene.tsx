@@ -11,12 +11,14 @@ import {
 } from 'motion/react'
 import { ProjectCover } from '@/components/atoms/ProjectCover'
 import { ProjectCTA } from '@/components/atoms/ProjectCTA'
+import { WordEmphasis } from '@/components/atoms/WordEmphasis'
 import { ProjectDialog } from './ProjectDialog'
 import { getPeriodOpening } from '@/components/atoms/periodOpening'
-import { clamp, getSkillFrame, projectStops, skills, skillTitleFillPortion } from './skillsTimeline'
+import { clamp, getSkillFrame, projectStops, skills, skillParagraphEndPortion, skillTitleFillPortion } from './skillsTimeline'
 
 type Project = (typeof skills)[number]['projects'][number]
 type OpenProject = (project: Project, trigger: HTMLButtonElement) => void
+const introText = 'Check out how I spend my time when I’m not working, being a dad, or playing guitar.'
 
 function SkillCategoryPill({
   index,
@@ -212,8 +214,11 @@ export function SkillsScene() {
   const scene = useRef<HTMLDivElement>(null)
   const period = useRef<HTMLSpanElement>(null)
   const [portal, setPortal] = useState({ x: 0, y: 0, radius: 0, dot: 0, borderWidth: 12 })
-  const revealStart = skillTitleFillPortion
-  const fillDuration = revealStart / 2
+  const revealStart = skillParagraphEndPortion
+  const fillDuration = skillTitleFillPortion / 2
+  const paragraphProgress = clamp(
+    (selection.intro - skillTitleFillPortion) / (revealStart - skillTitleFillPortion),
+  )
   const expansion = animated ? clamp((selection.intro - revealStart) / (1 - revealStart)) : 1
   const titleFill = (line: number) => animated ? clamp(selection.intro / fillDuration - line) * 100 : 0
   const openingRadius = expansion > 0
@@ -291,19 +296,21 @@ export function SkillsScene() {
       <div className="skills-heading" aria-hidden={animated && expansion === 1}>
         <div className="skills-title-stack">
           <div className="skills-title-shadow" aria-hidden="true">
-            <span>My Tech.</span>
-            <span>And Stuff.</span>
+            <span>Here’s What</span>
+            <span>I’m Building.</span>
           </div>
-          <h2 aria-label="My Tech. And Stuff.">
+          <h2 aria-label="Here’s What I’m Building.">
             <span className="skills-title-line" aria-hidden="true">
-              <span className="skills-title-fill" style={{ '--title-fill': `${titleFill(0)}%` } as CSSProperties}>My Tech.</span>
+              <span className="skills-title-fill" style={{ '--title-fill': `${titleFill(0)}%` } as CSSProperties}>Here’s What</span>
             </span>
             <span className="skills-title-line" aria-hidden="true">
-              <span className="skills-title-fill" style={{ '--title-fill': `${titleFill(1)}%` } as CSSProperties}>And Stuff</span><span ref={period} className="skills-title-period" />
+              <span className="skills-title-fill" style={{ '--title-fill': `${titleFill(1)}%` } as CSSProperties}>I’m Building</span><span ref={period} className="skills-title-period" />
             </span>
           </h2>
         </div>
-        <p className="skills-intro">Check out how I spend my time when I’m not working, being a dad, or playing guitar.</p>
+        <p className="skills-intro">
+          <WordEmphasis text={introText} progress={paragraphProgress} enabled={animated} />
+        </p>
       </div>
       {animated ? (
         <div className="skills-reveal" inert={expansion < 1} aria-hidden={expansion < 1}>

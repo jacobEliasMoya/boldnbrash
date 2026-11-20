@@ -23,6 +23,14 @@ const menuPop = { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const }
 const linkPopStart = { opacity: 0, scale: 0.78, y: 8 }
 const linkPopEnd = { opacity: 1, scale: 1, y: 0 }
 const linkPopDuration = 0.23
+const labelFill = { '--letter-fill': '100%' }
+const labelFillRest = { '--letter-fill': '0%', x: 0, y: 0, scale: 1 }
+const labelFillMotion = {
+  ...labelFill,
+  x: [0, -2, 0],
+  y: [0, -2, 0],
+  scale: [1, 1.045, 1],
+}
 
 function linkPopTransition(index: number, reduced: boolean | null) {
   if (reduced) return { duration: 0 }
@@ -505,7 +513,9 @@ export function MobileMenu({
                         <motion.span
                           className="mobile-menu-label-fill"
                           initial={false}
-                          animate={{ '--letter-fill': highlighted === index && covered === index ? '100%' : '0%' }}
+                          animate={highlighted === index && covered === index
+                            ? reduceMotion ? labelFill : labelFillMotion
+                            : labelFillRest}
                           transition={{ duration: reduceMotion ? 0 : 0.33, ease: [0.22, 1, 0.36, 1] }}
                           onAnimationStart={() => {
                             if (filled.current === index) filled.current = null

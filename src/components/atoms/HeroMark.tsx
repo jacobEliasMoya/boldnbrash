@@ -1,18 +1,22 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { useReducedMotion } from 'motion/react'
+import { animate, useReducedMotion } from 'motion/react'
 import { ParticleMonogram, type WalkRipple } from './ParticleMonogram'
 import {
   drawHeroFrame,
   getHeroScrollPose,
+  getHeroWaveExitPose,
   heroFrameCount,
   heroStandingCenter,
+  heroWalkInEnd,
   heroWalkFrames,
 } from './heroFrames'
 
-export function HeroMark({ entranceReady, onFormationComplete }: {
+export function HeroMark({ entranceReady, walkReady, particlesEnabled, onFormationComplete }: {
   entranceReady?: boolean
+  walkReady: boolean
+  particlesEnabled: boolean
   onFormationComplete?: () => void
 }) {
   const canvas = useRef<HTMLCanvasElement>(null)
@@ -24,9 +28,11 @@ export function HeroMark({ entranceReady, onFormationComplete }: {
     const element = root.current
     const surface = canvas.current
     const context = surface?.getContext('2d')
-    if (!element || !surface || !context || reduceMotion !== false) return
+    if (!element || !surface || !context || reduceMotion !== false || !walkReady) return
     let disposed = false
     let ready = false
+    let walkInProgress: number | null = 0
+    let stopWalk: (() => void) | undefined
     let paintedPose = ''
     let edgeCenter = 760
     let characterScale = 1
@@ -45,7 +51,9 @@ export function HeroMark({ entranceReady, onFormationComplete }: {
 
     function paint() {
       if (!ready || disposed) return
-      const pose = getHeroScrollPose(progress)
+      const pose = walkInProgress === null
+        ? getHeroWaveExitPose(progress)
+        : getHeroScrollPose(walkInProgress)
       const center =
         pose.walkProgress !== undefined
           ? edgeCenter + (heroStandingCenter - edgeCenter) * pose.walkProgress
@@ -82,6 +90,7 @@ export function HeroMark({ entranceReady, onFormationComplete }: {
       const poseIndex = phase < 0.3 ? 0 : phase < 0.5 ? 1 : phase < 0.8 ? 2 : 3
       const walkingStep = Math.floor(cycle) * heroWalkFrames.length + poseIndex
       if (
+        particlesEnabled &&
         walking &&
         walkingStep !== lastRippleStep &&
         walkingStep % 2 === 0 &&
@@ -160,8 +169,22 @@ export function HeroMark({ entranceReady, onFormationComplete }: {
     window.addEventListener('portfolio:hero-progress', updateScroll)
     Promise.all(frames.map((image) => image.decode()))
       .then(() => {
+        if (disposed) return
         ready = true
         paint()
+        const walk = animate(0, heroWalkInEnd, {
+          duration: 1.05,
+          ease: 'linear',
+          onUpdate: (value) => {
+            walkInProgress = value
+            paint()
+          },
+          onComplete: () => {
+            walkInProgress = null
+            paint()
+          },
+        })
+        stopWalk = () => walk.stop()
       })
       .catch(() => {
         /* Keep the monogram if a frame cannot load. */
@@ -169,6 +192,7 @@ export function HeroMark({ entranceReady, onFormationComplete }: {
 
     return () => {
       disposed = true
+      stopWalk?.()
       ripples.current = []
       observer.disconnect()
       themeObserver.disconnect()
@@ -178,11 +202,13 @@ export function HeroMark({ entranceReady, onFormationComplete }: {
       surface.style.opacity = '0'
       element.dataset.mode = 'logo'
     }
-  }, [reduceMotion])
+  }, [reduceMotion, walkReady, particlesEnabled])
 
   return (
     <div ref={root} className="hero-mark-animation" data-mode="logo">
-      <ParticleMonogram ripples={ripples} entranceReady={entranceReady} onFormationComplete={onFormationComplete} />
+      {particlesEnabled
+        ? <ParticleMonogram ripples={ripples} entranceReady={entranceReady} onFormationComplete={onFormationComplete} />
+        : <div className="hero-mark-spacer" aria-hidden="true" />}
       <canvas
         ref={canvas}
         className="hero-mini-jacob"

@@ -1,25 +1,29 @@
 'use client'
 
 import { Children, useEffect, useRef, useState, type ReactNode } from 'react'
-import { animate, motionValue, motion, MotionConfig, useReducedMotion, useMotionValue } from 'motion/react'
+import { animate, motionValue, motion, MotionConfig, useReducedMotion, useMotionValue, useSpring } from 'motion/react'
 import {
   sceneDuration,
+  heroFillEnd,
+  heroParagraphEnd,
   sceneStops,
+  sectionScrollRanges,
   skillSegments,
   skillStart,
-  skillTitleFillEnd,
+  skillParagraphEnd,
   skillTravel,
   projectStops,
 } from './skillsTimeline'
 import { BlendedLogo } from '@/components/atoms/BlendedLogo'
 import { BlendedNav } from '@/components/atoms/BlendedNav'
 import { LiquidBoundary } from '@/components/atoms/LiquidBoundary'
+import { ScrollPill } from '@/components/atoms/ScrollPill'
 import { ThemeToggle } from '@/components/atoms/ThemeToggle'
 import { MobileMenu } from './MobileMenu'
 import { heroAnimationTravel } from '@/components/atoms/heroFrames'
 import { getPortalBounds } from '@/components/atoms/portalBounds'
 import { getPeriodOpening } from '@/components/atoms/periodOpening'
-import { toPlaybackTime, fromPlaybackTime, heroFillEnd } from './scrollPlayback'
+import { toPlaybackTime, fromPlaybackTime } from './scrollPlayback'
 import { useIntroReady } from '@/hooks/useIntroReady'
 
 const scenes = [
@@ -28,7 +32,7 @@ const scenes = [
   { id: 'about', label: 'About' },
   { id: 'contact', label: 'Contact' },
 ]
-const heroRevealTravel = sceneStops[1] - heroFillEnd
+const heroRevealTravel = sceneStops[1] - heroParagraphEnd
 const wordmarkDropStart = -100
 
 const origins = [
@@ -43,6 +47,9 @@ export function SceneSequence({ children }: { children: ReactNode }) {
   const headerEntranceY = useMotionValue(-24)
   const wordmarkEntranceY = useMotionValue(wordmarkDropStart)
   const timeline = useMotionValue(0)
+  const scrollProgress = useMotionValue(0)
+  const scrollRecess = useSpring(1, { stiffness: 340, damping: 34, mass: 0.85 })
+  const [scrollSection, setScrollSection] = useState(0)
   const track = useRef<HTMLDivElement>(null)
   const panels = useRef<(HTMLElement | null)[]>([])
   const sceneOpenings = useRef<(SVGCircleElement | null)[]>([])
@@ -148,6 +155,9 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     let displayed = 0
     let requested = 0
     let inputDirection = 0
+    let pillSection = 0
+    let pillRecessTarget = 1
+    let hasScrolled = false
     let gesturePlayback = false
     let gestureTargetClock = 0
     const playbackClock = motionValue(0)
@@ -157,8 +167,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     let snapExpectedY = 0
 
     const transitionRanges = [
-      { start: heroFillEnd, end: sceneStops[1] },
-      { start: skillTitleFillEnd, end: skillStart },
+      { start: heroParagraphEnd, end: sceneStops[1] },
+      { start: skillParagraphEnd, end: skillStart },
       ...sceneStops.slice(2).map((end) => ({ start: end - 1, end })),
     ]
     let sceneTransition: { range: (typeof transitionRanges)[number]; direction: number; stop?: () => void } | null = null
@@ -329,6 +339,19 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       // had a chance to handle it; keep the skills timeline free of a queue.
       if (current === 1) {
         let travel = touchInput ? pixels * 1.25 : pixels
+        if (!sceneTransition && requested >= sceneStops[1] && requested <= skillParagraphEnd + 0.01) {
+          // Cap how far a wheel burst can lead the painted intro. Preserve small
+          // deltas and leave enough room for the words to pass at a readable pace.
+          if (!touchInput) {
+            const lead = Math.max(0, 0.12 - direction * (requested - displayed))
+            travel = direction * Math.min(Math.abs(pixels), 56, lead * distance / sceneDuration)
+          }
+          if (direction > 0 && displayed < skillParagraphEnd - 0.02) {
+            const endY = start + skillParagraphEnd * distance / sceneDuration
+            travel = Math.min(travel, Math.max(0, endY - scrollY))
+          }
+          if (!travel) return true
+        }
         if (touchInput && touch && displayed >= skillStart && displayed <= skillStart + skillTravel) {
           if (touch.projectSwipe?.direction !== direction) {
             const position = requested - skillStart
@@ -378,10 +401,13 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       inputDirection = direction
       const inputGain = touchInput ? (current === 0 ? 0.005 : 0.003) : 0.0015
       const desired = base + direction * (touchInput ? Math.abs(pixels) : Math.min(Math.abs(pixels), 120)) * inputGain
+      const limit = direction > 0 && current === 0 && displayed < heroParagraphEnd - 0.02
+        ? heroParagraphEnd
+        : sceneDuration
       const bounded = Math.max(
         0,
         Math.min(
-          toPlaybackTime(sceneDuration),
+          toPlaybackTime(limit),
           desired,
         ),
       )
@@ -483,7 +509,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       const currentTime = toPlaybackTime(displayed)
       const targetTime = toPlaybackTime(requested)
       const difference = Math.abs(targetTime - currentTime)
-      const heroPlayback = Math.min(displayed, requested) < heroFillEnd
+      const heroPlayback = Math.min(displayed, requested) < heroParagraphEnd
+      const skillsIntroPlayback = current === 1 && Math.min(displayed, requested) < skillParagraphEnd
       if (difference < 0.000001) {
         displayed = requested
         renderScene(displayed)
@@ -493,7 +520,9 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       // Keep velocity when a new gesture target arrives. Use the same spring for
       // wheel and touch through the walk and text fill so a wheel notch cannot restart an ease-out.
       const control = animate(playbackClock, targetTime, {
-        ...(gesturePlayback || heroPlayback
+        ...(skillsIntroPlayback
+          ? { type: 'spring' as const, stiffness: 230, damping: 30, mass: 0.9, restDelta: 0.0005, restSpeed: 0.005 }
+          : gesturePlayback || heroPlayback
           ? { type: 'spring' as const, stiffness: 420, damping: 42, mass: 0.9, restDelta: 0.0005, restSpeed: 0.005 }
           : current === 1
             ? { type: 'tween' as const, duration: 0.24, ease: [0.22, 1, 0.36, 1] as const }
@@ -526,6 +555,9 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       const boundary = transitionRanges.flatMap(({ start, end }) => [start, end])
         .find((stop) => Math.abs(stop - rawProgress) * travel / sceneDuration < 1)
       const progress = boundary ?? rawProgress
+      if (Math.abs(progress - requested) > 0.001 && document.documentElement.dataset.introLoading !== 'true') {
+        hasScrolled = true
+      }
       timeline.set(progress)
       render(timeline.get())
     }
@@ -533,6 +565,24 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     function renderScene(value: number) {
       if (media.matches) return
       const progress = Math.max(0, Math.min(sceneDuration, value))
+      const section = sceneStops.findLastIndex((start) => progress >= start)
+      const range = sectionScrollRanges[section]
+      const nextStart = sceneStops[section + 1]
+      const departure = nextStart === undefined ? 0 :
+        Math.max(0, Math.min(1, (progress - range.end) / ((nextStart - range.end) * 0.32)))
+      const recess = hasScrolled ? departure * departure * (3 - 2 * departure) : 1
+      const sectionChanged = section !== pillSection
+      if (sectionChanged) {
+        // Reset the vertical position while the pill and its liquid are offscreen.
+        scrollRecess.jump(1)
+        pillSection = section
+        setScrollSection(section)
+      }
+      scrollProgress.set(Math.max(0, Math.min(1, (progress - range.start) / (range.end - range.start))))
+      if (sectionChanged || recess !== pillRecessTarget) {
+        scrollRecess.set(recess)
+        pillRecessTarget = recess
+      }
       if (track.current) {
         track.current.dataset.playbackProgress = String(progress)
         track.current.dataset.playbackTime = String(toPlaybackTime(progress))
@@ -540,7 +590,12 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       const jakeProgress = Math.max(0, Math.min(1, progress / heroAnimationTravel))
       if (panels.current[0]) panels.current[0].dataset.jakeProgress = String(jakeProgress)
       window.dispatchEvent(
-        new CustomEvent('portfolio:hero-progress', { detail: { progress: jakeProgress } }),
+        new CustomEvent('portfolio:hero-progress', {
+          detail: {
+            progress: jakeProgress,
+            paragraph: Math.max(0, Math.min(1, (progress - heroFillEnd) / (heroParagraphEnd - heroFillEnd))),
+          },
+        }),
       )
       const heroFill = Math.max(
         0,
@@ -568,7 +623,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           index === 0
             ? 1
             : index === 1
-              ? Math.max(0, Math.min(1, (progress - heroFillEnd) / heroRevealTravel))
+              ? Math.max(0, Math.min(1, (progress - heroParagraphEnd) / heroRevealTravel))
               : Math.max(0, Math.min(1, progress - sceneStops[index] + 1))
         if (index > 0 && (reveal === 0 || reveal === 1)) {
           panel.style.clipPath = reveal === 1 ? 'none' : 'circle(0px)'
@@ -729,6 +784,22 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       goTo(index, true)
     }
 
+    function seekScroll(event: Event) {
+      const fraction = (event as CustomEvent<number>).detail
+      const node = track.current
+      if (!node || media.matches || !Number.isFinite(fraction)) return
+      cancelSceneTransition()
+      cancelSnap()
+      pendingFocus = null
+      const range = sectionScrollRanges[sceneStops.findLastIndex((start) => displayed >= start)]
+      const position = range.start + Math.max(0, Math.min(1, fraction)) * (range.end - range.start)
+      const start = scrollY + node.getBoundingClientRect().top
+      const distance = node.offsetHeight - (node.firstElementChild?.clientHeight ?? innerHeight)
+      window.scrollTo({ top: start + distance * position / sceneDuration, behavior: 'instant' })
+      timeline.jump(position)
+      render(position, true)
+    }
+
     function restoreHash() {
       const index = window.location.hash
         ? scenes.findIndex((scene) => `#${scene.id}` === window.location.hash)
@@ -759,6 +830,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     document.addEventListener('click', navigate)
     window.addEventListener('portfolio:select-skill', selectSkill)
     window.addEventListener('portfolio:select-scene', selectScene)
+    window.addEventListener('portfolio:seek-scroll', seekScroll)
     window.addEventListener('popstate', restoreHash)
     window.addEventListener('hashchange', restoreHash)
     media.addEventListener('change', setup)
@@ -786,11 +858,12 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       document.removeEventListener('click', navigate)
       window.removeEventListener('portfolio:select-skill', selectSkill)
       window.removeEventListener('portfolio:select-scene', selectScene)
+      window.removeEventListener('portfolio:seek-scroll', seekScroll)
       window.removeEventListener('popstate', restoreHash)
       window.removeEventListener('hashchange', restoreHash)
       media.removeEventListener('change', setup)
     }
-  }, [timeline])
+  }, [timeline, scrollProgress, scrollRecess])
 
   // Switching from document flow to a sticky stage changes the track geometry.
   useEffect(() => {
@@ -810,7 +883,16 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         <LiquidBoundary
           headerY={headerEntranceY}
           wordmarkY={wordmarkEntranceY}
+          scrollProgress={scrollProgress}
+          scrollRecess={scrollRecess}
         />
+        {enhanced && introReady && !menuOpen && (
+          <ScrollPill
+            progress={scrollProgress}
+            recess={scrollRecess}
+            section={scenes[scrollSection].label}
+          />
+        )}
         <a className="skip-link" href="#skills">
           Skip to selected work
         </a>

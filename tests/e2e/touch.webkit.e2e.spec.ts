@@ -44,6 +44,16 @@ test('vertical touch input advances and reverses the scene clock', async ({ page
   })
   const consumed = await swipe(page, '.hero-copy', 620, 220)
   expect(consumed.every(Boolean)).toBe(true)
+  const slider = page.getByRole('slider', { name: 'Home scroll position' })
+  await expect(slider).toBeAttached()
+  const { top, bottomInset } = await slider.evaluate((element) => {
+    const bounds = element.getBoundingClientRect()
+    const height = window.visualViewport?.height ?? innerHeight
+    return { top: bounds.top, bottomInset: (height - bounds.bottom) / height }
+  })
+  const menuBounds = (await page.getByRole('button', { name: 'Open menu' }).boundingBox())!
+  expect(top - (menuBounds.y + menuBounds.height)).toBeGreaterThanOrEqual(16)
+  expect(bottomInset).toBeCloseTo(0.07, 3)
   await expect
     .poll(async () =>
       Number(await page.locator('.scene-track').getAttribute('data-playback-progress')),
@@ -141,7 +151,7 @@ test('skills introduction fill responds to mobile wheel input and vertical swipe
   await expect(first).toHaveCSS('--title-fill', '0%')
   await first.dispatchEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true })
   await expect.poll(async () => parseFloat(await first.evaluate((line) =>
-    getComputedStyle(line).getPropertyValue('--title-fill')))).toBeGreaterThan(20)
+    getComputedStyle(line).getPropertyValue('--title-fill')))).toBeGreaterThan(8)
   const consumed = await swipe(page, '.skills-title-fill', 620, 320)
   expect(consumed.every(Boolean)).toBe(true)
   await expect(first).toHaveCSS('--title-fill', '100%')

@@ -7,13 +7,18 @@ import { introCompleteEvent } from '@/hooks/useIntroReady'
 export function LiquidBoundary({
   headerY,
   wordmarkY,
+  scrollProgress,
+  scrollRecess,
 }: {
   headerY: MotionValue<number>
   wordmarkY: MotionValue<number>
+  scrollProgress: MotionValue<number>
+  scrollRecess: MotionValue<number>
 }) {
   const root = useRef<SVGSVGElement>(null)
   const surround = useRef<SVGSVGElement>(null)
   const parked = useRef<SVGPathElement>(null)
+  const scrollLiquid = useRef<SVGPathElement>(null)
 
   useEffect(() => {
     const svg = root.current
@@ -28,6 +33,7 @@ export function LiquidBoundary({
     let perimeter = 1
     let corner = 25
     let segments: number[] = []
+    let basePoints: ReturnType<typeof pointAt>[] = []
     let position = 0
     let targetPosition = 0
     let depth = 0
@@ -41,6 +47,11 @@ export function LiquidBoundary({
     let idle = false
     let idleTimer = 0
     let parkedGeometry = ''
+    let scrollGeometry = ''
+    let scrollTop = 31
+    let scrollBottom = 31
+    let scrollReach = 23
+    let scrollRadius = 46
     svg.dataset.mode = media.matches ? 'static' : 'pointer'
 
     function armIdle() {
@@ -96,8 +107,7 @@ export function LiquidBoundary({
     }
     function contour(position: number, depth: number, radius: number, power: number, updateSurround = false) {
       const direction = pointAt(position)
-      const count = Math.ceil(perimeter / 5)
-      const basePoints = Array.from({ length: count }, (_, i) => pointAt((perimeter * i) / count))
+      const count = basePoints.length
       const points = basePoints.map((base, i) => {
         const s = (perimeter * i) / count
         const amount = depth * Math.exp(-((Math.abs(arcDelta(position, s)) / radius) ** power))
@@ -143,6 +153,18 @@ export function LiquidBoundary({
       radius += (targetRadius - radius) * ease
       power += (targetPower - power) * ease
       path!.setAttribute('d', contour(position, depth, radius, power, true))
+      const scrollY = scrollTop + Math.max(0, height - scrollTop - scrollBottom) * scrollProgress.get()
+      const scrollDepth = scrollReach * (1 - Math.max(0, Math.min(1, scrollRecess.get())))
+      const scrollKey = `${width}:${height}:${scrollY}:${scrollDepth}:${scrollRadius}`
+      if (scrollKey !== scrollGeometry) {
+        const rightEdge = segments[0] + segments[1] + Math.max(0, scrollY - corner)
+        if (scrollDepth > 0) {
+          scrollLiquid.current?.setAttribute('d', contour(rightEdge, scrollDepth, scrollRadius, 2.5))
+        } else {
+          scrollLiquid.current?.removeAttribute('d')
+        }
+        scrollGeometry = scrollKey
+      }
       const bounds = (surround.current ?? svg!).getBoundingClientRect()
       const wordmark = window.innerWidth > 760
         ? document.querySelector<HTMLElement>('.site-header .wordmark-text')?.getBoundingClientRect()
@@ -231,9 +253,18 @@ export function LiquidBoundary({
         12
       width = Math.max(1, bounds.width - 2 * frameInset)
       height = Math.max(1, bounds.height - 2 * frameInset)
+      const styles = getComputedStyle(document.documentElement)
+      const thumbHeight = parseFloat(styles.getPropertyValue('--scroll-pill-height')) || 46
+      const edgeInset = parseFloat(styles.getPropertyValue('--scroll-pill-edge-inset')) || frameInset
+      const topInset = parseFloat(styles.getPropertyValue('--scroll-pill-top-inset')) || edgeInset
+      scrollTop = topInset - frameInset + thumbHeight / 2
+      scrollBottom = edgeInset - frameInset + thumbHeight / 2
+      scrollReach = parseFloat(styles.getPropertyValue('--scroll-liquid-depth')) || 23
+      scrollRadius = parseFloat(styles.getPropertyValue('--scroll-liquid-radius')) || 46
       path!.setAttribute('transform', `translate(${frameInset} ${frameInset})`)
       surroundPath?.setAttribute('transform', `translate(${frameInset} ${frameInset})`)
       parkedPath?.setAttribute('transform', `translate(${frameInset} ${frameInset})`)
+      scrollLiquid.current?.setAttribute('transform', `translate(${frameInset} ${frameInset})`)
       corner = Math.min(25, width / 2, height / 2)
       const quarter = (Math.PI * corner) / 2
       segments = [
@@ -247,6 +278,8 @@ export function LiquidBoundary({
         quarter,
       ]
       perimeter = segments.reduce((sum, length) => sum + length, 0)
+      const sampleCount = Math.ceil(perimeter / 5)
+      basePoints = Array.from({ length: sampleCount }, (_, index) => pointAt(perimeter * index / sampleCount))
       position = wrap(position)
       targetPosition = wrap(targetPosition)
       schedule()
@@ -377,7 +410,7 @@ export function LiquidBoundary({
     if (surround.current) observer.observe(surround.current)
     const wordmarkAnchor = document.querySelector('.site-header .logo-anchor')
     if (wordmarkAnchor) observer.observe(wordmarkAnchor)
-    const stopFollowingEntrance = [headerY, wordmarkY].map((value) =>
+    const stopFollowing = [headerY, wordmarkY, scrollProgress, scrollRecess].map((value) =>
       value.on('change', schedule),
     )
     measure()
@@ -395,7 +428,7 @@ export function LiquidBoundary({
     media.addEventListener('change', preferenceChanged)
     return () => {
       cancelAnimationFrame(frame)
-      stopFollowingEntrance.forEach((unsubscribe) => unsubscribe())
+      stopFollowing.forEach((unsubscribe) => unsubscribe())
       document.querySelectorAll<HTMLElement>('[data-liquid-covered]').forEach((control) => {
         delete control.dataset.liquidCovered
       })
@@ -413,7 +446,7 @@ export function LiquidBoundary({
       document.removeEventListener('focusout', unfocus)
       media.removeEventListener('change', preferenceChanged)
     }
-  }, [headerY, wordmarkY])
+  }, [headerY, wordmarkY, scrollProgress, scrollRecess])
 
   return (
     <>
@@ -423,6 +456,7 @@ export function LiquidBoundary({
       <svg ref={surround} className="liquid-surround" aria-hidden="true" focusable="false">
         <path fillRule="evenodd" />
         <path ref={parked} className="liquid-wordmark-parked" fillRule="evenodd" />
+        <path ref={scrollLiquid} className="liquid-scroll-pill" fillRule="evenodd" />
       </svg>
     </>
   )
