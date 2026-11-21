@@ -98,7 +98,10 @@ export function drawHeroFrame(
     }
   }
   // This common crop retains the movement already present in all 16 supplied frames.
-  context.drawImage(image, 700, 80, 580, 640, 0, 0, 580, 640)
+  const sourceScale = image.naturalWidth / 1280
+  context.drawImage(
+    image, 700 * sourceScale, 80 * sourceScale, 580 * sourceScale, 640 * sourceScale, 0, 0, 580, 640,
+  )
   context.restore()
   context.restore()
 }

@@ -26,7 +26,9 @@ export function LiquidBoundary({
     const surroundPath = surround.current?.querySelector('path')
     const parkedPath = parked.current
     if (!svg || !path) return
-    const media = window.matchMedia('(prefers-reduced-motion: reduce), (pointer: coarse)')
+    const media = window.matchMedia(
+      '(max-width: 760px), (prefers-reduced-motion: reduce), (pointer: coarse)',
+    )
     let frameInset = 12
     let width = 0
     let height = 0
@@ -391,6 +393,7 @@ export function LiquidBoundary({
       schedule()
     }
     function unfocus(event: FocusEvent) {
+      if (media.matches) return
       activity()
       targetDepth = 0
       connect(

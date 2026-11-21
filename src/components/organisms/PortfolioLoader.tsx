@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import { heroFrameCount } from '@/components/atoms/heroFrames'
 import { introCompleteEvent } from '@/hooks/useIntroReady'
 import { getPeriodOpening } from '@/components/atoms/periodOpening'
+import { mobileLoaderAtlas, mobileSpriteMedia } from '@/components/atoms/spriteAssets'
 
 const seenKey = 'portfolio:intro-seen'
 const frameDurations = [
@@ -21,7 +22,7 @@ const readingHoldDuration = 400
 const readyDelayReduction = 333
 const fadeDuration = 300
 const openerDuration = 1150
-const introLines = ['Im Jake']
+const introLines = ['I’m Jake']
 const copyStartsAt = frameStarts[13] + 300
 const copyFillStartsAt = copyStartsAt + 560
 const copyFillDuration = 650
@@ -68,12 +69,14 @@ export function PortfolioLoader({ playOnce = false }: { playOnce?: boolean }) {
     let elapsed = 0
     let paintedFrame = -1
     let copyStarted = false
+    let previousCopyFill = -1
     let assetsReady = false
     let assetsReadyAt = Number.POSITIVE_INFINITY
     let completedAssets = 0
     let openerStarted = false
     let openerOrigin = { x: 0, y: 0, radius: 0 }
     const lightIntro = documentRoot.dataset.theme !== 'dark'
+    const mobile = window.matchMedia(mobileSpriteMedia).matches
     delete documentRoot.dataset.introComplete
     const portfolio = document.querySelector<HTMLElement>('.portfolio')
     const previousOverflow = documentRoot.style.overflow
@@ -105,7 +108,9 @@ export function PortfolioLoader({ playOnce = false }: { playOnce?: boolean }) {
     }
     timeout = window.setTimeout(release, 8000)
 
-    const frames = reduceMotion
+    const atlasImage = !reduceMotion && mobile ? new Image() : null
+    if (atlasImage) atlasImage.src = mobileLoaderAtlas.src
+    const frames = reduceMotion || atlasImage
       ? []
       : Array.from({ length: frameDurations.length }, (_, index) => {
           const image = new Image()
@@ -113,7 +118,13 @@ export function PortfolioLoader({ playOnce = false }: { playOnce?: boolean }) {
           return image
         })
     const context = canvas.current?.getContext('2d')
-    const heroAssets = reduceMotion
+    if (atlasImage && context) {
+      const { canvas: surface } = context
+      surface.width = 960
+      surface.height = 540
+      context.scale(0.75, 0.75)
+    }
+    const heroAssets = reduceMotion || mobile
       ? []
       : [
           '/jm-symbol.svg',
@@ -128,13 +139,13 @@ export function PortfolioLoader({ playOnce = false }: { playOnce?: boolean }) {
         })
     let pageLoadHandler: (() => void) | undefined
     const pageReady =
-      document.readyState === 'complete'
+      mobile || document.readyState === 'complete'
         ? Promise.resolve()
         : new Promise<void>((resolve) => {
             pageLoadHandler = () => resolve()
             window.addEventListener('load', pageLoadHandler, { once: true })
           })
-    const totalAssets = frames.length + heroAssets.length + 2
+    const totalAssets = (atlasImage ? 1 : frames.length) + heroAssets.length + 2
     function track(task: Promise<unknown>) {
       return task.then((result) => {
         completedAssets += 1
@@ -146,7 +157,7 @@ export function PortfolioLoader({ playOnce = false }: { playOnce?: boolean }) {
         return result
       })
     }
-    const loaderTasks = frames.map((image) => track(image.decode()))
+    const loaderTasks = atlasImage ? [track(atlasImage.decode())] : frames.map((image) => track(image.decode()))
     const readinessTasks = [
       track(document.fonts.ready),
       track(pageReady),
@@ -159,7 +170,10 @@ export function PortfolioLoader({ playOnce = false }: { playOnce?: boolean }) {
       previousTime = time
       if (!document.hidden) elapsed += delta
       const copyFill = reduceMotion ? 1 : Math.min(1, Math.max(0, (elapsed - copyFillStartsAt) / copyFillDuration))
-      layer.current?.style.setProperty('--title-fill', `${copyFill * 100}%`)
+      if (copyFill !== previousCopyFill) {
+        layer.current?.style.setProperty('--title-fill', `${copyFill * 100}%`)
+        previousCopyFill = copyFill
+      }
       if (reduceMotion) {
         if (!copyStarted) {
           copyStarted = true
@@ -188,7 +202,15 @@ export function PortfolioLoader({ playOnce = false }: { playOnce?: boolean }) {
           context.ellipse(640, 620, (12 + growth * 62) * impact, 4 + growth * 7, 0, 0, Math.PI * 2)
           context.fill()
           context.restore()
-          context.drawImage(frames[frame], 0, 0)
+          if (atlasImage) {
+            const { columns, left, top, width, height, scale } = mobileLoaderAtlas
+            context.drawImage(
+              atlasImage, (frame % columns) * width, Math.floor(frame / columns) * height, width, height,
+              left * scale, top * scale, width * scale, height * scale,
+            )
+          } else {
+            context.drawImage(frames[frame], 0, 0)
+          }
           canvas.current!.dataset.frame = String(frame)
           paintedFrame = frame
         }
@@ -196,9 +218,10 @@ export function PortfolioLoader({ playOnce = false }: { playOnce?: boolean }) {
           copyStarted = true
           setCopyReady(true)
         }
-        if (layer.current)
-          layer.current.dataset.phase =
-            elapsed < copyStartsAt ? 'avatar' : elapsed < catchSettledAt ? 'copy' : 'catch'
+        if (layer.current && !openerStarted) {
+          const phase = elapsed < copyStartsAt ? 'avatar' : elapsed < catchSettledAt ? 'copy' : 'catch'
+          if (layer.current.dataset.phase !== phase) layer.current.dataset.phase = phase
+        }
         const fadeStartsAt = sequenceDuration + readingHoldDuration - readyDelayReduction
         const readinessFadeStartsAt = Math.max(fadeStartsAt, assetsReadyAt)
         if (

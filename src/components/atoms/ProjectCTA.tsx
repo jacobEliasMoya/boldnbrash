@@ -43,7 +43,7 @@ export function ProjectCTA({ title, description, onOpen }: {
       type="button"
       className="skill-project-band"
       aria-haspopup="dialog"
-      aria-label={`Read project - ${title}`}
+      aria-label={`Read project - ${title} ${description}`}
       onClick={async (event) => {
         if (opening.current) return
         opening.current = true
@@ -74,7 +74,7 @@ export function ProjectCTA({ title, description, onOpen }: {
         <motion.path d={path} />
       </svg>
       <span className="skill-project-band-copy">
-        <span className="skill-project-title" role="heading" aria-level={4}>{title}</span>
+        <span className="skill-project-title">{title}</span>{' '}
         <span className="skill-project-information">{description}</span>
       </span>
       <span className="skill-project-band-arrow" aria-hidden="true"><DotIcon controls={arrowControls} /></span>

@@ -50,7 +50,7 @@ for (const viewport of [
         elements.flatMap((element, index) => getComputedStyle(element).transform === 'none' ? [] : [index]),
       )
       await expect.poll(() => paragraph.textContent()).toBe(
-        'Check out how I spend my time when I’m not working, being a dad, or playing guitar.',
+        'See what I’ve built across client websites, design systems, and developer tools, plus a few experiments in 3D and AI.',
       )
       await scrollToPhase(page, titleEnd + (skillParagraphEnd - titleEnd) * 2.5 / count)
       await expect.poll(activeWords).toEqual([2])

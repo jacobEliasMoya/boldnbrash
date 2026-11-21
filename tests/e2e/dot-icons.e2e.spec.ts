@@ -46,7 +46,7 @@ test('mobile menu and project controls visibly gather and rebound before opening
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('portfolio:select-skill', {
     detail: { index: 2, offset: 0.95 }, cancelable: true,
   })))
-  const card = page.getByRole('button', { name: 'Read project - GitGo', exact: true })
+  const card = page.getByRole('button', { name: /^Read project - GitGo\b/ })
   await expectClickRebound(card, card.locator('.dot-icon'))
   const modal = page.getByRole('dialog', { name: 'GitGo', exact: true })
   await expect(modal).toBeVisible()

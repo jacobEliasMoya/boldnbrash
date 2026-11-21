@@ -11,7 +11,13 @@ export default function HomePage() {
   return (
     <>
       <noscript>
-        <style>{'.portfolio-loader{display:none}'}</style>
+        <style>{`
+          .portfolio-loader { display: none; }
+          .site-header, .wordmark, .hero-greeting, .hero-description, .hero-letter, .hero-period {
+            opacity: 1 !important;
+            transform: none !important;
+          }
+        `}</style>
       </noscript>
       <PortfolioLoader playOnce={playLoaderOnce} />
       <SceneSequence>

@@ -15,12 +15,12 @@ export function ProfileSections() {
       </div>
       <div className="about-copy">
         <p>
-          I’m Jacob Moya. I build reusable design systems and carry accessible
-          interfaces from design into production.
+          I’m Jacob Moya, a software engineer in Southern California. I build
+          accessible web interfaces and the reusable components behind them.
         </p>
         <p>
-          Based in Southern California. Working across interfaces, content
-          platforms, and tools.
+          My work includes React applications, WordPress migrations, and tools
+          that automate repetitive development tasks.
         </p>
         <ProfileLinks placement="about" />
         <details className="about-details">

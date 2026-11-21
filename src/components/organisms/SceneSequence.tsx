@@ -44,6 +44,12 @@ const scenes = [
   { id: 'about', label: 'About' },
   { id: 'contact', label: 'Contact' },
 ]
+// Matching path commands let Motion gather both glyphs into the same point.
+const showcasePlayPath = 'M8 5.5 L18 12 L8 18.5 L8 5.5 M8 12 L8 12 L8 12 L8 12'
+const showcasePausePath = 'M9 6 L9 10 L9 14 L9 18 M15 6 L15 10 L15 14 L15 18'
+const showcaseCenterPath = 'M12 12 L12 12 L12 12 L12 12 M12 12 L12 12 L12 12 L12 12'
+const showcasePlayOvershoot = 'M7.5 4.7 L18.7 12 L7.5 19.3 L7.5 4.7 M7.5 12 L7.5 12 L7.5 12 L7.5 12'
+const showcasePauseOvershoot = 'M8.6 5.3 L8.6 9.8 L8.6 14.2 L8.6 18.7 M15.4 5.3 L15.4 9.8 L15.4 14.2 L15.4 18.7'
 const heroRevealTravel = sceneStops[1] - heroWalkOutEnd
 const wordmarkDropStart = -100
 
@@ -204,6 +210,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     let lastHeroParagraph = -1
     let lastHeroFill = -1
     let stopShowcasePlayback: (() => void) | undefined
+    let showcaseExpectedY = 0
 
     function cancelSceneTransition() {
       sceneTransition?.stop?.()
@@ -814,7 +821,10 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     }
 
     function schedule() {
-      if (stopShowcasePlayback) return
+      if (stopShowcasePlayback) {
+        if (Math.abs(scrollY - showcaseExpectedY) <= 1) return
+        pauseShowcase()
+      }
       if (sceneTransition) {
         if (Math.abs(scrollY - transitionExpectedY) <= 2) return
         cancelSceneTransition()
@@ -896,6 +906,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       const start = window.scrollY + node.getBoundingClientRect().top
       const distance =
         node.offsetHeight - (node.firstElementChild?.clientHeight ?? window.innerHeight)
+      pauseShowcase()
       event.preventDefault()
       const position = skillStart + skillSegments[index].start + Math.max(0.001, offset)
       window.scrollTo({ top: start + (distance * position) / sceneDuration, behavior: 'instant' })
@@ -953,6 +964,10 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       pauseShowcase()
     }
 
+    function interruptNestedScroll(event: Event) {
+      if (event.target instanceof Element) pauseShowcase()
+    }
+
     toggleShowcase.current = () => {
       if (stopShowcasePlayback) {
         pauseShowcase()
@@ -972,9 +987,11 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       const distance = node.offsetHeight - (node.firstElementChild?.clientHeight ?? innerHeight)
       const from = displayed >= sceneDuration - 0.01 ? 0 : toShowcaseTime(displayed)
       const end = toShowcaseTime(sceneDuration)
+      showcaseExpectedY = scrollY
       const playFrame = (time: number) => {
         const position = Math.min(sceneDuration, fromShowcaseTime(time))
         window.scrollTo({ top: start + (distance * position) / sceneDuration, behavior: 'instant' })
+        showcaseExpectedY = scrollY
         timeline.jump(position)
         render(position, true)
       }
@@ -1022,6 +1039,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     window.addEventListener('wheel', pauseShowcase, { passive: true, capture: true })
     window.addEventListener('keydown', interruptShowcase, true)
     window.addEventListener('resize', pauseShowcase)
+    document.addEventListener('touchmove', pauseShowcase, { passive: true, capture: true })
+    document.addEventListener('scroll', interruptNestedScroll, { passive: true, capture: true })
     document.addEventListener('visibilitychange', pauseShowcase)
 
     return () => {
@@ -1031,6 +1050,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       window.removeEventListener('wheel', pauseShowcase, true)
       window.removeEventListener('keydown', interruptShowcase, true)
       window.removeEventListener('resize', pauseShowcase)
+      document.removeEventListener('touchmove', pauseShowcase, true)
+      document.removeEventListener('scroll', interruptNestedScroll, true)
       document.removeEventListener('visibilitychange', pauseShowcase)
       history.scrollRestoration = previousScrollRestoration
       cancelSceneTransition()
@@ -1066,6 +1087,9 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     if (enhanced) window.dispatchEvent(new Event('scroll'))
   }, [enhanced])
 
+  const showcasePath = showcasePlaying ? showcasePausePath : showcasePlayPath
+  const showcaseOvershoot = showcasePlaying ? showcasePauseOvershoot : showcasePlayOvershoot
+
   return (
     <MotionConfig reducedMotion="user" transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}>
       <div
@@ -1089,7 +1113,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         <a className="skip-link" href="#skills">
           Skip to selected work
         </a>
-        <motion.header
+        <header id="portfolio-header">
+        <motion.div
           className={`site-header tone-${scenes[active]?.id === 'contact' ? 'dark' : 'paper'}`}
           initial={reduceMotion ? false : { opacity: 0, y: -24 }}
           animate={introReady ? { opacity: 1, y: 0 } : { opacity: 0, y: -24 }}
@@ -1120,8 +1145,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
               }}
             >
               <span className="wordmark-text" aria-hidden="true">
-                JacobMoya
-                <span className="nav-label-contrast">JacobMoya</span>
+                Jacob Moya
+                <span className="nav-label-contrast wordmark-contrast" data-text="Jacob Moya" />
               </span>
               <span className="wordmark-symbol" aria-hidden="true" />
             </motion.a>
@@ -1198,7 +1223,33 @@ export function SceneSequence({ children }: { children: ReactNode }) {
                 onClick={() => toggleShowcase.current?.()}
                 whileTap={{ scale: 0.92 }}
               >
-                <span aria-hidden="true"><DotIcon kind={showcasePlaying ? 'pause' : 'play'} /></span>
+                <span aria-hidden="true">
+                  <DotIcon kind={showcasePlaying ? 'pause' : 'play'} animateOnChange />
+                  <svg
+                    className="showcase-rounded-icon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.75"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    focusable="false"
+                  >
+                    <motion.path
+                      initial={false}
+                      animate={{
+                        d: reduceMotion
+                          ? showcasePath
+                          : [null, showcaseCenterPath, showcaseOvershoot, showcasePath],
+                      }}
+                      transition={{
+                        duration: reduceMotion ? 0 : 0.3,
+                        times: [0, 0.38, 0.83, 1],
+                        ease: ['easeIn', 'easeOut', 'easeInOut'],
+                      }}
+                    />
+                  </svg>
+                </span>
               </motion.button>
             </BlendedLogo>
           )}
@@ -1225,7 +1276,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
               }
             }}
           />
-        </motion.header>
+        </motion.div>
+        </header>
         <main
           ref={track}
           className="scene-track"

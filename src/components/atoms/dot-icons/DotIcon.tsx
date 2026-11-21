@@ -12,16 +12,18 @@ const dotPatterns = {
   pause: [[8, 6.8], [8, 12], [8, 17.2], [16, 6.8], [16, 12], [16, 17.2]],
 } as const
 
-export function DotIcon({ kind = 'arrow', controls }: {
+export function DotIcon({ kind = 'arrow', controls, animateOnChange = false }: {
   kind?: keyof typeof dotPatterns
   controls?: ReturnType<typeof useAnimationControls>
+  animateOnChange?: boolean
 }) {
   const localControls = useAnimationControls()
   const reduced = useReducedMotion()
   const svg = useRef<SVGSVGElement>(null)
+  const previousKind = useRef(kind)
   const animation = controls ?? localControls
   useEffect(() => {
-    if (controls || reduced) return
+    if (controls || reduced || animateOnChange) return
     const parent = svg.current?.closest('a, button')
     if (!parent) return
     let busy = false
@@ -38,7 +40,22 @@ export function DotIcon({ kind = 'arrow', controls }: {
       parent.removeEventListener('click', click)
       localControls.stop()
     }
-  }, [controls, reduced, localControls])
+  }, [controls, reduced, localControls, animateOnChange])
+
+  useEffect(() => {
+    const changed = previousKind.current !== kind
+    previousKind.current = kind
+    if (!changed || !animateOnChange || controls || reduced) return
+    let cancelled = false
+    void (async () => {
+      await playDotClick(localControls)
+      if (!cancelled) await localControls.start('idle')
+    })()
+    return () => {
+      cancelled = true
+      localControls.stop()
+    }
+  }, [kind, animateOnChange, controls, reduced, localControls])
   return (
     <motion.svg ref={svg} className="dot-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"
       initial="idle" animate={animation} variants={{

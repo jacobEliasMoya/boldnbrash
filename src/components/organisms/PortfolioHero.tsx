@@ -96,6 +96,7 @@ export function PortfolioHero() {
           {headline.slice(0, -1).map((text, index) => (
             <span key={text} className="hero-line">
               <AnimatedLetters text={text} start={0.98 + index * 0.33} reduceMotion={reduceMotion} introReady={introReady} />
+              {' '}
             </span>
           ))}
           <span className="hero-line">
@@ -103,7 +104,7 @@ export function PortfolioHero() {
             <motion.a
               className="hero-period"
               href="#skills"
-              aria-label="Explore my skills"
+              aria-label="Explore selected projects and skills"
               initial={reduceMotion ? false : entrance}
               animate={introReady ? entered : entrance}
               transition={entranceTransition(1.64 + headline[2].length * letterStep, reduceMotion)}
@@ -131,7 +132,6 @@ export function PortfolioHero() {
             progress={paragraphProgress}
           />
         </motion.p>
-        <span className="sr-only">Jacob Moya’s creative development portfolio</span>
       </div>
       <div className="hero-mark">
         <HeroMark

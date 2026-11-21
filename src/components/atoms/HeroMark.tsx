@@ -1,5 +1,7 @@
 'use client'
 
+import { mobileSpriteMedia } from './spriteAssets'
+
 import { useEffect, useRef } from 'react'
 import { animate, useReducedMotion } from 'motion/react'
 import { ParticleMonogram, type WalkRipple } from './ParticleMonogram'
@@ -43,9 +45,11 @@ export function HeroMark({ entranceReady, walkReady, particlesEnabled, onFormati
     let walkingDistance = 0
     let lastRippleStep = -1
     let progress = Number(element.closest('.scene')?.getAttribute('data-jake-progress') ?? 0)
+    const mobile = window.matchMedia(mobileSpriteMedia).matches
+    const directory = mobile ? 'mini-jacob-mobile' : 'mini-jacob'
     const frames = Array.from({ length: heroFrameCount }, (_, index) => {
       const image = new Image()
-      image.src = `/images/mini-jacob/frame-${String(index).padStart(3, '0')}.webp?v=3`
+      image.src = `/images/${directory}/frame-${String(index).padStart(3, '0')}.webp?v=3`
       return image
     })
 

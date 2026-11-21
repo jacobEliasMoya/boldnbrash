@@ -26,7 +26,13 @@ export function useBlendBounds<T extends HTMLElement>(
         return
       }
       const rect = anchor.current!.getBoundingClientRect()
-      setBounds({ left: rect.left, top: rect.top, width: rect.width, height: rect.height })
+      setBounds((previous) => {
+        if (
+          previous?.left === rect.left && previous.top === rect.top &&
+          previous.width === rect.width && previous.height === rect.height
+        ) return previous
+        return { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
+      })
     }
     const observer = new ResizeObserver(followLayout)
     observer.observe(anchor.current)
@@ -94,7 +100,7 @@ export function BlendedNav({
           >
             {children}
           </nav>,
-          document.body,
+          document.getElementById('portfolio-header') ?? document.body,
         )}
     </>
   )

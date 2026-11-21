@@ -7,6 +7,15 @@ const __filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(__filename)
 
 const nextConfig: NextConfig = {
+  async headers() {
+    return [
+      {
+        source: '/images/:sequence(mini-jacob|mini-jacob-mobile|mini-jacob-loader)/:frame',
+        has: [{ type: 'query', key: 'v' }],
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=604800' }],
+      },
+    ]
+  },
   experimental: {
     agentUpgrade: 'security',
   },

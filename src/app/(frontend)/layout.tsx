@@ -2,12 +2,27 @@ import { existsSync } from 'node:fs'
 import type { Metadata } from 'next'
 import Script from 'next/script'
 import type { ReactNode } from 'react'
+import { mobileLoaderAtlas, mobileSpriteQueries } from '@/components/atoms/spriteAssets'
+import { portfolioDescription, portfolioTitle, siteUrl } from './siteMetadata'
 import './styles.css'
 
 export const metadata: Metadata = {
-  description:
-    'Jacob Moya’s frontend and product engineering portfolio. Interfaces, systems, and experiments.',
-  title: 'Jacob Moya | Creative Developer',
+  metadataBase: siteUrl,
+  alternates: siteUrl ? { canonical: '/' } : undefined,
+  description: portfolioDescription,
+  title: portfolioTitle,
+  openGraph: {
+    type: 'website',
+    title: portfolioTitle,
+    description: portfolioDescription,
+    siteName: 'Jacob Moya',
+    url: siteUrl,
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: portfolioTitle,
+    description: portfolioDescription,
+  },
   icons: { icon: '/jm-symbol.svg' },
 }
 
@@ -30,6 +45,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <link
+          rel="preload"
+          as="image"
+          fetchPriority="low"
+          href={mobileLoaderAtlas.src}
+          media={mobileSpriteQueries.map((query) => `${query} and (prefers-reduced-motion: no-preference)`).join(', ')}
+        />
         <script
           dangerouslySetInnerHTML={{
             __html: `try{document.documentElement.dataset.theme=localStorage.getItem('portfolio-theme')==='dark'?'dark':'light'}catch{};window.addEventListener('storage',function(e){if(e.key==='portfolio-theme'){document.documentElement.dataset.theme=e.newValue==='dark'?'dark':'light';window.dispatchEvent(new Event('portfolio:theme'))}})`,

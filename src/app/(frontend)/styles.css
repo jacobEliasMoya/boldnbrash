@@ -2,7 +2,7 @@
 
 @font-face {
   font-family: 'JetBrains Mono';
-  src: url('/fonts/jetbrains-mono/JetBrainsMono-Variable.ttf') format('truetype');
+  src: url('/fonts/jetbrains-mono/JetBrainsMono-Variable.woff2') format('woff2');
   font-style: normal;
   font-weight: 100 800;
   font-display: swap;
@@ -10,7 +10,7 @@
 
 @font-face {
   font-family: 'Instrument Sans';
-  src: url('/fonts/instrument-sans/InstrumentSans-Variable.ttf') format('truetype');
+  src: url('/fonts/instrument-sans/InstrumentSans-Variable.woff2') format('woff2');
   font-style: normal;
   font-weight: 400 700;
   font-display: swap;
@@ -2628,6 +2628,12 @@ ul {
   height: 22px;
 }
 
+.showcase-rounded-icon {
+  display: none;
+  width: 22px;
+  height: 22px;
+}
+
 @media (min-width: 761px) {
   .header-control-anchor:has(.showcase-toggle) {
     margin-inline-end: calc(4px - var(--header-gap));
@@ -2635,8 +2641,16 @@ ul {
 }
 
 @media (max-width: 760px) {
-  :is(.header-control-anchor, .liquid-blended-control):has(.showcase-toggle) {
+  .header-control-anchor:has(.showcase-toggle) {
+    margin-inline-start: 0;
+  }
+
+  .showcase-toggle .dot-icon {
     display: none;
+  }
+
+  .showcase-rounded-icon {
+    display: block;
   }
 }
 
@@ -2727,7 +2741,7 @@ ul {
   fill: #fff;
   pointer-events: none;
 }
-@media (prefers-reduced-motion: reduce), (pointer: coarse) {
+@media (max-width: 760px), (prefers-reduced-motion: reduce), (pointer: coarse) {
   .portfolio[data-enhanced] .liquid-boundary {
     display: none;
   }
@@ -3450,12 +3464,12 @@ ul {
     0 1px 2px #fff;
 }
 [data-liquid-covered='true'] .nav-home-icon,
-[data-liquid-covered='true'].showcase-toggle .dot-icon,
+[data-liquid-covered='true'].showcase-toggle svg,
 [data-liquid-covered='true'] .theme-toggle-track {
   filter: drop-shadow(0 0 1px #000);
 }
 :root[data-theme='dark'] [data-liquid-covered='true'] .nav-home-icon,
-:root[data-theme='dark'] [data-liquid-covered='true'].showcase-toggle .dot-icon,
+:root[data-theme='dark'] [data-liquid-covered='true'].showcase-toggle svg,
 :root[data-theme='dark'] [data-liquid-covered='true'] .theme-toggle-track {
   filter: drop-shadow(0 0 1px #fff);
 }
@@ -3918,6 +3932,12 @@ ul {
 .nav-label,
 .wordmark-text {
   position: relative;
+}
+.wordmark-text {
+  word-spacing: -0.14em;
+}
+.wordmark-contrast::before {
+  content: attr(data-text);
 }
 .nav-label-contrast {
   position: absolute;

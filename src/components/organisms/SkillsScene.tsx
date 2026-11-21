@@ -2,6 +2,8 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import {
+  cancelFrame,
+  frame,
   motion,
   useMotionValue,
   useReducedMotion,
@@ -18,7 +20,7 @@ import { clamp, getSkillFrame, projectStops, skills, skillParagraphEndPortion, s
 
 type Project = (typeof skills)[number]['projects'][number]
 type OpenProject = (project: Project, trigger: HTMLButtonElement) => void
-const introText = 'Check out how I spend my time when I’m not working, being a dad, or playing guitar.'
+const introText = 'See what I’ve built across client websites, design systems, and developer tools, plus a few experiments in 3D and AI.'
 
 function SkillCategoryPill({
   index,
@@ -70,7 +72,7 @@ function SkillCategoryPill({
   const order = useTransform(distance, (value) => 20 - Math.round(Math.abs(value) * 4))
   return (
     <motion.div
-      role="listitem"
+      role={animated ? 'listitem' : undefined}
       className="skills-category-pill"
       data-active={active ? '' : undefined}
       style={{
@@ -132,6 +134,7 @@ function SkillProjects({
     <div
       id={`skills-projects-${index}`}
       className="skills-project-stage skills-project-deck"
+      role="group"
       aria-label={`Projects in ${skill.name}`}
       data-skill={skill.name}
       data-project={projectIndex}
@@ -195,6 +198,7 @@ export function SkillsScene() {
   const reduceMotion = useReducedMotion()
   const animated = pinned && !reduceMotion
   const wheel = useRef<HTMLDivElement>(null)
+  const pendingCategoryFocus = useRef<number | null>(null)
   const [radius, setRadius] = useState(340)
   const [compactWheel, setCompactWheel] = useState(false)
   const ringPosition = useMotionValue(0)
@@ -258,7 +262,16 @@ export function SkillsScene() {
   }, [animated])
   useLayoutEffect(() => {
     ringPosition.set(selection.ringPosition)
-  }, [selection.ringPosition, ringPosition])
+    if (pendingCategoryFocus.current === selection.index) {
+      const focusCategory = () => {
+        pendingCategoryFocus.current = null
+        wheel.current?.querySelectorAll<HTMLButtonElement>('.skills-pill-toggle')[selection.index]
+          ?.focus({ preventScroll: true })
+      }
+      frame.postRender(focusCategory)
+      return () => cancelFrame(focusCategory)
+    }
+  }, [selection.index, selection.ringPosition, ringPosition])
   useEffect(() => {
     function update(event: Event) {
       const { progress, intro } = (event as CustomEvent<{ progress: number; intro: number }>).detail
@@ -311,7 +324,7 @@ export function SkillsScene() {
       {animated ? (
         <div className="skills-reveal" inert={expansion < 1} aria-hidden={expansion < 1}>
         <div className="skills-performance">
-          <div className="skills-projects" aria-label="Related projects">
+        <div className="skills-projects">
             {skills.map((skill, index) => (
               <SkillProjects
                 key={skill.name}
@@ -323,7 +336,41 @@ export function SkillsScene() {
               />
             ))}
           </div>
-          <div ref={wheel} className="skills-browser" role="list" aria-label="Skill categories">
+          <div
+            ref={wheel}
+            className="skills-browser"
+            role="list"
+            aria-label="Skill categories"
+            onKeyDown={(event) => {
+              if (!(event.target instanceof HTMLButtonElement) ||
+                !event.target.classList.contains('skills-pill-toggle')) return
+
+              const last = skills.length - 1
+              let next = selection.index
+              switch (event.key) {
+                case 'ArrowUp':
+                case 'ArrowLeft':
+                  next = Math.max(0, next - 1)
+                  break
+                case 'ArrowDown':
+                case 'ArrowRight':
+                  next = Math.min(last, next + 1)
+                  break
+                case 'Home':
+                  next = 0
+                  break
+                case 'End':
+                  next = last
+                  break
+                default:
+                  return
+              }
+              event.preventDefault()
+              if (next === selection.index) return
+              pendingCategoryFocus.current = next
+              selectSkill(next)
+            }}
+          >
             {skills.map((skill, index) => (
               <SkillCategoryPill
                 key={skill.name}

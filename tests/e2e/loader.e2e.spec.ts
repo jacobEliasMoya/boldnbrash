@@ -40,9 +40,11 @@ for (const width of [1440, 390]) {
     await expect(copyLines.last()).toHaveCSS('opacity', '0')
     await expect.poll(() => loader.evaluate((el) => parseFloat(getComputedStyle(el).getPropertyValue('--title-fill')))).toBe(0)
     await expect(page.locator('.site-header')).toHaveCSS('opacity', '0')
-    await expect(page.locator('.site-header .wordmark')).toHaveCSS('opacity', '0')
+    await expect.poll(() => page.locator('.site-header .wordmark').evaluate(
+      (wordmark) => new DOMMatrixReadOnly(getComputedStyle(wordmark).transform).m42,
+    )).toBeLessThan(0)
     if (width === 390)
-      await expect(page.getByRole('button', { name: 'Open menu' })).toHaveCSS('opacity', '0')
+      await expect(page.locator('.site-header .mobile-menu-toggle')).toHaveCSS('opacity', '0')
     await expect(page.locator('.hero-letter').first()).toHaveCSS('opacity', '0')
     await expect(loader).toHaveAttribute('data-play-once', 'false')
     await expect(loader, 'the light-mode loader should use the white canvas without an inset frame').toHaveCSS(
@@ -53,7 +55,7 @@ for (const width of [1440, 390]) {
       'none',
     )
     await expect(page.locator('.portfolio')).toHaveJSProperty('inert', true)
-    await expect(copyLines).toHaveText(['Im Jake'])
+    await expect(copyLines).toHaveText(['I’m Jake'])
     await expect(loader).toHaveAttribute('data-phase', 'copy', { timeout: 7000 })
     await expect(copyLines.last()).toHaveCSS('opacity', '1')
     await expect(loader).toHaveAttribute('data-phase', 'catch')
@@ -96,7 +98,7 @@ test('reduced motion skips the drop sequence and does not load its frames', asyn
 })
 
 test('a failed loader frame releases the portfolio', async ({ page }) => {
-  await page.route('**/mini-jacob-loader/**', (route) => route.abort())
+  await page.route('**/mini-jacob-loader*/**', (route) => route.abort())
   await page.goto(baseURL)
   await expect(page.locator('.portfolio-loader')).toHaveCount(0)
   await expect(page.locator('.portfolio')).toHaveJSProperty('inert', false)

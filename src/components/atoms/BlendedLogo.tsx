@@ -47,7 +47,7 @@ export function BlendedLogo({
           >
             {children}
           </div>,
-          document.body,
+          document.getElementById('portfolio-header') ?? document.body,
         )}
     </>
   )
