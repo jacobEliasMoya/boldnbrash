@@ -15,7 +15,12 @@ import {
   heroWalkFrames,
 } from './heroFrames'
 
-export function HeroMark({ entranceReady, walkReady, particlesEnabled, onFormationComplete }: {
+export function HeroMark({
+  entranceReady,
+  walkReady,
+  particlesEnabled,
+  onFormationComplete,
+}: {
   entranceReady?: boolean
   walkReady: boolean
   particlesEnabled: boolean
@@ -30,7 +35,9 @@ export function HeroMark({ entranceReady, walkReady, particlesEnabled, onFormati
     const element = root.current
     const surface = canvas.current
     const context = surface?.getContext('2d')
+
     if (!element || !surface || !context || reduceMotion !== false || !walkReady) return
+
     let disposed = false
     let ready = false
     let walkInProgress: number | null = 0
@@ -49,15 +56,17 @@ export function HeroMark({ entranceReady, walkReady, particlesEnabled, onFormati
     const directory = mobile ? 'mini-jacob-mobile' : 'mini-jacob'
     const frames = Array.from({ length: heroFrameCount }, (_, index) => {
       const image = new Image()
+
       image.src = `/images/${directory}/frame-${String(index).padStart(3, '0')}.webp?v=3`
+
       return image
     })
 
     function paint() {
       if (!ready || disposed) return
-      const pose = walkInProgress === null
-        ? getHeroWaveExitPose(progress)
-        : getHeroScrollPose(walkInProgress)
+
+      const pose =
+        walkInProgress === null ? getHeroWaveExitPose(progress) : getHeroScrollPose(walkInProgress)
       const center =
         pose.walkProgress !== undefined
           ? edgeCenter + (heroStandingCenter - edgeCenter) * pose.walkProgress
@@ -66,12 +75,16 @@ export function HeroMark({ entranceReady, walkReady, particlesEnabled, onFormati
               ((pose.center - heroStandingCenter) / 470) * (edgeCenter - heroStandingCenter)
             : heroStandingCenter
       const walking = pose.sourceFrame !== undefined
+
       if (walking && lastCenter !== null) {
         const movement = center - lastCenter
+
         if (directionAnchor === null) directionAnchor = lastCenter
+
         // Keep the furthest point in the current direction. Tiny backscrolls
         // cannot turn the character; a sustained reversal can accumulate naturally.
         const reverseDistance = facingRight ? directionAnchor - center : center - directionAnchor
+
         if (reverseDistance >= reversalThreshold) {
           facingRight = !facingRight
           directionAnchor = center
@@ -80,12 +93,16 @@ export function HeroMark({ entranceReady, walkReady, particlesEnabled, onFormati
             ? Math.max(directionAnchor, center)
             : Math.min(directionAnchor, center)
         }
+
         walkingDistance += Math.abs(movement)
       } else {
         directionAnchor = null
+
         if (walking) facingRight = pose.mirrored
       }
+
       lastCenter = walking ? center : null
+
       // Advance the gait forward by distance, even when the scroll timeline reverses.
       // Match stride distance to the rendered character size on mobile.
       // Hold the two extended-leg contacts longer than the passing poses.
@@ -93,6 +110,7 @@ export function HeroMark({ entranceReady, walkReady, particlesEnabled, onFormati
       const phase = cycle % 1
       const poseIndex = phase < 0.3 ? 0 : phase < 0.5 ? 1 : phase < 0.8 ? 2 : 3
       const walkingStep = Math.floor(cycle) * heroWalkFrames.length + poseIndex
+
       if (
         particlesEnabled &&
         walking &&
@@ -111,11 +129,14 @@ export function HeroMark({ entranceReady, walkReady, particlesEnabled, onFormati
         ]
         lastRippleStep = walkingStep
       }
+
       const sourceFrame = walking ? heroWalkFrames[walkingStep % heroWalkFrames.length] : undefined
       const mirrored = walking ? facingRight : pose.mirrored
       const theme = document.documentElement.dataset.theme
       const key = `${theme}:${pose.frame}:${sourceFrame}:${mirrored}:${pose.mode}:${center}`
+
       if (key === paintedPose) return
+
       drawHeroFrame(
         context!,
         frames[sourceFrame ?? pose.frame],
@@ -136,19 +157,31 @@ export function HeroMark({ entranceReady, walkReady, particlesEnabled, onFormati
       element!.dataset.mode = pose.mode
       paintedPose = key
     }
+
     function updateScroll(event: Event) {
       const detail = (event as CustomEvent<{ progress: number }>).detail
+
       if (!Number.isFinite(detail.progress)) return
+
       progress = detail.progress
       paint()
     }
+
     function measure() {
-      characterScale = window.matchMedia('(max-width: 760px), (pointer: coarse) and (max-height: 560px)').matches ? 1.3 : 1
+      characterScale = window.matchMedia(
+        '(max-width: 760px), (pointer: coarse) and (max-height: 560px)',
+      ).matches
+        ? 1.3
+        : 1
+
       const bounds = element!.getBoundingClientRect()
       const scale = bounds.height / 640
+
       if (!scale) return
+
       const left = (bounds.width - 580 * scale) / 2
       const pageEdge = (window.innerWidth - bounds.left - left) / scale
+
       edgeCenter = pageEdge + 160
       // Require 12 visible pixels of reverse travel at every viewport size.
       reversalThreshold = 12 / scale
@@ -161,12 +194,16 @@ export function HeroMark({ entranceReady, walkReady, particlesEnabled, onFormati
       paintedPose = ''
       paint()
     }
+
     const themeObserver = new MutationObserver(paint)
+
     themeObserver.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ['data-theme'],
     })
+
     const observer = new ResizeObserver(measure)
+
     observer.observe(element)
     window.addEventListener('resize', measure)
     measure()
@@ -174,8 +211,10 @@ export function HeroMark({ entranceReady, walkReady, particlesEnabled, onFormati
     Promise.all(frames.map((image) => image.decode()))
       .then(() => {
         if (disposed) return
+
         ready = true
         paint()
+
         const walk = animate(0, heroWalkInEnd, {
           duration: 1.05,
           ease: 'linear',
@@ -188,10 +227,11 @@ export function HeroMark({ entranceReady, walkReady, particlesEnabled, onFormati
             paint()
           },
         })
+
         stopWalk = () => walk.stop()
       })
       .catch(() => {
-        /* Keep the monogram if a frame cannot load. */
+        // Keep the monogram if a frame cannot load.
       })
 
     return () => {
@@ -210,9 +250,15 @@ export function HeroMark({ entranceReady, walkReady, particlesEnabled, onFormati
 
   return (
     <div ref={root} className="hero-mark-animation" data-mode="logo">
-      {particlesEnabled
-        ? <ParticleMonogram ripples={ripples} entranceReady={entranceReady} onFormationComplete={onFormationComplete} />
-        : <div className="hero-mark-spacer" aria-hidden="true" />}
+      {particlesEnabled ? (
+        <ParticleMonogram
+          ripples={ripples}
+          entranceReady={entranceReady}
+          onFormationComplete={onFormationComplete}
+        />
+      ) : (
+        <div className="hero-mark-spacer" aria-hidden="true" />
+      )}
       <canvas
         ref={canvas}
         className="hero-mini-jacob"

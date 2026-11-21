@@ -18,14 +18,17 @@ export function SceneProject({
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
   const previousOverflow = useRef('')
+
   function open() {
     previousOverflow.current = document.documentElement.style.overflow
     document.documentElement.style.overflow = 'hidden'
     dialog.current?.showModal()
   }
+
   function close() {
     dialog.current?.close()
   }
+
   return (
     <>
       <article className="scene-project">
@@ -36,7 +39,9 @@ export function SceneProject({
         <div className="artwork-frame">{artwork}</div>
         <button className="project-open" onClick={open} aria-haspopup="dialog">
           View project <span className="sr-only">— {title}</span>
-          <b aria-hidden="true"><DotIcon /></b>
+          <b aria-hidden="true">
+            <DotIcon />
+          </b>
         </button>
       </article>
       <dialog

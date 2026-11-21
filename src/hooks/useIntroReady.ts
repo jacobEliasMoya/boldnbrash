@@ -12,8 +12,11 @@ export function useIntroReady() {
       setReady(true)
     }
 
+    // The loader may have finished before this component subscribed.
     if (document.documentElement.dataset.introComplete === 'true') complete()
+
     window.addEventListener(introCompleteEvent, complete)
+
     return () => window.removeEventListener(introCompleteEvent, complete)
   }, [])
 

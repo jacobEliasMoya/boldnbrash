@@ -19,8 +19,8 @@
   position: absolute;
   inset: -0.25rem 0 auto;
   height: 0.5rem;
-  background: radial-gradient(circle, var(--portfolio-canvas) 0.14rem, transparent 0.18rem)
-    0 50% / 0.75rem 0.5rem repeat-x;
+  background: radial-gradient(circle, var(--portfolio-canvas) 0.14rem, transparent 0.18rem) 0 50% /
+    0.75rem 0.5rem repeat-x;
   content: '';
   pointer-events: none;
 }
@@ -39,14 +39,16 @@
     inset: 0 auto 0 -0.25rem;
     width: 0.5rem;
     height: auto;
-    background: radial-gradient(circle, var(--portfolio-canvas) 0.14rem, transparent 0.18rem)
-      50% 0 / 0.5rem 0.75rem repeat-y;
+    background: radial-gradient(circle, var(--portfolio-canvas) 0.14rem, transparent 0.18rem) 50%
+      0 / 0.5rem 0.75rem repeat-y;
   }
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .tab {
-    transition: transform 240ms ease-out, box-shadow 240ms ease-out;
+    transition:
+      transform 240ms ease-out,
+      box-shadow 240ms ease-out;
   }
 
   .email:is(:hover, :focus-visible) .tab {

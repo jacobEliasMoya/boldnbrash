@@ -33,12 +33,14 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     ['fedro/Fedro-Black.otf', 'opentype'],
     ['fedro/Fedro-Black.ttf', 'truetype'],
   ]
+
   if (process.env.NODE_ENV === 'development') {
     candidates.push(
       ['fedro-preview/Fedro-Black.otf', 'opentype'],
       ['fedro-preview/Fedro-Black.woff', 'woff'],
     )
   }
+
   const font = candidates.find(([file]) => existsSync(`public/fonts/${file}`))
   const fontSource = font ? `url('/fonts/${font[0]}') format('${font[1]}')` : null
 
@@ -50,11 +52,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           as="image"
           fetchPriority="low"
           href={mobileLoaderAtlas.src}
-          media={mobileSpriteQueries.map((query) => `${query} and (prefers-reduced-motion: no-preference)`).join(', ')}
+          media={mobileSpriteQueries
+            .map((query) => `${query} and (prefers-reduced-motion: no-preference)`)
+            .join(', ')}
         />
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{document.documentElement.dataset.theme=localStorage.getItem('portfolio-theme')==='dark'?'dark':'light'}catch{};window.addEventListener('storage',function(e){if(e.key==='portfolio-theme'){document.documentElement.dataset.theme=e.newValue==='dark'?'dark':'light';window.dispatchEvent(new Event('portfolio:theme'))}})`,
+            __html: `document.documentElement.dataset.js='';try{document.documentElement.dataset.theme=localStorage.getItem('portfolio-theme')==='dark'?'dark':'light'}catch{};window.addEventListener('storage',function(e){if(e.key==='portfolio-theme'){document.documentElement.dataset.theme=e.newValue==='dark'?'dark':'light';window.dispatchEvent(new Event('portfolio:theme'))}})`,
           }}
         />
         {fontSource && (

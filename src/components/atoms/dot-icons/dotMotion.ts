@@ -13,7 +13,11 @@ export async function playDotClick(controls: ReturnType<typeof useAnimationContr
   await controls.start('rebound')
 }
 
-export function mergeDots(gather: MotionValue<number>, scale: MotionValue<number>, complete: () => void) {
+export function mergeDots(
+  gather: MotionValue<number>,
+  scale: MotionValue<number>,
+  complete: () => void,
+) {
   let stopped = false
   const spreadDuration = 0.07
   const duration = spreadDuration + dotGatherDuration
@@ -25,14 +29,20 @@ export function mergeDots(gather: MotionValue<number>, scale: MotionValue<number
   })
   const compress = animate(scale, 0.86, { duration: dotGatherDuration, delay: spreadDuration })
   const stop = [() => merge.stop(), () => compress.stop()]
+
   void (async () => {
     await Promise.all([merge, compress])
+
     if (stopped) return
+
     const rebound = animate(scale, dotReboundScale, dotReboundTransition)
+
     stop.push(() => rebound.stop())
     await rebound
+
     if (!stopped) complete()
   })()
+
   return () => {
     stopped = true
     stop.forEach((cancel) => cancel())

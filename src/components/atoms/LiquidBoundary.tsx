@@ -25,7 +25,9 @@ export function LiquidBoundary({
     const path = svg?.querySelector('path')
     const surroundPath = surround.current?.querySelector('path')
     const parkedPath = parked.current
+
     if (!svg || !path) return
+
     const media = window.matchMedia(
       '(max-width: 760px), (prefers-reduced-motion: reduce), (pointer: coarse)',
     )
@@ -54,11 +56,14 @@ export function LiquidBoundary({
     let scrollBottom = 31
     let scrollReach = 23
     let scrollRadius = 46
+
     svg.dataset.mode = media.matches ? 'static' : 'pointer'
 
     function armIdle() {
       window.clearTimeout(idleTimer)
+
       if (media.matches || document.hidden) return
+
       idleTimer = window.setTimeout(() => {
         if (
           media.matches ||
@@ -69,12 +74,14 @@ export function LiquidBoundary({
             document.activeElement?.matches('[data-liquid-header]:focus-visible'))
         )
           return
+
         idle = true
         targetPosition = position
         svg!.dataset.mode = 'idle'
         schedule()
       }, 2500)
     }
+
     function activity() {
       idle = false
       svg!.dataset.mode = media.matches ? 'static' : 'pointer'
@@ -107,6 +114,7 @@ export function LiquidBoundary({
         edge: ['top-right', 'bottom-right', 'bottom-left', 'top-left'][quadrant],
       }
     }
+
     function closedCurve(vertices: { x: number; y: number }[]) {
       const first = vertices[0]
       const last = vertices[vertices.length - 1]
@@ -118,9 +126,11 @@ export function LiquidBoundary({
       }
       return d + ' Z'
     }
+
     let outside = ''
     let flatPath = ''
     let flatPathPainted = false
+
     function contour(position: number, depth: number, radius: number, power: number) {
       const direction = pointAt(position)
       const points = basePoints.map((base, i) => {
@@ -130,10 +140,14 @@ export function LiquidBoundary({
       })
       return outside + closedCurve(points)
     }
+
     function paint(time: number) {
       const dt = previous ? Math.min(time - previous, 50) : 16
+
       previous = time
+
       const ease = 1 - Math.exp(-dt / 160)
+
       if (idle) {
         // A quiet clockwise lap, starting exactly where the pointer left the pull.
         targetPosition = wrap(targetPosition + (perimeter * dt) / 36000)
@@ -141,37 +155,54 @@ export function LiquidBoundary({
         targetRadius = 130
         targetPower = 2
       }
+
       // One mass travels the shortest route around the perimeter, including corners.
       position = wrap(position + arcDelta(position, targetPosition) * ease)
       depth += (targetDepth - depth) * ease
       radius += (targetRadius - radius) * ease
       power += (targetPower - power) * ease
+
       const flat = depth < 0.01 && targetDepth === 0
+
       if (!flat || !flatPathPainted) {
         path!.setAttribute('d', flat ? flatPath : contour(position, depth, radius, power))
         flatPathPainted = flat
       }
-      const scrollY = scrollTop + Math.max(0, height - scrollTop - scrollBottom) * scrollProgress.get()
+
+      const scrollY =
+        scrollTop + Math.max(0, height - scrollTop - scrollBottom) * scrollProgress.get()
       const scrollDepth = scrollReach * (1 - Math.max(0, Math.min(1, scrollRecess.get())))
       const scrollKey = `${width}:${height}:${scrollY}:${scrollDepth}:${scrollRadius}`
+
       if (scrollKey !== scrollGeometry) {
         const rightEdge = segments[0] + segments[1] + Math.max(0, scrollY - corner)
+
         if (scrollDepth > 0) {
-          scrollLiquid.current?.setAttribute('d', contour(rightEdge, scrollDepth, scrollRadius, 2.5))
+          scrollLiquid.current?.setAttribute(
+            'd',
+            contour(rightEdge, scrollDepth, scrollRadius, 2.5),
+          )
         } else {
           scrollLiquid.current?.removeAttribute('d')
         }
+
         scrollGeometry = scrollKey
       }
+
       const bounds = (surround.current ?? svg!).getBoundingClientRect()
-      const wordmark = window.innerWidth > 760
-        ? document.querySelector<HTMLElement>('.site-header .wordmark-text')?.getBoundingClientRect()
-        : undefined
+      const wordmark =
+        window.innerWidth > 760
+          ? document
+              .querySelector<HTMLElement>('.site-header .wordmark-text')
+              ?.getBoundingClientRect()
+          : undefined
       const parkedDepth = 68 + headerY.get() + wordmarkY.get()
       const parkedVisible = !!wordmark?.width && parkedDepth > 0
+
       if (wordmark?.width && parkedVisible) {
         const anchor = wrap(wordmark.left + wordmark.width / 2 - bounds.left - frameInset - corner)
         const key = `${width}:${height}:${anchor}:${wordmark.width}:${parkedDepth}`
+
         if (key !== parkedGeometry) {
           parkedPath?.setAttribute('d', contour(anchor, parkedDepth, wordmark.width * 0.7 + 20, 4))
           parkedGeometry = key
@@ -180,39 +211,60 @@ export function LiquidBoundary({
         parkedPath?.removeAttribute('d')
         parkedGeometry = ''
       }
+
       for (const control of document.querySelectorAll<HTMLElement>('[data-liquid-header]')) {
         const label = control.querySelector('.nav-label, .theme-toggle-track, span') ?? control
         const rect = label.getBoundingClientRect()
         const contrast = control.querySelector<HTMLElement>('.nav-label-contrast')
+
         if (contrast) {
           // Clip the contrast copy to the actual liquid edge instead of flipping
           // the whole label when a single corner touches it.
           const contains = (x: number, y: number) => {
-            const point = new DOMPoint(rect.left + x - bounds.left - frameInset, rect.top + y - bounds.top - frameInset)
-            return !!(parkedVisible && parkedPath?.isPointInFill(point)) || (!media.matches && path!.isPointInFill(point))
+            const point = new DOMPoint(
+              rect.left + x - bounds.left - frameInset,
+              rect.top + y - bounds.top - frameInset,
+            )
+
+            return (
+              !!(parkedVisible && parkedPath?.isPointInFill(point)) ||
+              (!media.matches && path!.isPointInFill(point))
+            )
           }
-          const hidden = (media.matches && !parkedVisible) || !rect.width || !!control.closest('[inert]') ||
+          const hidden =
+            (media.matches && !parkedVisible) ||
+            !rect.width ||
+            !!control.closest('[inert]') ||
             getComputedStyle(control).visibility === 'hidden'
+
           if (hidden) contrast.style.clipPath = 'inset(0 0 100% 0)'
           else {
             const edge = Array.from({ length: 25 }, (_, index) => {
-              const x = rect.width * index / 24
+              const x = (rect.width * index) / 24
               let low = 0
               let high = rect.height
+
               if (!contains(x, 0)) high = 0
               else if (contains(x, rect.height)) low = rect.height
-              else for (let step = 0; step < 7; step++) {
-                const middle = (low + high) / 2
-                if (contains(x, middle)) low = middle
-                else high = middle
-              }
+              else
+                for (let step = 0; step < 7; step++) {
+                  const middle = (low + high) / 2
+
+                  if (contains(x, middle)) low = middle
+                  else high = middle
+                }
+
               return `${x}px ${(low + high) / 2}px`
             })
+
             contrast.style.clipPath = `polygon(0 0, 100% 0, ${edge.reverse().join(', ')})`
           }
+
           control.dataset.liquidCovered = 'false'
+
           continue
         }
+
         // Check the edges as well as the centre; contrast must change before a letter disappears.
         const covered =
           !media.matches &&
@@ -227,34 +279,45 @@ export function LiquidBoundary({
               ),
             ),
           )
+
         control.dataset.liquidCovered = String(covered)
       }
+
       svg!.dataset.edge = pointAt(position).edge
       svg!.dataset.pullDepth = depth.toFixed(2)
       svg!.dataset.pullPosition = position.toFixed(2)
+
       const settled =
         Math.abs(arcDelta(position, targetPosition)) +
           Math.abs(depth - targetDepth) +
           Math.abs(radius - targetRadius) +
           Math.abs(power - targetPower) <
         0.01
+
       frame = settled && !idle ? 0 : requestAnimationFrame(paint)
+
       if (settled && !idle) previous = 0
     }
+
     function schedule() {
       if (!frame) frame = requestAnimationFrame(paint)
     }
+
     function measure() {
       const bounds = (surround.current ?? svg!).getBoundingClientRect()
+
       frameInset =
         parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--frame-inset')) ||
         12
       width = Math.max(1, bounds.width - 2 * frameInset)
       height = Math.max(1, bounds.height - 2 * frameInset)
+
       const styles = getComputedStyle(document.documentElement)
       const thumbHeight = parseFloat(styles.getPropertyValue('--scroll-pill-height')) || 46
-      const edgeInset = parseFloat(styles.getPropertyValue('--scroll-pill-edge-inset')) || frameInset
+      const edgeInset =
+        parseFloat(styles.getPropertyValue('--scroll-pill-edge-inset')) || frameInset
       const topInset = parseFloat(styles.getPropertyValue('--scroll-pill-top-inset')) || edgeInset
+
       scrollTop = topInset - frameInset + thumbHeight / 2
       scrollBottom = edgeInset - frameInset + thumbHeight / 2
       scrollReach = parseFloat(styles.getPropertyValue('--scroll-liquid-depth')) || 23
@@ -264,6 +327,7 @@ export function LiquidBoundary({
       parkedPath?.setAttribute('transform', `translate(${frameInset} ${frameInset})`)
       scrollLiquid.current?.setAttribute('transform', `translate(${frameInset} ${frameInset})`)
       corner = Math.min(25, width / 2, height / 2)
+
       const quarter = (Math.PI * corner) / 2
       segments = [
         width - 2 * corner,
@@ -277,7 +341,9 @@ export function LiquidBoundary({
       ]
       perimeter = segments.reduce((sum, length) => sum + length, 0)
       const sampleCount = Math.ceil(perimeter / 5)
-      basePoints = Array.from({ length: sampleCount }, (_, index) => pointAt(perimeter * index / sampleCount))
+      basePoints = Array.from({ length: sampleCount }, (_, index) =>
+        pointAt((perimeter * index) / sampleCount),
+      )
       outside = `M${-frameInset},${-frameInset} H${width + frameInset} V${height + frameInset} H${-frameInset} Z `
       flatPath = outside + closedCurve(basePoints)
       flatPathPainted = false
@@ -293,8 +359,10 @@ export function LiquidBoundary({
       targetPosition = wrap(targetPosition)
       schedule()
     }
+
     function connect(link: HTMLElement | null, proximity = 1) {
       if (!link) return false
+
       const rect = link.getBoundingClientRect()
       const bounds = svg!.getBoundingClientRect()
       const label =
@@ -303,6 +371,7 @@ export function LiquidBoundary({
           ?.getBoundingClientRect() ?? rect
       const isLogo = link.classList.contains('wordmark')
       const pull = Math.min(1, proximity / 0.85)
+
       targetPosition = wrap(rect.left + rect.width / 2 - bounds.left - frameInset - corner)
       targetRadius = 110 + (label.width * (isLogo ? 0.7 : 0.6) + (isLogo ? 20 : 16) - 110) * pull
       targetDepth = Math.max(
@@ -311,73 +380,99 @@ export function LiquidBoundary({
           pull,
       )
       targetPower = 2 + 2 * pull
+
       return true
     }
+
     function move(event: PointerEvent) {
       if (media.matches || event.pointerType !== 'mouse') return
+
       if ((event.target as Element).closest('.mobile-menu-toggle, .mobile-menu-close')) {
         reset()
+
         return
       }
+
       activity()
+
       const bounds = svg!.getBoundingClientRect()
       const x = Math.max(0, Math.min(width, event.clientX - bounds.left - frameInset))
       const y = Math.max(0, Math.min(height, event.clientY - bounds.top - frameInset))
       let projected = targetPosition
       let nearestDistanceToFrame = Infinity
+
       for (let s = 0; s < perimeter; s += 5) {
         const point = pointAt(s)
         const distance = Math.hypot(point.x - x, point.y - y)
+
         if (distance < nearestDistanceToFrame) {
           projected = s
           nearestDistanceToFrame = distance
         }
       }
+
       const current = pointAt(targetPosition)
       const currentDistance = Math.hypot(current.x - x, current.y - y)
+
       if (
         depth < 0.5 ||
         nearestDistanceToFrame < 80 ||
         nearestDistanceToFrame + 18 < currentDistance
       )
         targetPosition = projected
+
       targetDepth = 5 + 37 * Math.exp(-nearestDistanceToFrame / 100)
       targetRadius = 110 + targetDepth
       targetPower = 2
+
       let nearest: HTMLElement | null = null
       let nearestDistance = 90
       const selector = '[data-liquid-header]:not(:disabled)'
+
       for (const link of document.querySelectorAll<HTMLElement>(selector)) {
         if (link.closest('[inert]') || !link.checkVisibility()) continue
+
         const rect = link.getBoundingClientRect()
+
         if (!rect.width || !rect.height) continue
+
         const distance = Math.hypot(
           Math.max(rect.left - event.clientX, 0, event.clientX - rect.right),
           Math.max(rect.top - event.clientY, 0, event.clientY - rect.bottom),
         )
+
         if (distance < nearestDistance) {
           nearest = link
           nearestDistance = distance
         }
       }
+
       const proximity = Math.max(0, 1 - nearestDistance / 90) ** 1.5
       const nearCorner = Math.min(x, width - x) < 45 && Math.min(y, height - y) < 45
+
       if (
         proximity > 0.08 &&
         (!nearCorner || (event.target as Element).closest('[data-liquid-header]'))
       )
         connect(nearest, proximity)
+
       if (depth < 0.5) position = wrap(targetPosition)
+
       schedule()
     }
+
     function focus(event: FocusEvent) {
       if (media.matches) return
+
       if ((event.target as Element).closest('.mobile-menu-toggle, .mobile-menu-close')) {
         reset()
+
         return
       }
+
       activity()
       targetDepth = 0
+
       if (
         connect(
           (event.target as Element).closest<HTMLElement>('[data-liquid-header]:not(:disabled)'),
@@ -385,6 +480,7 @@ export function LiquidBoundary({
       )
         schedule()
     }
+
     function reset() {
       idle = false
       window.clearTimeout(idleTimer)
@@ -392,8 +488,10 @@ export function LiquidBoundary({
       targetDepth = 0
       schedule()
     }
+
     function unfocus(event: FocusEvent) {
       if (media.matches) return
+
       activity()
       targetDepth = 0
       connect(
@@ -403,26 +501,37 @@ export function LiquidBoundary({
       )
       schedule()
     }
+
     function releasePointer() {
       reset()
       armIdle()
     }
+
     function preferenceChanged() {
       reset()
+
       if (!media.matches) armIdle()
     }
+
     function visibilityChanged() {
       if (document.hidden) reset()
       else armIdle()
     }
+
     const observer = new ResizeObserver(measure)
+
     observer.observe(svg)
+
     if (surround.current) observer.observe(surround.current)
+
     const wordmarkAnchor = document.querySelector('.site-header .logo-anchor')
+
     if (wordmarkAnchor) observer.observe(wordmarkAnchor)
+
     const stopFollowing = [headerY, wordmarkY, scrollProgress, scrollRecess].map((value) =>
       value.on('change', schedule),
     )
+
     measure()
     armIdle()
     window.addEventListener('pointermove', move, { passive: true })
@@ -436,6 +545,7 @@ export function LiquidBoundary({
     document.addEventListener('focusin', focus)
     document.addEventListener('focusout', unfocus)
     media.addEventListener('change', preferenceChanged)
+
     return () => {
       cancelAnimationFrame(frame)
       stopFollowing.forEach((unsubscribe) => unsubscribe())

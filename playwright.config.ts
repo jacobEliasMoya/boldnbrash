@@ -40,8 +40,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'pnpm dev',
+    command: process.env.PLAYWRIGHT_WEB_SERVER_COMMAND || 'npm run dev',
     reuseExistingServer: true,
-    url: 'http://localhost:3000',
+    url: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000',
   },
 })

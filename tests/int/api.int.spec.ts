@@ -8,6 +8,7 @@ let payload: Payload
 describe('API', () => {
   beforeAll(async () => {
     const payloadConfig = await config
+
     payload = await getPayload({ config: payloadConfig })
   })
 
@@ -15,6 +16,7 @@ describe('API', () => {
     const users = await payload.find({
       collection: 'users',
     })
+
     expect(users).toBeDefined()
   })
 })

@@ -43,7 +43,12 @@ export function ProjectCard({
         </div>
       </summary>
       <div className="border-t border-rule/50 p-6 sm:p-8">
-        <p aria-hidden="true" className="mb-4 font-display text-5xl leading-none font-black text-accent sm:text-6xl">{metric}</p>
+        <p
+          aria-hidden="true"
+          className="mb-4 font-display text-5xl leading-none font-black text-accent sm:text-6xl"
+        >
+          {metric}
+        </p>
         <div className="max-w-prose text-base leading-relaxed text-muted">{children}</div>
       </div>
     </details>

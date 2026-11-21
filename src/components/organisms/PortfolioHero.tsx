@@ -4,11 +4,14 @@ import { HeroMark } from '@/components/atoms/HeroMark'
 import { WordEmphasis } from '@/components/atoms/WordEmphasis'
 import { motion, useReducedMotion } from 'motion/react'
 import { useIntroReady } from '@/hooks/useIntroReady'
+import { useClientReady } from '@/hooks/useClientReady'
 import { Fragment, useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 
 function subscribeMobile(onChange: () => void) {
   const media = window.matchMedia('(max-width: 760px)')
+
   media.addEventListener('change', onChange)
+
   return () => media.removeEventListener('change', onChange)
 }
 
@@ -39,19 +42,25 @@ function AnimatedLetters({
   reduceMotion: boolean | null
   introReady: boolean
 }) {
+  const clientReady = useClientReady()
+
   return (
     <span aria-hidden="true">
-      {[...text].map((letter, index) => letter === ' ' ? <Fragment key={index}> </Fragment> : (
-        <motion.span
-          className="hero-letter"
-          key={`${letter}-${index}`}
-          initial={reduceMotion ? false : entrance}
-          animate={introReady ? entered : entrance}
-          transition={entranceTransition(start + index * letterStep, reduceMotion)}
-        >
-          {letter}
-        </motion.span>
-      ))}
+      {[...text].map((letter, index) =>
+        letter === ' ' ? (
+          <Fragment key={index}> </Fragment>
+        ) : (
+          <motion.span
+            className="hero-letter"
+            key={`${letter}-${index}`}
+            initial={false}
+            animate={clientReady ? (introReady ? entered : entrance) : undefined}
+            transition={entranceTransition(start + index * letterStep, reduceMotion)}
+          >
+            {letter}
+          </motion.span>
+        ),
+      )}
     </span>
   )
 }
@@ -59,35 +68,46 @@ function AnimatedLetters({
 export function PortfolioHero() {
   const reduceMotion = useReducedMotion()
   const loaderReady = useIntroReady()
-  const mobile = useSyncExternalStore(subscribeMobile,
-    () => window.matchMedia('(max-width: 760px)').matches, () => false)
+  const clientReady = useClientReady()
+  const mobile = useSyncExternalStore(
+    subscribeMobile,
+    () => window.matchMedia('(max-width: 760px)').matches,
+    () => false,
+  )
   const [navReady, setNavReady] = useState(false)
   const [particlesReady, setParticlesReady] = useState(false)
   const [paragraphProgress, setParagraphProgress] = useState(0)
   const finishFormation = useCallback(() => setParticlesReady(true), [])
+
   useEffect(() => {
     const complete = () => setNavReady(true)
+
     window.addEventListener('portfolio:mobile-nav-ready', complete)
+
     if (document.documentElement.dataset.mobileNavReady === 'true') complete()
+
     return () => window.removeEventListener('portfolio:mobile-nav-ready', complete)
   }, [])
   useEffect(() => {
     const update = (event: Event) => {
       setParagraphProgress((event as CustomEvent<{ paragraph: number }>).detail.paragraph)
     }
+
     window.addEventListener('portfolio:hero-progress', update)
+
     return () => window.removeEventListener('portfolio:hero-progress', update)
   }, [])
-  const introReady = loaderReady && (!mobile || reduceMotion ||
-    (heroParticlesEnabled ? particlesReady : navReady))
+
+  const introReady =
+    loaderReady && (!mobile || reduceMotion || (heroParticlesEnabled ? particlesReady : navReady))
 
   return (
     <div className="hero-scene scene-content">
       <div className="hero-copy">
         <motion.p
           className="eyebrow hero-greeting"
-          initial={reduceMotion ? false : entrance}
-          animate={introReady ? entered : entrance}
+          initial={false}
+          animate={clientReady ? (introReady ? entered : entrance) : undefined}
           transition={entranceTransition(0.82, reduceMotion)}
         >
           Hi, I’m <span className="name-pill">Jake</span>
@@ -95,22 +115,33 @@ export function PortfolioHero() {
         <h1 aria-label={`${headline.join(' ')}.`}>
           {headline.slice(0, -1).map((text, index) => (
             <span key={text} className="hero-line">
-              <AnimatedLetters text={text} start={0.98 + index * 0.33} reduceMotion={reduceMotion} introReady={introReady} />
-              {' '}
+              <AnimatedLetters
+                text={text}
+                start={0.98 + index * 0.33}
+                reduceMotion={reduceMotion}
+                introReady={introReady}
+              />{' '}
             </span>
           ))}
           <span className="hero-line">
-            <AnimatedLetters text={headline[2]} start={1.64} reduceMotion={reduceMotion} introReady={introReady} />
+            <AnimatedLetters
+              text={headline[2]}
+              start={1.64}
+              reduceMotion={reduceMotion}
+              introReady={introReady}
+            />
             <motion.a
               className="hero-period"
               href="#skills"
               aria-label="Explore selected projects and skills"
-              initial={reduceMotion ? false : entrance}
-              animate={introReady ? entered : entrance}
+              initial={false}
+              animate={clientReady ? (introReady ? entered : entrance) : undefined}
               transition={entranceTransition(1.64 + headline[2].length * letterStep, reduceMotion)}
               onAnimationComplete={() => {
                 if (!introReady) return
+
                 const hero = document.querySelector<HTMLElement>('.scene-top')
+
                 if (hero) hero.dataset.periodReady = 'true'
               }}
             >
@@ -123,8 +154,8 @@ export function PortfolioHero() {
         </h1>
         <motion.p
           className="hero-description w-full"
-          initial={reduceMotion ? false : entrance}
-          animate={introReady ? entered : entrance}
+          initial={false}
+          animate={clientReady ? (introReady ? entered : entrance) : undefined}
           transition={entranceTransition(2.18, reduceMotion)}
         >
           <WordEmphasis

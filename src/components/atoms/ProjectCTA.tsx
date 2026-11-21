@@ -3,9 +3,20 @@
 import { DotIcon } from '@/components/atoms/dot-icons/DotIcon'
 import { playDotClick } from './dot-icons/dotMotion'
 import { useRef } from 'react'
-import { motion, useAnimationControls, useMotionValue, useReducedMotion, useSpring, useTransform } from 'motion/react'
+import {
+  motion,
+  useAnimationControls,
+  useMotionValue,
+  useReducedMotion,
+  useSpring,
+  useTransform,
+} from 'motion/react'
 
-export function ProjectCTA({ title, description, onOpen }: {
+export function ProjectCTA({
+  title,
+  description,
+  onOpen,
+}: {
   title: string
   description: string
   onOpen: (trigger: HTMLButtonElement) => void
@@ -26,14 +37,17 @@ export function ProjectCTA({ title, description, onOpen }: {
     const tail = (reduced ? 0.5 : trailing.get()) * 200
     const points = Array.from({ length: 41 }, (_, index) => {
       const y = index * 5
-      const depth = 70 * amount * (
-        0.78 * Math.exp(-(((y - head) / 95) ** 2)) +
-        0.22 * Math.exp(-(((y - tail) / 115) ** 2))
-      )
+      const depth =
+        70 *
+        amount *
+        (0.78 * Math.exp(-(((y - head) / 95) ** 2)) + 0.22 * Math.exp(-(((y - tail) / 115) ** 2)))
+
       return `${1000 - depth},${y}`
     })
+
     return `M1000,0 L${points.join(' L')} L1000,200 Z`
   })
+
   function update() {
     target.set(hovered.current || focused.current ? 1 : 0)
   }
@@ -46,13 +60,23 @@ export function ProjectCTA({ title, description, onOpen }: {
       aria-label={`Read project - ${title} ${description}`}
       onClick={async (event) => {
         if (opening.current) return
+
         opening.current = true
+
         const button = event.currentTarget
+
         if (!reduced) await playDotClick(arrowControls)
+
         onOpen(button)
       }}
-      onHoverStart={() => { hovered.current = true; update() }}
-      onHoverEnd={() => { hovered.current = false; update() }}
+      onHoverStart={() => {
+        hovered.current = true
+        update()
+      }}
+      onHoverEnd={() => {
+        hovered.current = false
+        update()
+      }}
       onFocus={() => {
         opening.current = false
         arrowControls.set('idle')
@@ -60,24 +84,37 @@ export function ProjectCTA({ title, description, onOpen }: {
         pointer.set(0.5)
         update()
       }}
-      onBlur={() => { focused.current = false; update() }}
+      onBlur={() => {
+        focused.current = false
+        update()
+      }}
       onPointerMove={(event) => {
         if (event.pointerType !== 'mouse') return
+
         const bounds = event.currentTarget.getBoundingClientRect()
+
         pointer.set(Math.max(0.15, Math.min(0.85, (event.clientY - bounds.top) / bounds.height)))
       }}
       whileHover={reduced ? undefined : { '--band-arrow-x': '3px', '--band-arrow-y': '-3px' }}
       whileFocus={reduced ? undefined : { '--band-arrow-x': '3px', '--band-arrow-y': '-3px' }}
       transition={{ type: 'spring', stiffness: 340, damping: 22 }}
     >
-      <svg className="project-cta-liquid" viewBox="0 0 1000 200" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      <svg
+        className="project-cta-liquid"
+        viewBox="0 0 1000 200"
+        preserveAspectRatio="none"
+        aria-hidden="true"
+        focusable="false"
+      >
         <motion.path d={path} />
       </svg>
       <span className="skill-project-band-copy">
         <span className="skill-project-title">{title}</span>{' '}
         <span className="skill-project-information">{description}</span>
       </span>
-      <span className="skill-project-band-arrow" aria-hidden="true"><DotIcon controls={arrowControls} /></span>
+      <span className="skill-project-band-arrow" aria-hidden="true">
+        <DotIcon controls={arrowControls} />
+      </span>
     </motion.button>
   )
 }

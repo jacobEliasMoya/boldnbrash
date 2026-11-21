@@ -16,11 +16,21 @@ import { ProjectCTA } from '@/components/atoms/ProjectCTA'
 import { WordEmphasis } from '@/components/atoms/WordEmphasis'
 import { ProjectDialog } from './ProjectDialog'
 import { getPeriodOpening } from '@/components/atoms/periodOpening'
-import { clamp, getSkillFrame, projectStops, skills, skillParagraphEndPortion, skillTitleFillPortion } from './skillsTimeline'
+import {
+  clamp,
+  getSkillFrame,
+  projectStops,
+  skills,
+  skillParagraphEndPortion,
+  skillTitleFillPortion,
+} from './skillsTimeline'
 
 type Project = (typeof skills)[number]['projects'][number]
+
 type OpenProject = (project: Project, trigger: HTMLButtonElement) => void
-const introText = 'See what I’ve built across client websites, design systems, and developer tools, plus a few experiments in 3D and AI.'
+
+const introText =
+  'See what I’ve built across client websites, design systems, and developer tools, plus a few experiments in 3D and AI.'
 
 function SkillCategoryPill({
   index,
@@ -49,27 +59,39 @@ function SkillCategoryPill({
   })
   const rotation = useTransform(distance, (value) => clamp(-value * (compact ? 62 : 38), -81, 81))
   const vertical = useTransform(distance, (value) => Math.sin((value * Math.PI) / 4) * radius)
-  const depth = useTransform(distance, (value) => (Math.cos((value * Math.PI) / 4) - 1) * radius * (compact ? 3.5 : 1))
+  const depth = useTransform(
+    distance,
+    (value) => (Math.cos((value * Math.PI) / 4) - 1) * radius * (compact ? 3.5 : 1),
+  )
   const opacity = useTransform(distance, (value) => 1 - clamp(Math.abs(value)) * 0.65)
-  const visibility = useTransform(distance, (value) => Math.abs(value) < 1.75 ? 'visible' : 'hidden')
+  const visibility = useTransform(distance, (value) =>
+    Math.abs(value) < 1.75 ? 'visible' : 'hidden',
+  )
   const scaleX = useSpring(0.82, { stiffness: 340, damping: 17, mass: 0.8 })
   const scaleY = useSpring(0.82, { stiffness: 260, damping: 14, mass: 0.8 })
+
   useEffect(() => {
     if (!animated) return
+
     let focused: boolean | undefined
     const update = (value: number) => {
       // Pop only as the item reaches the centre, rather than halfway through a turn.
       const next = active && Math.abs(value) < 0.12
+
       if (next === focused) return
+
       focused = next
       scaleX.set(next ? 0.94 : 0.82)
       scaleY.set(next ? 0.94 : 0.82)
     }
+
     update(distance.get())
+
     return distance.on('change', update)
   }, [active, animated, distance, scaleX, scaleY])
 
   const order = useTransform(distance, (value) => 20 - Math.round(Math.abs(value) * 4))
+
   return (
     <motion.div
       role={animated ? 'listitem' : undefined}
@@ -87,7 +109,9 @@ function SkillCategoryPill({
       }}
     >
       <div className="skills-category-current" data-skill={skill.name}>
-        <span className="skills-category-number" aria-hidden="true">0{index + 1}</span>
+        <span className="skills-category-number" aria-hidden="true">
+          0{index + 1}
+        </span>
         <div className="skills-category-copy">
           <p className="skills-technologies">{skill.technologies.join(' \u00b7 ')}</p>
           <h3>{skill.name}</h3>
@@ -130,6 +154,7 @@ function SkillProjects({
   const incoming = Math.ceil(projectPosition)
   const reveal = projectPosition - outgoing
   const visible = !animated || (first <= incoming && first + skill.projects.length - 1 >= outgoing)
+
   return (
     <div
       id={`skills-projects-${index}`}
@@ -202,19 +227,32 @@ export function SkillsScene() {
   const [radius, setRadius] = useState(340)
   const [compactWheel, setCompactWheel] = useState(false)
   const ringPosition = useMotionValue(0)
+
   useLayoutEffect(() => {
     const element = wheel.current
+
     if (!element || !animated) return
+
     const measure = () => {
       const compact = window.matchMedia('(max-width: 900px)').matches
+
       setCompactWheel(compact)
-      setRadius(compact ? Math.max(80, element.clientHeight * 0.6) : Math.max(130, element.clientHeight * 0.46))
+      setRadius(
+        compact
+          ? Math.max(80, element.clientHeight * 0.6)
+          : Math.max(130, element.clientHeight * 0.46),
+      )
     }
+
     measure()
+
     const observer = new ResizeObserver(measure)
+
     observer.observe(element)
+
     return () => observer.disconnect()
   }, [animated])
+
   const scene = useRef<HTMLDivElement>(null)
   const period = useRef<HTMLSpanElement>(null)
   const [portal, setPortal] = useState({ x: 0, y: 0, radius: 0, dot: 0, borderWidth: 12 })
@@ -224,37 +262,54 @@ export function SkillsScene() {
     (selection.intro - skillTitleFillPortion) / (revealStart - skillTitleFillPortion),
   )
   const expansion = animated ? clamp((selection.intro - revealStart) / (1 - revealStart)) : 1
-  const titleFill = (line: number) => animated ? clamp(selection.intro / fillDuration - line) * 100 : 0
-  const openingRadius = expansion > 0
-    ? getPeriodOpening(expansion, portal.dot, portal.radius).innerRadius
-    : 0
+  const titleFill = (line: number) =>
+    animated ? clamp(selection.intro / fillDuration - line) * 100 : 0
+  const openingRadius =
+    expansion > 0 ? getPeriodOpening(expansion, portal.dot, portal.radius).innerRadius : 0
+
   useLayoutEffect(() => {
     const element = scene.current
     const dot = period.current
+
     if (!element || !dot) return
+
     let disposed = false
     const measure = () => {
       if (disposed) return
+
       const bounds = element.getBoundingClientRect()
       const point = dot.getBoundingClientRect()
       const x = point.left + point.width / 2 - bounds.left
       const y = point.top + point.height / 2 - bounds.top
+
       setPortal({
-        x, y, dot: point.width / 2,
-        borderWidth: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--frame-inset')) || 12,
+        x,
+        y,
+        dot: point.width / 2,
+        borderWidth:
+          parseFloat(
+            getComputedStyle(document.documentElement).getPropertyValue('--frame-inset'),
+          ) || 12,
         radius: Math.hypot(Math.max(x, bounds.width - x), Math.max(y, bounds.height - y)) + 2,
       })
     }
+
     measure()
+
     const observer = new ResizeObserver(measure)
+
     observer.observe(element)
     observer.observe(dot)
+
     const heading = element.querySelector('.skills-heading')
+
     if (heading) {
       observer.observe(heading)
       heading.querySelectorAll('.skills-title-fill').forEach((line) => observer.observe(line))
     }
+
     document.fonts.ready.then(measure)
+
     return () => {
       disposed = true
       observer.disconnect()
@@ -262,25 +317,33 @@ export function SkillsScene() {
   }, [animated])
   useLayoutEffect(() => {
     ringPosition.set(selection.ringPosition)
+
     if (pendingCategoryFocus.current === selection.index) {
       const focusCategory = () => {
         pendingCategoryFocus.current = null
-        wheel.current?.querySelectorAll<HTMLButtonElement>('.skills-pill-toggle')[selection.index]
-          ?.focus({ preventScroll: true })
+        wheel.current
+          ?.querySelectorAll<HTMLButtonElement>('.skills-pill-toggle')
+          [selection.index]?.focus({ preventScroll: true })
       }
+
       frame.postRender(focusCategory)
+
       return () => cancelFrame(focusCategory)
     }
   }, [selection.index, selection.ringPosition, ringPosition])
   useEffect(() => {
     function update(event: Event) {
       const { progress, intro } = (event as CustomEvent<{ progress: number; intro: number }>).detail
+
       setPinned(true)
       setSelection({ ...getSkillFrame(progress), intro })
     }
+
     window.addEventListener('portfolio:skills-progress', update)
+
     return () => window.removeEventListener('portfolio:skills-progress', update)
   }, [])
+
   function selectSkill(index: number) {
     window.dispatchEvent(
       new CustomEvent('portfolio:select-skill', {
@@ -289,31 +352,50 @@ export function SkillsScene() {
       }),
     )
   }
+
   function openProject(project: Project, button: HTMLButtonElement) {
     trigger.current = button
-    const bounds = (button.querySelector('.skill-project-band-arrow .dot-icon') ?? button).getBoundingClientRect()
+
+    const bounds = (
+      button.querySelector('.skill-project-band-arrow .dot-icon') ?? button
+    ).getBoundingClientRect()
+
     setProjectOrigin({ x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 })
     setOpenedProject(project)
   }
+
   return (
     <div
       ref={scene}
       className="skills-scene skills-index skills-duet scene-content"
       data-playing={animated ? '' : undefined}
-      style={{
-        '--skills-portal-x': `${portal.x}px`,
-        '--skills-portal-y': `${portal.y}px`,
-        '--skills-portal-radius': `${openingRadius}px`,
-      } as CSSProperties}
+      style={
+        {
+          '--skills-portal-x': `${portal.x}px`,
+          '--skills-portal-y': `${portal.y}px`,
+          '--skills-portal-radius': `${openingRadius}px`,
+        } as CSSProperties
+      }
     >
       <div className="skills-heading" aria-hidden={animated && expansion === 1}>
         <div className="skills-title-stack">
           <h2 aria-label="Here’s What I’m Building.">
             <span className="skills-title-line" aria-hidden="true">
-              <span className="skills-title-fill" style={{ '--title-fill': `${titleFill(0)}%` } as CSSProperties}>Here’s What</span>
+              <span
+                className="skills-title-fill"
+                style={{ '--title-fill': `${titleFill(0)}%` } as CSSProperties}
+              >
+                Here’s What
+              </span>
             </span>
             <span className="skills-title-line" aria-hidden="true">
-              <span className="skills-title-fill" style={{ '--title-fill': `${titleFill(1)}%` } as CSSProperties}>I’m Building</span><span ref={period} className="skills-title-period" />
+              <span
+                className="skills-title-fill"
+                style={{ '--title-fill': `${titleFill(1)}%` } as CSSProperties}
+              >
+                I’m Building
+              </span>
+              <span ref={period} className="skills-title-period" />
             </span>
           </h2>
         </div>
@@ -323,68 +405,79 @@ export function SkillsScene() {
       </div>
       {animated ? (
         <div className="skills-reveal" inert={expansion < 1} aria-hidden={expansion < 1}>
-        <div className="skills-performance">
-        <div className="skills-projects">
-            {skills.map((skill, index) => (
-              <SkillProjects
-                key={skill.name}
-                index={index}
-                active={selection.index === index}
-                projectPosition={selection.projectPosition}
-                animated
-                onOpenProject={openProject}
-              />
-            ))}
-          </div>
-          <div
-            ref={wheel}
-            className="skills-browser"
-            role="list"
-            aria-label="Skill categories"
-            onKeyDown={(event) => {
-              if (!(event.target instanceof HTMLButtonElement) ||
-                !event.target.classList.contains('skills-pill-toggle')) return
-
-              const last = skills.length - 1
-              let next = selection.index
-              switch (event.key) {
-                case 'ArrowUp':
-                case 'ArrowLeft':
-                  next = Math.max(0, next - 1)
-                  break
-                case 'ArrowDown':
-                case 'ArrowRight':
-                  next = Math.min(last, next + 1)
-                  break
-                case 'Home':
-                  next = 0
-                  break
-                case 'End':
-                  next = last
-                  break
-                default:
+          <div className="skills-performance">
+            <div className="skills-projects">
+              {skills.map((skill, index) => (
+                <SkillProjects
+                  key={skill.name}
+                  index={index}
+                  active={selection.index === index}
+                  projectPosition={selection.projectPosition}
+                  animated
+                  onOpenProject={openProject}
+                />
+              ))}
+            </div>
+            <div
+              ref={wheel}
+              className="skills-browser"
+              role="list"
+              aria-label="Skill categories"
+              onKeyDown={(event) => {
+                if (
+                  !(event.target instanceof HTMLButtonElement) ||
+                  !event.target.classList.contains('skills-pill-toggle')
+                )
                   return
-              }
-              event.preventDefault()
-              if (next === selection.index) return
-              pendingCategoryFocus.current = next
-              selectSkill(next)
-            }}
-          >
-            {skills.map((skill, index) => (
-              <SkillCategoryPill
-                key={skill.name}
-                index={index}
-                active={selection.index === index}
-                animated
-                ringPosition={ringPosition}
-                radius={radius}
-                compact={compactWheel}
-                onSelect={selectSkill}
-              />
-            ))}
+
+                const last = skills.length - 1
+                let next = selection.index
+
+                switch (event.key) {
+                  case 'ArrowUp':
+                  case 'ArrowLeft':
+                    next = Math.max(0, next - 1)
+
+                    break
+                  case 'ArrowDown':
+                  case 'ArrowRight':
+                    next = Math.min(last, next + 1)
+
+                    break
+                  case 'Home':
+                    next = 0
+
+                    break
+                  case 'End':
+                    next = last
+
+                    break
+                  default:
+                    return
+                }
+
+                event.preventDefault()
+
+                if (next === selection.index) return
+
+                pendingCategoryFocus.current = next
+                selectSkill(next)
+              }}
+            >
+              {skills.map((skill, index) => (
+                <SkillCategoryPill
+                  key={skill.name}
+                  index={index}
+                  active={selection.index === index}
+                  animated
+                  ringPosition={ringPosition}
+                  radius={radius}
+                  compact={compactWheel}
+                  onSelect={selectSkill}
+                />
+              ))}
+            </div>
           </div>
-        </div>
         </div>
       ) : (
         <div className="skills-fallback">

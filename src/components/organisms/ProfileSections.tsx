@@ -15,12 +15,12 @@ export function ProfileSections() {
       </div>
       <div className="about-copy">
         <p>
-          I’m Jacob Moya, a software engineer in Southern California. I build
-          accessible web interfaces and the reusable components behind them.
+          I’m Jacob Moya, a software engineer in Southern California. I build accessible web
+          interfaces and the reusable components behind them.
         </p>
         <p>
-          My work includes React applications, WordPress migrations, and tools
-          that automate repetitive development tasks.
+          My work includes React applications, WordPress migrations, and tools that automate
+          repetitive development tasks.
         </p>
         <ProfileLinks placement="about" />
         <details className="about-details">
@@ -57,25 +57,16 @@ export function ProfileSections() {
             </li>
             <li>
               <strong>Rusted-Cargo</strong>
-              <span>
-                Rust exercises in ownership, traits, and error handling.
-              </span>
+              <span>Rust exercises in ownership, traits, and error handling.</span>
             </li>
             <li>
               <strong>Image Batch Tools</strong>
-              <span>
-                Python utilities to geotag, resize, compress, and convert images
-                to WebP.
-              </span>
+              <span>Python utilities to geotag, resize, compress, and convert images to WebP.</span>
             </li>
           </ul>
         </details>
       </div>
-      <div
-        className="contact-portal"
-        data-portal="contact"
-        aria-hidden="true"
-      />
+      <div className="contact-portal" data-portal="contact" aria-hidden="true" />
       <div className="scene-footnote">
         <span>Southern California</span>
         <span>03 / 04</span>

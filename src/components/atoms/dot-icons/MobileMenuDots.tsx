@@ -8,6 +8,7 @@ export function MenuTriangleDots({ gather }: { gather: MotionValue<number> }) {
   const left = useTransform(gather, (progress) => -6 * (1 - progress))
   const right = useTransform(gather, (progress) => 6 * (1 - progress))
   const scale = useMergedDotScale(gather)
+
   return (
     <>
       <motion.i style={{ x: 0, y: top, scale }} />
@@ -21,6 +22,7 @@ export function MenuCloseDots({ gather }: { gather: MotionValue<number> }) {
   const positive = useTransform(gather, (progress) => 6 * (1 - progress))
   const negative = useTransform(gather, (progress) => -6 * (1 - progress))
   const scale = useMergedDotScale(gather)
+
   return (
     <>
       <motion.i style={{ x: negative, y: negative, scale }} />

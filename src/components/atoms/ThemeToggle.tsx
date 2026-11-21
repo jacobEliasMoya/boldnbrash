@@ -5,18 +5,27 @@ import { createPortal } from 'react-dom'
 import { animate, motion, useMotionValue, useReducedMotion } from 'motion/react'
 import { useBlendBounds } from './BlendedNav'
 import { useIntroReady } from '@/hooks/useIntroReady'
+import {
+  useHeaderEntrance,
+  getMobileHeaderPop,
+  mobileHeaderRest,
+  mobileHeaderEntered,
+} from '@/hooks/useHeaderEntrance'
 
 function subscribe(onChange: () => void) {
   window.addEventListener('portfolio:theme', onChange)
   window.addEventListener('storage', onChange)
+
   return () => {
     window.removeEventListener('portfolio:theme', onChange)
     window.removeEventListener('storage', onChange)
   }
 }
+
 const toggleSpring = { type: 'spring' as const, stiffness: 340, damping: 26 }
 
 export function ThemeToggle({ inline = false }: { inline?: boolean }) {
+  const headerEntrance = useHeaderEntrance()
   const dark = useSyncExternalStore(
     subscribe,
     () => document.documentElement.dataset.theme === 'dark',
@@ -28,26 +37,38 @@ export function ThemeToggle({ inline = false }: { inline?: boolean }) {
   const entranceOpacity = useMotionValue(0)
   const pressScale = useMotionValue(1)
   const busy = useRef(false)
-  const { anchor: thumb, bounds } = useBlendBounds<HTMLSpanElement>(introReady && !inline, dark, true)
+  const { anchor: thumb, bounds } = useBlendBounds<HTMLSpanElement>(
+    introReady && !inline,
+    dark,
+    true,
+  )
+
   useEffect(() => () => pressScale.stop(), [pressScale])
 
   function toggleTheme() {
     const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'
+
     document.documentElement.dataset.theme = theme
+
     try {
       localStorage.setItem('portfolio-theme', theme)
     } catch {
-      /* Storage is optional. */
+      // Storage is optional.
     }
+
     window.dispatchEvent(new Event('portfolio:theme'))
   }
 
   async function pressToggle() {
     if (busy.current) return
+
     if (reduceMotion) {
       toggleTheme()
+
       return
     }
+
+    // Keep rapid clicks from overlapping the press and release animation.
     busy.current = true
     await animate(pressScale, 0.89, { duration: 0.1, ease: 'easeOut' })
     toggleTheme()
@@ -59,13 +80,21 @@ export function ThemeToggle({ inline = false }: { inline?: boolean }) {
     <>
       <motion.button
         className="theme-toggle"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: introReady ? 1 : 0 }}
+        initial={
+          headerEntrance.mobile && !inline ? mobileHeaderRest : { opacity: 0, y: inline ? 0 : -24 }
+        }
+        animate={
+          headerEntrance.mobile && !inline
+            ? { ...(introReady ? mobileHeaderEntered : mobileHeaderRest), y: 0 }
+            : { opacity: introReady ? 1 : 0, y: inline || introReady ? 0 : -24 }
+        }
         style={{ opacity: entranceOpacity }}
         transition={{
-          duration: reduceMotion ? 0 : 0.7,
-          delay: reduceMotion ? 0 : 0.12,
-          ease: [0.22, 1, 0.36, 1],
+          ...(headerEntrance.mobile && !inline
+            ? getMobileHeaderPop(headerEntrance.themeDelay, reduceMotion)
+            : { duration: headerEntrance.duration, ease: [0.22, 1, 0.36, 1] as const }),
+          ...(reduceMotion ? { duration: 0 } : {}),
+          delay: reduceMotion ? 0 : inline ? 0.12 : headerEntrance.themeDelay,
         }}
         data-liquid-header
         type="button"
@@ -105,7 +134,8 @@ export function ThemeToggle({ inline = false }: { inline?: boolean }) {
           />
         </span>
       </motion.button>
-      {!inline && introReady &&
+      {!inline &&
+        introReady &&
         bounds &&
         createPortal(
           <motion.span

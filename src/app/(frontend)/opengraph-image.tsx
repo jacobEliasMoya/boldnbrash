@@ -20,7 +20,9 @@ export default function OpenGraphImage() {
       }}
     >
       <div style={{ fontSize: 108, fontWeight: 700, letterSpacing: '-5px' }}>Jacob Moya</div>
-      <div style={{ fontSize: 37, color: '#ffc857' }}>Software Engineer &amp; Creative Developer</div>
+      <div style={{ fontSize: 37, color: '#ffc857' }}>
+        Software Engineer &amp; Creative Developer
+      </div>
     </div>,
     size,
   )

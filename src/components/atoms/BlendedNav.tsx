@@ -1,12 +1,14 @@
 'use client'
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import type { MotionValue } from 'motion/react'
 import { createPortal } from 'react-dom'
 
 export function useBlendBounds<T extends HTMLElement>(
   enabled: boolean,
   ready: boolean,
   visibleOnly = false,
+  headerY?: MotionValue<number>,
 ) {
   const anchor = useRef<T>(null)
   const [bounds, setBounds] = useState<{
@@ -15,47 +17,69 @@ export function useBlendBounds<T extends HTMLElement>(
     width: number
     height: number
   } | null>(null)
+
   useEffect(() => {
     if (!enabled || !anchor.current) return
+
     const measure = () => {
       if (
         visibleOnly &&
         (!anchor.current!.checkVisibility() || anchor.current!.closest('[inert]'))
       ) {
         setBounds(null)
+
         return
       }
+
       const rect = anchor.current!.getBoundingClientRect()
+      const header = headerY ? anchor.current!.closest('.site-header') : null
+      const headerOffset = header
+        ? new DOMMatrixReadOnly(getComputedStyle(header).transform).m42
+        : 0
+      const top = rect.top - headerOffset
+
       setBounds((previous) => {
         if (
-          previous?.left === rect.left && previous.top === rect.top &&
-          previous.width === rect.width && previous.height === rect.height
-        ) return previous
-        return { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
+          previous?.left === rect.left &&
+          previous.top === top &&
+          previous.width === rect.width &&
+          previous.height === rect.height
+        )
+          return previous
+
+        return { left: rect.left, top, width: rect.width, height: rect.height }
       })
     }
     const observer = new ResizeObserver(followLayout)
+
     observer.observe(anchor.current)
+
     // The header finishes its entrance after its dimensions have settled.
     let frame = 0
     let started = performance.now()
     const followEntrance = () => {
       measure()
-      if (performance.now() - started < 1200) frame = requestAnimationFrame(followEntrance)
+
+      if (performance.now() - started < 2600) frame = requestAnimationFrame(followEntrance)
     }
+
     frame = requestAnimationFrame(followEntrance)
+
     function followLayout() {
       started = performance.now()
       cancelAnimationFrame(frame)
       frame = requestAnimationFrame(followEntrance)
     }
+
     window.addEventListener('resize', followLayout)
+
     return () => {
       observer.disconnect()
       cancelAnimationFrame(frame)
       window.removeEventListener('resize', followLayout)
     }
-  }, [enabled, ready, visibleOnly])
+  }, [enabled, ready, visibleOnly, headerY])
+
   return { anchor, bounds }
 }
 
@@ -71,6 +95,7 @@ export function BlendedNav({
   tone?: 'paper' | 'dark'
 }) {
   const { anchor, bounds } = useBlendBounds<HTMLElement>(enabled, ready)
+
   return (
     <>
       <nav

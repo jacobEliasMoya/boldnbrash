@@ -1,4 +1,7 @@
-export const mobileSpriteQueries = ['(max-width: 760px)', '(pointer: coarse) and (max-height: 560px)']
+export const mobileSpriteQueries = [
+  '(max-width: 760px)',
+  '(pointer: coarse) and (max-height: 560px)',
+]
 export const mobileSpriteMedia = mobileSpriteQueries.join(', ')
 
 export const mobileLoaderAtlas = {

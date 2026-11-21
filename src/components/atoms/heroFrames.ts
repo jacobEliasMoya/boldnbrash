@@ -12,16 +12,18 @@ export const heroWalkInEnd = heroEntranceTravel / 2 / heroAnimationTravel
 
 export function getHeroWaveExitPose(progress: number) {
   const waveEnd = heroEntranceTravel / heroAnimationTravel
-  const poseProgress = progress < waveEnd
-    ? heroWalkInEnd + progress * (waveEnd - heroWalkInEnd) / waveEnd
-    : progress
+  const poseProgress =
+    progress < waveEnd ? heroWalkInEnd + (progress * (waveEnd - heroWalkInEnd)) / waveEnd : progress
+
   return getHeroScrollPose(poseProgress)
 }
 
 export function getHeroScrollPose(progress: number) {
   const position = Math.max(0, Math.min(1, progress)) * heroAnimationTravel
+
   if (position <= heroEntranceTravel) {
     const frame = Math.round((position / heroEntranceTravel) * (heroFrameCount - 1))
+
     return {
       frame,
       sourceFrame:
@@ -35,6 +37,7 @@ export function getHeroScrollPose(progress: number) {
       mode: frame < 8 ? 'walk' : frame === 8 || frame === 15 ? 'idle' : 'wave',
     }
   }
+
   if (position <= heroExitStart)
     return {
       frame: heroFrameCount - 1,
@@ -44,8 +47,10 @@ export function getHeroScrollPose(progress: number) {
       center: undefined,
       mode: 'idle',
     }
+
   const exit = (position - heroExitStart) / (heroAnimationTravel - heroExitStart)
   const frame = heroWalkFrames[Math.min(9, Math.floor(exit * 10)) % heroWalkFrames.length]
+
   return {
     frame,
     sourceFrame: frame,
@@ -76,9 +81,11 @@ export function drawHeroFrame(
   context.translate(center, 546 + offsetY)
   context.scale(characterScale, characterScale)
   context.translate(-center, -546)
+
   // Paint in stage coordinates before flipping the sprite, so the ground
   // shadow follows the character without mirroring or shifting between frames.
   const passing = positionedFrame === 5 || positionedFrame === 7
+
   context.save()
   context.globalAlpha = passing ? 0.22 : 0.28
   context.fillStyle = dark ? '#9072ce' : '#21123d'
@@ -88,8 +95,10 @@ export function drawHeroFrame(
   context.fill()
   context.restore()
   context.save()
+
   if (positionedFrame !== undefined) {
     const origin = walkingCenters[positionedFrame]
+
     if (mirrored) {
       context.translate(origin + center, 0)
       context.scale(-1, 1)
@@ -97,10 +106,20 @@ export function drawHeroFrame(
       context.translate(center - origin, 0)
     }
   }
+
   // This common crop retains the movement already present in all 16 supplied frames.
   const sourceScale = image.naturalWidth / 1280
+
   context.drawImage(
-    image, 700 * sourceScale, 80 * sourceScale, 580 * sourceScale, 640 * sourceScale, 0, 0, 580, 640,
+    image,
+    700 * sourceScale,
+    80 * sourceScale,
+    580 * sourceScale,
+    640 * sourceScale,
+    0,
+    0,
+    580,
+    640,
   )
   context.restore()
   context.restore()

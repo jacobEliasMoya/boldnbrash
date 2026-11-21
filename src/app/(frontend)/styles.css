@@ -510,6 +510,7 @@ ul {
   aspect-ratio: 1;
 }
 .portfolio-loader {
+  display: none;
   --loader-lift: clamp(16px, 2.5svh, 24px);
   position: fixed;
   inset: 0;
@@ -517,6 +518,47 @@ ul {
   overflow: hidden;
   background: var(--canvas);
   color: var(--ink);
+}
+
+/* Prepare entrances only when the bootstrap script runs. Motion owns subsequent movement. */
+:root[data-js] .portfolio-loader {
+  display: block;
+}
+
+:root[data-js]
+  :is(
+    .site-header,
+    .hero-greeting,
+    .hero-description,
+    .hero-letter:not(.hero-period-glyph),
+    .hero-period
+  ) {
+  opacity: 0;
+}
+
+:root[data-js] .site-header {
+  transform: translateY(-24px);
+}
+
+/* Only the animated header logo needs a prepared entrance state, not the menu's logo. */
+:root[data-js] :is(.site-header, .liquid-blended-logo) .wordmark {
+  transform: translateY(-100px);
+}
+
+@media (max-width: 760px) {
+  :root[data-js] .site-header {
+    transform: none;
+  }
+
+  :root[data-js] :is(.site-header, .liquid-blended-logo) .wordmark {
+    opacity: 0;
+    transform: scale(0.84);
+  }
+}
+
+:root[data-js]
+  :is(.hero-greeting, .hero-description, .hero-letter:not(.hero-period-glyph), .hero-period) {
+  transform: translateY(10px);
 }
 .portfolio-loader-avatar {
   position: absolute;
@@ -541,7 +583,7 @@ ul {
   row-gap: 0.08em;
   color: var(--ink);
   white-space: nowrap;
-  font: 900 clamp(68px, 11.8vw, 168px)/0.88 var(--display);
+  font: 900 clamp(58px, 10vw, 143px)/0.88 var(--display);
   letter-spacing: -0.055em;
   text-align: center;
 }
@@ -561,26 +603,33 @@ ul {
 .portfolio-loader-copy-line {
   transform-origin: 50% 100%;
 }
+.portfolio-loader-letter {
+  display: inline-block;
+}
+.portfolio-loader-letter-space {
+  white-space: pre;
+}
 .portfolio-loader-progress {
   position: absolute;
-  left: 50%;
-  bottom: 38px;
+  inset: 0;
   z-index: 4;
-  width: min(82vw, 760px);
-  height: 18px;
-  padding: 3px;
-  overflow: hidden;
-  border: 2px solid var(--ink);
-  border-radius: 999px;
-  background: var(--canvas);
-  transform: translateX(-50%);
   pointer-events: none;
 }
-.portfolio-loader-progress > span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--ink);
+.loader-progress-frame {
+  fill: var(--frame-color);
+}
+:root[data-theme='dark'] .loader-progress-frame {
+  fill: #fff;
+}
+.loader-progress-pill {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  border-radius: 999px 999px 0 0;
+  background: var(--accent);
+}
+:root[data-theme='dark'] .loader-progress-pill {
+  background: #5530dc;
 }
 @media (max-width: 760px) {
   .portfolio-loader-avatar {
@@ -590,7 +639,7 @@ ul {
     top: calc(50% - var(--loader-lift) + 74px + 20px);
   }
   .portfolio-loader-copy {
-    font-size: clamp(90px, 27vw, 110px);
+    font-size: clamp(77px, 23vw, 94px);
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1637,9 +1686,10 @@ ul {
 @media (max-width: 760px) and (orientation: portrait) {
   .hero-copy .hero-description {
     max-width: calc(100vw - 2 * var(--frame-inset));
-    margin-inline-start: min(0px, calc(
-      100vw - var(--frame-inset) - 4px - clamp(32px, 9vw, 42px) - 40.5ch
-    ));
+    margin-inline-start: min(
+      0px,
+      calc(100vw - var(--frame-inset) - 4px - clamp(32px, 9vw, 42px) - 40.5ch)
+    );
   }
 }
 
@@ -2253,9 +2303,10 @@ ul {
   gap: clamp(26px, 5svh, 48px);
 }
 .mobile-menu-links a {
-  display: flex;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 36px;
   align-items: center;
-  gap: 18px;
+  gap: 0;
   width: 100%;
   font: 900 clamp(35px, 14.25cqw, 84px)/1.08 var(--display);
   letter-spacing: -0.04em;
@@ -2268,7 +2319,7 @@ ul {
   text-decoration-color: #a58cff;
 }
 .mobile-menu-label {
-  margin-inline-start: 10px;
+  justify-self: center;
   white-space: nowrap;
 }
 .mobile-menu-label-fill {
@@ -2317,13 +2368,6 @@ ul {
   height: 100%;
   pointer-events: none;
   fill: var(--menu-frame);
-}
-.mobile-menu-current {
-  margin-left: auto;
-  font:
-    22px 'JetBrains Mono',
-    monospace;
-  color: var(--blue);
 }
 .mobile-menu-footnote {
   position: relative;
@@ -2687,7 +2731,8 @@ ul {
     --scroll-pill-height: clamp(28px, 4.2dvh, 40px);
     --scroll-pill-edge-inset: max(var(--frame-inset), 7dvh);
     --scroll-pill-width: 10px;
-    --scroll-liquid-depth: 15px;
+    /* Keep the mobile bump visible while clearing nearby content. */
+    --scroll-liquid-depth: 7px;
     --scroll-liquid-radius: 32px;
   }
 }
@@ -2848,8 +2893,9 @@ ul {
   visibility: hidden;
   pointer-events: none;
 }
-:root[data-theme='dark'] .portfolio-loader-period {
-  display: none;
+:root[data-theme='dark'] .portfolio-loader-period,
+:root[data-theme='dark'] .portfolio-loader-opener {
+  background: var(--ink);
 }
 
 .portfolio-loader-copy-line:has(.portfolio-loader-period) {
@@ -3024,7 +3070,8 @@ ul {
 /* Oversized decorative boxes must not enlarge a mobile scene's scroll area. */
 @media (max-width: 760px), (pointer: coarse) and (max-height: 560px) {
   .scene-top::before {
-    --hero-watermark-size: min(100vw, 50dvh);
+    /* Crop a 2x silhouette into the scene for an abstract mobile backdrop. */
+    --hero-watermark-size: min(200vw, 100dvh);
     inset: 0;
     width: 100%;
     height: 100%;

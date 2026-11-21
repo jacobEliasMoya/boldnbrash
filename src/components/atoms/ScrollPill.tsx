@@ -3,7 +3,11 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react'
 import { motion, useMotionValueEvent, useTransform, type MotionValue } from 'motion/react'
 
-export function ScrollPill({ progress, recess, section }: {
+export function ScrollPill({
+  progress,
+  recess,
+  section,
+}: {
   progress: MotionValue<number>
   recess: MotionValue<number>
   section: string
@@ -15,6 +19,7 @@ export function ScrollPill({ progress, recess, section }: {
   const frame = useRef(0)
   const top = useTransform(progress, (position) => `${position * 100}%`)
   const x = useTransform(recess, (position) => 26 * position)
+
   useMotionValueEvent(progress, 'change', (position) => setValue(position * 100))
   useMotionValueEvent(recess, 'change', (position) => setHidden(position > 0.8))
 
@@ -24,16 +29,20 @@ export function ScrollPill({ progress, recess, section }: {
 
   function seekAt(y: number) {
     const bounds = travel.current?.getBoundingClientRect()
-    if (bounds?.height) seek(100 * (y - bounds.top) / bounds.height)
+
+    if (bounds?.height) seek((100 * (y - bounds.top)) / bounds.height)
   }
 
   function startDrag(event: PointerEvent<HTMLInputElement>) {
     if (!event.isPrimary || event.button !== 0 || !travel.current) return
+
     event.preventDefault()
+
     const bounds = travel.current.getBoundingClientRect()
     const center = bounds.top + progress.get() * bounds.height
     const offset = event.clientY - center
     const halfThumbHeight = bounds.top - event.currentTarget.getBoundingClientRect().top
+
     drag.current = { id: event.pointerId, offset: Math.abs(offset) <= halfThumbHeight ? offset : 0 }
     event.currentTarget.focus({ preventScroll: true })
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -42,15 +51,20 @@ export function ScrollPill({ progress, recess, section }: {
 
   function moveDrag(event: PointerEvent<HTMLInputElement>) {
     if (drag.current?.id !== event.pointerId) return
+
     const y = event.clientY - drag.current.offset
+
     cancelAnimationFrame(frame.current)
     frame.current = requestAnimationFrame(() => seekAt(y))
   }
 
   function endDrag(event: PointerEvent<HTMLInputElement>) {
     if (drag.current?.id !== event.pointerId) return
+
     cancelAnimationFrame(frame.current)
+
     if (event.type === 'pointerup') seekAt(event.clientY - drag.current.offset)
+
     drag.current = null
   }
 
@@ -79,6 +93,7 @@ export function ScrollPill({ progress, recess, section }: {
         onLostPointerCapture={endDrag}
         onKeyDown={(event) => {
           if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
+
           event.preventDefault()
           seek(value + (event.key === 'ArrowDown' ? 2 : -2))
         }}

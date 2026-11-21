@@ -1,5 +1,6 @@
 'use client'
 
+import { motion, type MotionValue } from 'motion/react'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useBlendBounds } from './BlendedNav'
@@ -11,6 +12,7 @@ export function BlendedLogo({
   tone = 'paper',
   control = false,
   menu = false,
+  headerY,
 }: {
   children: ReactNode
   enabled: boolean
@@ -18,8 +20,10 @@ export function BlendedLogo({
   tone?: 'paper' | 'dark'
   control?: boolean
   menu?: boolean
+  headerY?: MotionValue<number>
 }) {
-  const { anchor, bounds } = useBlendBounds<HTMLSpanElement>(enabled, ready)
+  const { anchor, bounds } = useBlendBounds<HTMLSpanElement>(enabled, ready, false, headerY)
+
   return (
     <>
       <span
@@ -34,11 +38,12 @@ export function BlendedLogo({
       {enabled &&
         bounds &&
         createPortal(
-          <div
+          <motion.div
             className={control ? 'liquid-blended-control' : 'liquid-blended-logo'}
             data-tone={tone}
             inert={!ready}
             style={{
+              y: headerY,
               left: bounds.left,
               top: bounds.top,
               width: bounds.width,
@@ -46,7 +51,7 @@ export function BlendedLogo({
             }}
           >
             {children}
-          </div>,
+          </motion.div>,
           document.getElementById('portfolio-header') ?? document.body,
         )}
     </>

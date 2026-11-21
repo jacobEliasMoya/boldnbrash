@@ -1,4 +1,5 @@
 import { DotIcon } from '@/components/atoms/dot-icons/DotIcon'
+
 export function PlatformArtwork() {
   return (
     <svg className="project-artwork" viewBox="0 0 500 250" fill="none" aria-hidden="true">
@@ -81,7 +82,9 @@ export function SystemArtwork() {
         <i />
         <i />
         <i />
-        <span><DotIcon /></span>
+        <span>
+          <DotIcon />
+        </span>
       </div>
     </div>
   )

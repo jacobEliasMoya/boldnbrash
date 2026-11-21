@@ -7,8 +7,7 @@ export const skills = [
       {
         title: 'Astro Platform',
         category: 'Astro',
-        description:
-          'One build. 50+ sites.',
+        description: 'One build. 50+ sites.',
         details: [
           'Helped consolidate roughly 16 builds into one shared Astro build for a platform designed to support more than 50 state sites.',
           'Resolved cross-state content leakage and added validation for routes, content, SEO, and assets.',
@@ -18,8 +17,7 @@ export const skills = [
       {
         title: 'This Portfolio',
         category: 'Next.js / TypeScript',
-        description:
-          'Scroll and motion.',
+        description: 'Scroll and motion.',
         details: [
           'Built the portfolio with Next.js, React, and TypeScript.',
           'Connected section reveals and project cards to scroll progress, with keyboard navigation and a reduced-motion document layout.',
@@ -37,9 +35,7 @@ export const skills = [
         title: 'RegisteredAgents',
         category: 'Strapi / GraphQL',
         description: 'Content models and pages.',
-        details: [
-          'Built content models and reusable page sections for RegisteredAgents.com.',
-        ],
+        details: ['Built content models and reusable page sections for RegisteredAgents.com.'],
         artwork: 'platform',
       },
     ],
@@ -54,9 +50,7 @@ export const skills = [
         sourceUrl: 'https://github.com/jacobEliasMoya/Git-Go',
         category: 'Go',
         description: 'Git from the terminal.',
-        details: [
-          'A personal Go project for working with Git from the command line.',
-        ],
+        details: ['A personal Go project for working with Git from the command line.'],
         artwork: 'terminal',
       },
       {
@@ -94,8 +88,7 @@ export const skills = [
         title: 'Survival Agent',
         status: 'In development',
         category: 'Ollama',
-        description:
-          'Offline AI in progress.',
+        description: 'Offline AI in progress.',
         details: ['In development. The planned stack is Ollama, local models, and tool calling.'],
         artwork: 'agent',
       },
@@ -109,8 +102,7 @@ export const skills = [
       {
         title: 'Design System',
         category: 'React / UI components',
-        description:
-          'Shared React components.',
+        description: 'Shared React components.',
         details: [
           'Built reusable React components with variants and themes.',
           'Updated a shared section overlay across roughly 21 components, including mobile layouts, dark mode, and contrast fixes.',
@@ -127,8 +119,7 @@ export const skills = [
       {
         title: 'Reviews Template',
         category: 'BIZIQ / WordPress',
-        description:
-          'Custom WordPress reviews.',
+        description: 'Custom WordPress reviews.',
         details: [
           'Created a custom PHP reviews template within the proprietary WordPress theme at BIZIQ.',
           'At BIZIQ, I worked on more than 200 WordPress sites.',
@@ -138,8 +129,7 @@ export const skills = [
       {
         title: 'VAREP Migration',
         category: 'VAREP / WordPress',
-        description:
-          'Joomla to WordPress.',
+        description: 'Joomla to WordPress.',
         details: [
           'Worked with a senior developer and designers on the move from Joomla to WordPress.',
           'Built responsive pages with Beaver Builder and supported content migration, plugin configuration, QA, and Gravity Forms.',
@@ -157,8 +147,7 @@ export const skills = [
         title: 'ProductivePython',
         sourceUrl: 'https://github.com/jacobEliasMoya/ProductivePython',
         category: 'Python / Pillow',
-        description:
-          'Batch image tools.',
+        description: 'Batch image tools.',
         details: [
           'BulkGeoTagger writes GPS metadata using city names from image folders and a coordinate lookup.',
           'BulkCompressor resizes images, targets a chosen file size, optionally converts to WebP, and packages the output.',
@@ -204,8 +193,10 @@ export function getScrollSection(position: number) {
   for (let index = sectionScrollRanges.length - 1; index > 0; index--) {
     if (position >= sectionScrollRanges[index].start) return index
   }
+
   return 0
 }
+
 const skillIntroTravel = skillStart - skillIntroStart
 export const skillTitleFillPortion = skillTitleTravel / skillIntroTravel
 export const skillParagraphEndPortion = (skillParagraphEnd - skillIntroStart) / skillIntroTravel
@@ -215,7 +206,9 @@ export const clamp = (value: number, min = 0, max = 1) => Math.max(min, Math.min
 export function getSkillPosition(progress: number) {
   const position = clamp(progress) * skillTravel
   let index = skillSegments.findIndex((segment) => position < segment.start + segment.duration)
+
   if (index < 0) index = skills.length - 1
+
   return { index, phase: position - skillSegments[index].start }
 }
 
@@ -231,7 +224,9 @@ export const projectStops = skills.flatMap((skill, skillIndex) =>
 export function getSkillFrame(progress: number) {
   const position = clamp(progress) * skillTravel
   let next = projectStops.findIndex((stop) => stop.position >= position)
+
   if (next < 0) next = projectStops.length - 1
+
   const previous = Math.max(0, next - 1)
   const from = projectStops[previous]
   const to = projectStops[next]
@@ -239,6 +234,7 @@ export function getSkillFrame(progress: number) {
     next === previous ? 0 : clamp((position - from.position) / (to.position - from.position))
   const projectPosition = previous + fraction
   const active = projectStops[Math.round(projectPosition)]
+
   return {
     index: active.skillIndex,
     projectIndex: active.projectIndex,
