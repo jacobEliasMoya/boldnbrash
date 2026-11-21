@@ -25,7 +25,7 @@ export function WordEmphasis({
 }) {
   const reducedMotion = useReducedMotion()
 
-  if (!enabled || reducedMotion) return text
+  if (!enabled) return text
 
   const tokens = text.split(/(\s+)/)
   const wordCount = tokens.filter((token) => /\S/.test(token)).length
@@ -34,7 +34,8 @@ export function WordEmphasis({
   return tokens.map((token, index) => {
     if (!/\S/.test(token)) return <Fragment key={index}>{token}</Fragment>
 
-    const phase = progress * wordCount - wordIndex++
+    // Keep the same markup during hydration; reduced motion only changes the visual state.
+    const phase = reducedMotion ? 0 : progress * wordCount - wordIndex++
     const style: MotionStyle & { '--word-emphasis': string } = getWordEmphasis(phase)
 
     return (

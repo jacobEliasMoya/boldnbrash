@@ -520,8 +520,9 @@ ul {
   color: var(--ink);
 }
 
-/* Prepare entrances only when the bootstrap script runs. Motion owns subsequent movement. */
-:root[data-js] .portfolio-loader {
+/* Keep the client loader visible even if hydration replaces the bootstrap marker. */
+:root[data-js] .portfolio-loader,
+.portfolio-loader[data-active] {
   display: block;
 }
 

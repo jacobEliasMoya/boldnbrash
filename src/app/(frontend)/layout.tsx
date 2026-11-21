@@ -58,7 +58,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         />
         <script
           dangerouslySetInnerHTML={{
-            __html: `document.documentElement.dataset.js='';try{document.documentElement.dataset.theme=localStorage.getItem('portfolio-theme')==='dark'?'dark':'light'}catch{};window.addEventListener('storage',function(e){if(e.key==='portfolio-theme'){document.documentElement.dataset.theme=e.newValue==='dark'?'dark':'light';window.dispatchEvent(new Event('portfolio:theme'))}})`,
+            // Hosting comments can introduce head whitespace that React treats as unexpected HTML.
+            __html: `for(const node of document.head.childNodes){if(node.nodeType===3&&!node.textContent.trim())node.remove()}document.documentElement.dataset.js='';try{document.documentElement.dataset.theme=localStorage.getItem('portfolio-theme')==='dark'?'dark':'light'}catch{};window.addEventListener('storage',function(e){if(e.key==='portfolio-theme'){document.documentElement.dataset.theme=e.newValue==='dark'?'dark':'light';window.dispatchEvent(new Event('portfolio:theme'))}})`,
           }}
         />
         {fontSource && (

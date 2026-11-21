@@ -7,6 +7,7 @@ import { heroFrameCount } from '@/components/atoms/heroFrames'
 import { introCompleteEvent } from '@/hooks/useIntroReady'
 import { getPeriodOpening } from '@/components/atoms/periodOpening'
 import { mobileLoaderAtlas, mobileSpriteMedia } from '@/components/atoms/spriteAssets'
+import { useClientReady } from '@/hooks/useClientReady'
 
 const seenKey = 'portfolio:intro-seen'
 // Frame timings preserve the landing and catch pauses in the sprite sequence.
@@ -50,6 +51,7 @@ export function PortfolioLoader({ playOnce = false }: { playOnce?: boolean }) {
   const titleFill = useMotionValue(0)
   const liquidPresence = useMotionValue(0)
   const reduceMotion = useReducedMotion()
+  const clientReady = useClientReady()
 
   useEffect(() => {
     if (reduceMotion === null) return
@@ -434,6 +436,7 @@ export function PortfolioLoader({ playOnce = false }: { playOnce?: boolean }) {
     <motion.div
       ref={layer}
       className="portfolio-loader"
+      data-active={clientReady ? '' : undefined}
       data-phase="avatar"
       data-play-once={playOnce}
       data-load-progress={loadProgress}
@@ -449,7 +452,7 @@ export function PortfolioLoader({ playOnce = false }: { playOnce?: boolean }) {
           <motion.span
             className="portfolio-loader-copy-echo"
             key={line}
-            initial={reduceMotion ? false : { opacity: 0, y: '-6svh' }}
+            initial={{ opacity: 0, y: '-6svh' }}
             animate={
               copyReady
                 ? {
