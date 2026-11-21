@@ -4,8 +4,16 @@ import { useEffect, useRef } from 'react'
 import { motion, useAnimationControls, useReducedMotion } from 'motion/react'
 import { dotGatherDuration, dotReboundScale, dotReboundTransition, playDotClick } from './dotMotion'
 
+const dotPatterns = {
+  arrow: [[6, 6], [12, 6], [18, 6], [18, 12], [18, 18], [12, 12], [6, 18]],
+  up: [[12, 4], [6, 10], [18, 10], [12, 10], [12, 15], [12, 20]],
+  close: [[6, 6], [18, 6], [12, 12], [6, 18], [18, 18]],
+  play: [[6, 5], [6, 12], [6, 19], [12, 8.5], [18, 12], [12, 15.5]],
+  pause: [[8, 6.8], [8, 12], [8, 17.2], [16, 6.8], [16, 12], [16, 17.2]],
+} as const
+
 export function DotIcon({ kind = 'arrow', controls }: {
-  kind?: 'arrow' | 'up' | 'close'
+  kind?: keyof typeof dotPatterns
   controls?: ReturnType<typeof useAnimationControls>
 }) {
   const localControls = useAnimationControls()
@@ -31,11 +39,6 @@ export function DotIcon({ kind = 'arrow', controls }: {
       localControls.stop()
     }
   }, [controls, reduced, localControls])
-  const dots = kind === 'close'
-    ? [[6, 6], [18, 6], [12, 12], [6, 18], [18, 18]]
-    : kind === 'up'
-      ? [[12, 4], [6, 10], [18, 10], [12, 10], [12, 15], [12, 20]]
-      : [[6, 6], [12, 6], [18, 6], [18, 12], [18, 18], [12, 12], [6, 18]]
   return (
     <motion.svg ref={svg} className="dot-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"
       initial="idle" animate={animation} variants={{
@@ -49,8 +52,8 @@ export function DotIcon({ kind = 'arrow', controls }: {
           transition: reduced ? { duration: 0 } : dotReboundTransition,
         },
       }}>
-      {dots.map(([cx, cy]) => (
-        <motion.circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="2.3"
+      {dotPatterns[kind].map(([cx, cy], index) => (
+        <motion.circle key={index} cx={cx} cy={cy} r="2.3"
           variants={{ idle: { cx, cy, r: 2.3 }, gather: { cx: 12, cy: 12, r: 3.8 }, rebound: { cx: 12, cy: 12, r: 3.8 } }}
           transition={{ duration: reduced ? 0 : dotGatherDuration, ease: [0.4, 0, 0.2, 1] }} />
       ))}

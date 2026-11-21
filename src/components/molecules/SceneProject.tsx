@@ -1,6 +1,6 @@
 'use client'
 
-import { DotIcon } from '@/components/atoms/DotIcon'
+import { DotIcon } from '@/components/atoms/dot-icons/DotIcon'
 import { useRef, type ReactNode } from 'react'
 
 export function SceneProject({

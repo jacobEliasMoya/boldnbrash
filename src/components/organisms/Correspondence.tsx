@@ -1,4 +1,4 @@
-import { DotIcon } from '@/components/atoms/DotIcon'
+import { DotIcon } from '@/components/atoms/dot-icons/DotIcon'
 export function Correspondence() {
   return (
     <div className="contact-scene scene-content">

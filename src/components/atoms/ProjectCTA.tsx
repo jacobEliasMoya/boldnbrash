@@ -1,7 +1,7 @@
 'use client'
 
-import { DotIcon } from '@/components/atoms/DotIcon'
-import { playDotClick } from './dotMotion'
+import { DotIcon } from '@/components/atoms/dot-icons/DotIcon'
+import { playDotClick } from './dot-icons/dotMotion'
 import { useRef } from 'react'
 import { motion, useAnimationControls, useMotionValue, useReducedMotion, useSpring, useTransform } from 'motion/react'
 

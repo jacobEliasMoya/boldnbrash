@@ -4,7 +4,7 @@ import { HeroMark } from '@/components/atoms/HeroMark'
 import { WordEmphasis } from '@/components/atoms/WordEmphasis'
 import { motion, useReducedMotion } from 'motion/react'
 import { useIntroReady } from '@/hooks/useIntroReady'
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+import { Fragment, useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 
 function subscribeMobile(onChange: () => void) {
   const media = window.matchMedia('(max-width: 760px)')
@@ -17,6 +17,7 @@ const entered = { opacity: 1, y: 0 }
 const letterStep = 0.055
 const entranceTempo = 0.65
 const heroParticlesEnabled = false
+const headline = ['Plan It.', 'Build It.', 'Launch It'] as const
 
 function entranceTransition(delay: number, reduceMotion: boolean | null) {
   return {
@@ -27,25 +28,22 @@ function entranceTransition(delay: number, reduceMotion: boolean | null) {
   }
 }
 
-function AnimatedWord({
-  word,
-  wordIndex,
+function AnimatedLetters({
+  text,
   start,
   reduceMotion,
   introReady,
 }: {
-  word: string
-  wordIndex: number
+  text: string
   start: number
   reduceMotion: boolean | null
   introReady: boolean
 }) {
   return (
-    <span className="hero-line" aria-hidden="true">
-      {[...word].map((letter, index) => (
+    <span aria-hidden="true">
+      {[...text].map((letter, index) => letter === ' ' ? <Fragment key={index}> </Fragment> : (
         <motion.span
           className="hero-letter"
-          data-fill-index={wordIndex * 6 + index}
           key={`${letter}-${index}`}
           initial={reduceMotion ? false : entrance}
           animate={introReady ? entered : entrance}
@@ -94,50 +92,28 @@ export function PortfolioHero() {
         >
           Hi, I’m <span className="name-pill">Jake</span>
         </motion.p>
-        <h1 aria-label="Build. Break. Repeat.">
-          <AnimatedWord
-            word="Build."
-            wordIndex={0}
-            start={0.98}
-            reduceMotion={reduceMotion}
-            introReady={introReady}
-          />
-          <AnimatedWord
-            word="Break."
-            wordIndex={1}
-            start={1.31}
-            reduceMotion={reduceMotion}
-            introReady={introReady}
-          />
-          <span className="hero-line">
-            <span aria-hidden="true">
-              {[...'Repeat'].map((letter, index) => (
-                <motion.span
-                  className="hero-letter"
-                  data-fill-index={12 + index}
-                  key={`${letter}-${index}`}
-                  initial={reduceMotion ? false : entrance}
-                  animate={introReady ? entered : entrance}
-                  transition={entranceTransition(1.64 + index * letterStep, reduceMotion)}
-                >
-                  {letter}
-                </motion.span>
-              ))}
+        <h1 aria-label={`${headline.join(' ')}.`}>
+          {headline.slice(0, -1).map((text, index) => (
+            <span key={text} className="hero-line">
+              <AnimatedLetters text={text} start={0.98 + index * 0.33} reduceMotion={reduceMotion} introReady={introReady} />
             </span>
+          ))}
+          <span className="hero-line">
+            <AnimatedLetters text={headline[2]} start={1.64} reduceMotion={reduceMotion} introReady={introReady} />
             <motion.a
               className="hero-period"
               href="#skills"
               aria-label="Explore my skills"
               initial={reduceMotion ? false : entrance}
               animate={introReady ? entered : entrance}
-              transition={entranceTransition(1.64 + 6 * letterStep, reduceMotion)}
+              transition={entranceTransition(1.64 + headline[2].length * letterStep, reduceMotion)}
               onAnimationComplete={() => {
                 if (!introReady) return
                 const hero = document.querySelector<HTMLElement>('.scene-top')
                 if (hero) hero.dataset.periodReady = 'true'
               }}
             >
-              <span className="hero-period-glyph hero-letter" data-fill-index={18} aria-hidden="true">
+              <span className="hero-period-glyph hero-letter" aria-hidden="true">
                 .
               </span>
               <span data-portal="skills" aria-hidden="true" />
@@ -150,7 +126,10 @@ export function PortfolioHero() {
           animate={introReady ? entered : entrance}
           transition={entranceTransition(2.18, reduceMotion)}
         >
-          <WordEmphasis text="I build for the web. Half the fun is finding out why it broke." progress={paragraphProgress} />
+          <WordEmphasis
+            text="I turn thoughtful design into accessible interfaces and reusable systems."
+            progress={paragraphProgress}
+          />
         </motion.p>
         <span className="sr-only">Jacob Moya’s creative development portfolio</span>
       </div>

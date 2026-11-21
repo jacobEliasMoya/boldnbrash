@@ -1,4 +1,4 @@
-import { DotIcon } from '@/components/atoms/DotIcon'
+import { DotIcon } from '@/components/atoms/dot-icons/DotIcon'
 export function PlatformArtwork() {
   return (
     <svg className="project-artwork" viewBox="0 0 500 250" fill="none" aria-hidden="true">

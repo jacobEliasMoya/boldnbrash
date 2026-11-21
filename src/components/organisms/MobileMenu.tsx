@@ -1,11 +1,12 @@
 'use client'
 
-import { DotIcon } from '@/components/atoms/DotIcon'
+import { DotIcon } from '@/components/atoms/dot-icons/DotIcon'
+import { MenuCloseDots, MenuTriangleDots } from '@/components/atoms/dot-icons/MobileMenuDots'
 import { getWordEmphasis } from '@/components/atoms/WordEmphasis'
-import { mergeDots } from '@/components/atoms/dotMotion'
+import { mergeDots } from '@/components/atoms/dot-icons/dotMotion'
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react'
-import { animate, motion, useMotionValue, useReducedMotion, useTransform } from 'motion/react'
+import { animate, motion, useMotionValue, useReducedMotion } from 'motion/react'
 import { createPortal } from 'react-dom'
 import { BlendedLogo } from '@/components/atoms/BlendedLogo'
 import { getPeriodOpening } from '@/components/atoms/periodOpening'
@@ -24,7 +25,8 @@ const menuPop = { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const }
 const numberStagger = 0.07
 const linkPopStart = { opacity: 0, scale: 0.78, y: 8 }
 const linkPopEnd = { opacity: 1, scale: 1, y: 0 }
-const linkPopDuration = 0.23
+const linkPopDuration = 0.18
+const linkPopStagger = 0.12
 const labelFill = { '--letter-fill': '100%' }
 const labelFillRest = { '--letter-fill': '0%', y: 0, scale: 1, rotate: 0 }
 const labelEmphasis = [0, 0.25, 0.5, 0.75, 1].map(getWordEmphasis)
@@ -38,10 +40,10 @@ const labelFillMotion = {
 function linkPopTransition(index: number, numberCount: number, reduced: boolean | null) {
   if (reduced) return { duration: 0 }
   const numberSequenceDuration = menuPop.duration + Math.max(0, numberCount - 1) * numberStagger
-  const delay = numberSequenceDuration * 0.32 + index * linkPopDuration
+  const delay = numberSequenceDuration * 0.32 + index * linkPopStagger
   return {
     default: { type: 'spring' as const, duration: linkPopDuration, bounce: 0.35, delay },
-    opacity: { duration: 0.12, delay },
+    opacity: { duration: 0.1, delay },
   }
 }
 
@@ -100,14 +102,6 @@ export function MobileMenu({
   const entryProgress = useMotionValue(0)
   const panelClip = useMotionValue('none')
   const socialOffset = useMotionValue(menuSocialStartOffset)
-  const topY = useTransform(gather, (progress) => -7 * (1 - progress))
-  const bottomY = useTransform(gather, (progress) => 3.5 * (1 - progress))
-  const leftX = useTransform(gather, (progress) => -6 * (1 - progress))
-  const rightX = useTransform(gather, (progress) => 6 * (1 - progress))
-  const closePositive = useTransform(closeGather, (progress) => 6 * (1 - progress))
-  const closeNegative = useTransform(closeGather, (progress) => -6 * (1 - progress))
-  const dotScale = useTransform(gather, (progress) => Math.sqrt(1 + 2 * Math.max(0, Math.min(1, progress))))
-  const closeDotScale = useTransform(closeGather, (progress) => Math.sqrt(1 + 2 * Math.max(0, Math.min(1, progress))))
   useEffect(() => () => {
     stopOpening.current?.()
     stopEntering.current?.()
@@ -368,9 +362,7 @@ export function MobileMenu({
               scaleY: { type: 'spring', stiffness: 260, damping: 14, mass: 0.8, delay: 0.22 },
             }}
           >
-            <motion.i style={{ x: 0, y: topY, scale: dotScale }} />
-            <motion.i style={{ x: leftX, y: bottomY, scale: dotScale }} />
-            <motion.i style={{ x: rightX, y: bottomY, scale: dotScale }} />
+            <MenuTriangleDots gather={gather} />
           </motion.span>
         </motion.button>
       </BlendedLogo>
@@ -427,11 +419,7 @@ export function MobileMenu({
                     onClick={closeMenu}
                   >
                     <motion.span className="mobile-menu-close-dots" aria-hidden="true" style={{ scale: closeRebound }}>
-                      <motion.i style={{ x: closeNegative, y: closeNegative, scale: closeDotScale }} />
-                      <motion.i style={{ x: closePositive, y: closeNegative, scale: closeDotScale }} />
-                      <motion.i style={{ x: 0, y: 0, scale: closeDotScale }} />
-                      <motion.i style={{ x: closeNegative, y: closePositive, scale: closeDotScale }} />
-                      <motion.i style={{ x: closePositive, y: closePositive, scale: closeDotScale }} />
+                      <MenuCloseDots gather={closeGather} />
                     </motion.span>
                   </button>
                 </div>

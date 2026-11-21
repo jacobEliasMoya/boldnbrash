@@ -105,35 +105,27 @@ export function LiquidBoundary({
         edge: ['top-right', 'bottom-right', 'bottom-left', 'top-left'][quadrant],
       }
     }
-    function contour(position: number, depth: number, radius: number, power: number, updateSurround = false) {
+    function closedCurve(vertices: { x: number; y: number }[]) {
+      const first = vertices[0]
+      const last = vertices[vertices.length - 1]
+      let d = `M${(last.x + first.x) / 2},${(last.y + first.y) / 2}`
+      for (let i = 0; i < vertices.length; i++) {
+        const a = vertices[i]
+        const b = vertices[(i + 1) % vertices.length]
+        d += ` Q${a.x},${a.y} ${(a.x + b.x) / 2},${(a.y + b.y) / 2}`
+      }
+      return d + ' Z'
+    }
+    let outside = ''
+    let flatPath = ''
+    let flatPathPainted = false
+    function contour(position: number, depth: number, radius: number, power: number) {
       const direction = pointAt(position)
-      const count = basePoints.length
       const points = basePoints.map((base, i) => {
-        const s = (perimeter * i) / count
+        const s = (perimeter * i) / basePoints.length
         const amount = depth * Math.exp(-((Math.abs(arcDelta(position, s)) / radius) ** power))
         return { x: base.x + direction.nx * amount, y: base.y + direction.ny * amount }
       })
-      function closedCurve(vertices: { x: number; y: number }[]) {
-        const first = vertices[0]
-        const last = vertices[vertices.length - 1]
-        let d = `M${(last.x + first.x) / 2},${(last.y + first.y) / 2}`
-        for (let i = 0; i < vertices.length; i++) {
-          const a = vertices[i]
-          const b = vertices[(i + 1) % vertices.length]
-          d += ` Q${a.x},${a.y} ${(a.x + b.x) / 2},${(a.y + b.y) / 2}`
-        }
-        return d + ' Z'
-      }
-      const outside = `M${-frameInset},${-frameInset} H${width + frameInset} V${height + frameInset} H${-frameInset} Z `
-      // Keep the outer surround solid in the theme colour. A subpixel overlap
-      // covers the antialiased join without restoring a separate outline stroke.
-      if (updateSurround) surroundPath?.setAttribute(
-        'd',
-        outside +
-          closedCurve(
-            basePoints.map((base) => ({ x: base.x + base.nx * 0.75, y: base.y + base.ny * 0.75 })),
-          ),
-      )
       return outside + closedCurve(points)
     }
     function paint(time: number) {
@@ -152,7 +144,11 @@ export function LiquidBoundary({
       depth += (targetDepth - depth) * ease
       radius += (targetRadius - radius) * ease
       power += (targetPower - power) * ease
-      path!.setAttribute('d', contour(position, depth, radius, power, true))
+      const flat = depth < 0.01 && targetDepth === 0
+      if (!flat || !flatPathPainted) {
+        path!.setAttribute('d', flat ? flatPath : contour(position, depth, radius, power))
+        flatPathPainted = flat
+      }
       const scrollY = scrollTop + Math.max(0, height - scrollTop - scrollBottom) * scrollProgress.get()
       const scrollDepth = scrollReach * (1 - Math.max(0, Math.min(1, scrollRecess.get())))
       const scrollKey = `${width}:${height}:${scrollY}:${scrollDepth}:${scrollRadius}`
@@ -280,6 +276,17 @@ export function LiquidBoundary({
       perimeter = segments.reduce((sum, length) => sum + length, 0)
       const sampleCount = Math.ceil(perimeter / 5)
       basePoints = Array.from({ length: sampleCount }, (_, index) => pointAt(perimeter * index / sampleCount))
+      outside = `M${-frameInset},${-frameInset} H${width + frameInset} V${height + frameInset} H${-frameInset} Z `
+      flatPath = outside + closedCurve(basePoints)
+      flatPathPainted = false
+      // The subpixel overlap keeps the antialiased join solid.
+      surroundPath?.setAttribute(
+        'd',
+        outside +
+          closedCurve(
+            basePoints.map((base) => ({ x: base.x + base.nx * 0.75, y: base.y + base.ny * 0.75 })),
+          ),
+      )
       position = wrap(position)
       targetPosition = wrap(targetPosition)
       schedule()

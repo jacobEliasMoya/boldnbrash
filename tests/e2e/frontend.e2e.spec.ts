@@ -2,6 +2,9 @@ import { expect, test, type Page } from '@playwright/test'
 import {
   heroFillEnd,
   heroParagraphEnd,
+  heroWalkOutStart,
+  heroWalkOutEnd,
+  skillParagraphEnd,
   sceneStops,
   skillSegments,
   skills,
@@ -39,11 +42,19 @@ test('Jake walks in with the particle effect disabled', async ({ page }) => {
     const backdrop = getComputedStyle(hero, '::before')
     return { color: backdrop.backgroundColor, opacity: backdrop.opacity }
   })
-  expect(watermark).toEqual({ color: 'rgb(56, 20, 255)', opacity: '0.12' })
+  expect(watermark).toEqual({ color: 'rgb(56, 20, 255)', opacity: '0.09' })
   await expect(page.locator('.hero-mark-animation')).toHaveAttribute('data-mode', 'idle')
   await page.setViewportSize({ width: 390, height: 844 })
   const mobileSize = await page.locator('#top').evaluate((hero) => getComputedStyle(hero, '::before').maskSize)
   expect(parseFloat(mobileSize)).toBe(390)
+  await page.setViewportSize({ width: 320, height: 568 })
+  const longestLine = page.locator('.hero-line').last()
+  const rightEdge = await longestLine.evaluate((line) => {
+    const range = document.createRange()
+    range.selectNodeContents(line)
+    return range.getBoundingClientRect().right
+  })
+  expect(rightEdge).toBeLessThan(308)
 })
 
 test('Jake turns toward his travel direction and keeps his gait forward when scrolling reverses', async ({
@@ -55,11 +66,11 @@ test('Jake turns toward his travel direction and keeps his gait forward when scr
   let previousStep = 0
   let previousCenter = Number(await avatar.getAttribute('data-center'))
   for (const [progress, facing] of [
-    [0.5, 'right'],
-    [0.46, 'left'],
-    [0.52, 'right'],
+    [0.35, 'right'],
+    [0.17, 'left'],
+    [0.43, 'right'],
   ] as const) {
-    await scrollTimeline(page, progress)
+    await scrollTimeline(page, heroWalkOutStart + progress * (heroWalkOutEnd - heroWalkOutStart))
     await expect(avatar).toHaveAttribute('data-facing', facing)
     const center = Number(await avatar.getAttribute('data-center'))
     expect(facing === 'right' ? center > previousCenter : center < previousCenter).toBe(true)
@@ -103,20 +114,20 @@ test('fast scrolling does not interrupt Jake’s automatic walk-in', async ({
 }) => {
   await page.goto(baseURL)
   const avatar = page.locator('.hero-mini-jacob')
-  await avatar.evaluate((element) => {
+  await avatar.evaluate((element, exitEnd) => {
     const samples: { frame: number; time: number }[] = []
     const observer = new MutationObserver(() => {
       if (samples.length === 0) {
         const track = document.querySelector<HTMLElement>('.scene-track')!
         const distance = track.offsetHeight - track.firstElementChild!.clientHeight
-        window.scrollTo(0, distance * 0.9 / Number(track.dataset.duration))
+        window.scrollTo(0, distance * (exitEnd + 0.05) / Number(track.dataset.duration))
       }
       samples.push({ frame: Number(element.getAttribute('data-frame')), time: performance.now() })
       ;(element as HTMLElement).dataset.frameTimes = JSON.stringify(samples)
       if (element.getAttribute('data-direction') === 'out') observer.disconnect()
     })
     observer.observe(element, { attributes: true, attributeFilter: ['data-frame'] })
-  })
+  }, heroWalkOutEnd)
   await expect(page.locator('.hero-mark-animation')).toHaveAttribute('data-mode', 'gone', {
     timeout: 15000,
   })
@@ -145,21 +156,26 @@ test('Jake walks in automatically, then scroll plays his wave and exit', async (
   await expect(mark).toHaveAttribute('data-mode', 'idle')
   await scrollTimeline(page, 0.4)
   await expect(mark).toHaveAttribute('data-mode', 'idle')
+  await scrollTimeline(page, heroWalkOutStart - 0.05)
+  await expect(mark).toHaveAttribute('data-mode', 'idle')
+  await expect(firstLetter).toHaveCSS('--letter-fill', '100%')
   let previousCenter = 289
   for (const step of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
-    await scrollTimeline(page, 0.42 + ((0.65 - 0.42) * (step + 0.2)) / 10)
+    await scrollTimeline(page, heroWalkOutStart + ((heroWalkOutEnd - heroWalkOutStart) * (step + 0.2)) / 10)
     await expect(avatar).toHaveAttribute('data-frame', String([4, 5, 6, 7][step % 4]))
     await expect(avatar).toHaveAttribute('data-direction', 'out')
     const center = Number(await avatar.getAttribute('data-center'))
     expect(center).toBeGreaterThan(previousCenter)
     previousCenter = center
-    await expect(firstLetter).toHaveCSS('--letter-fill', '0%')
+    await expect(firstLetter).toHaveCSS('--letter-fill', '100%')
   }
-  await scrollTimeline(page, 0.8)
+  await scrollTimeline(page, heroWalkOutEnd)
   await expect(mark).toHaveAttribute('data-mode', 'gone')
   await expect(avatar).toHaveCSS('opacity', '0')
+  await expect(page.locator('#skills')).toHaveCSS('visibility', 'hidden')
+  await scrollTimeline(page, 0.8)
   await expect(firstLetter).toHaveCSS('--letter-fill', '100%')
-  const secondLine = page.locator('.hero-letter').nth(6)
+  const secondLine = page.locator('.hero-line').nth(1).locator('.hero-letter').first()
   await expect(secondLine).toHaveCSS('--letter-fill', '100%')
   await expect(page.locator('.hero-letter').last()).toHaveCSS('--letter-fill', '0%')
   for (const selector of ['.hero-greeting', '.hero-greeting .name-pill', '.hero-description']) {
@@ -280,7 +296,7 @@ test('the edge scroll pill seeks and carries its liquid with it', async ({ page 
   await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 15000 })
   await expect(page.locator('.site-scrollbar')).toHaveAttribute('inert', '')
   await expect(liquid).not.toHaveAttribute('d')
-  await scrollTimeline(page, heroParagraphEnd / 4)
+  await scrollTimeline(page, heroWalkOutEnd / 4)
   await expect(slider).toHaveAttribute('aria-valuetext', '25% of Home')
   await expect(page.locator('.site-scrollbar')).toHaveCSS('transform', 'none')
   await expect(liquid).toHaveAttribute('d', /^M/)
@@ -298,13 +314,23 @@ test('the edge scroll pill seeks and carries its liquid with it', async ({ page 
   await slider.press('Home')
   await expect(slider).toHaveAttribute('aria-valuetext', '0% of Home')
 
-  await scrollTimeline(page, (heroParagraphEnd + sceneStops[1]) / 2)
+  await scrollTimeline(page, (heroWalkOutEnd + sceneStops[1]) / 2)
   await expect(page.locator('.site-scrollbar')).toHaveAttribute('inert', '')
   await scrollTimeline(page, sceneStops[1])
   await expect(page.getByRole('slider', { name: 'Work scroll position' }))
     .toHaveAttribute('aria-valuetext', '0% of Work')
   const thumb = page.locator('.site-scrollbar-thumb')
   expect((await thumb.boundingBox())!.height).toBeCloseTo(45.9, 1)
+  expect((await thumb.boundingBox())!.y).toBeCloseTo(45, 0)
+  const workSlider = page.getByRole('slider', { name: 'Work scroll position', exact: true })
+  await workSlider.press('End')
+  await expect(workSlider).toHaveAttribute('aria-valuetext', '100% of Work')
+  await expect(page.locator('.skills-reveal')).toHaveAttribute('inert', '')
+  await scrollTimeline(page, (skillParagraphEnd + skillStart) / 2)
+  await expect(page.locator('.site-scrollbar')).toHaveAttribute('inert', '')
+  await scrollTimeline(page, skillStart)
+  await expect(page.getByRole('slider', { name: 'Work projects scroll position' }))
+    .toHaveAttribute('aria-valuetext', '0% of Work projects')
   expect((await thumb.boundingBox())!.y).toBeCloseTo(45, 0)
   await page.setViewportSize({ width: 1440, height: 600 })
   await expect(thumb).toHaveCSS('height', '36px')
@@ -313,13 +339,16 @@ test('the edge scroll pill seeks and carries its liquid with it', async ({ page 
   await expect(thumb).toHaveCSS('width', '10px')
   expect((await thumb.boundingBox())!.height).toBeCloseTo(35.45, 1)
   await expect(page.locator('.site-scrollbar-input')).toHaveCSS('width', '24px')
+  await expect(thumb).toHaveCSS('background-color', 'rgb(255, 200, 87)')
+  await page.evaluate(() => { document.documentElement.dataset.theme = 'dark' })
+  await expect(thumb).toHaveCSS('background-color', 'rgb(85, 48, 220)')
 })
 
 test('a touch drag on the scroll pill follows the finger until release', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto(baseURL)
   await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 15000 })
-  await scrollTimeline(page, heroParagraphEnd / 4)
+  await scrollTimeline(page, heroWalkOutEnd / 4)
   const slider = page.getByRole('slider', { name: 'Home scroll position' })
   await expect(slider).toHaveAttribute('aria-valuetext', '25% of Home')
   await expect(page.locator('.site-scrollbar')).toHaveCSS('transform', 'none')
@@ -345,7 +374,9 @@ test('scenes open with scroll and close again in reverse', async ({ page }) => {
   await page.goto(baseURL)
   await expect(page).toHaveTitle(/Jacob Moya/)
   await expect(page.locator('.portfolio')).toHaveAttribute('data-enhanced', '')
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Build.Break.Repeat.')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveAccessibleName(
+    'Plan It. Build It. Launch It.',
+  )
   await expect(page.locator('#top')).toHaveAttribute('aria-hidden', 'false')
   await expect(page.locator('#top')).toHaveCSS('background-color', 'rgb(255, 255, 255)')
   await expect(page.locator('#about')).toHaveCSS('background-color', 'rgb(255, 255, 255)')
@@ -362,6 +393,50 @@ test('scenes open with scroll and close again in reverse', async ({ page }) => {
   await expect(page.locator('#top')).toHaveAttribute('aria-hidden', 'false')
   await expect(home.locator('.desktop-section-marker')).toHaveCSS('opacity', '1')
   await expect(page.locator('#skills')).toHaveJSProperty('inert', true)
+})
+
+test('the Work reveal starts at the visible period on desktop and mobile', async ({ page }) => {
+  test.setTimeout(60000)
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport)
+    await page.goto(baseURL)
+    const period = page.locator('.hero-period')
+    await expect(page.locator('#top')).toHaveAttribute('data-period-ready', 'true', { timeout: 15000 })
+    await scrollTimeline(page, heroWalkOutEnd)
+    await expect(page.locator('.hero-period-glyph')).toHaveCSS('--letter-fill', '100%')
+    const bounds = (await period.boundingBox())!
+    const screenshot = await period.screenshot()
+    const inkCenter = await page.evaluate(async (png) => {
+      const image = new Image()
+      image.src = 'data:image/png;base64,' + png
+      await image.decode()
+      const canvas = document.createElement('canvas')
+      canvas.width = image.width
+      canvas.height = image.height
+      const context = canvas.getContext('2d')!
+      context.drawImage(image, 0, 0)
+      const { data } = context.getImageData(0, 0, image.width, image.height)
+      let left = image.width, top = image.height, right = -1, bottom = -1
+      for (let y = 0; y < image.height; y++) {
+        // Negative letter spacing can paint the preceding letter across the crop's left edge.
+        for (let x = Math.floor(image.width / 4); x < image.width; x++) {
+          const offset = (y * image.width + x) * 4
+          if (data[offset] > 100 || data[offset + 1] > 100 || data[offset + 2] < 150) continue
+          left = Math.min(left, x)
+          right = Math.max(right, x)
+          top = Math.min(top, y)
+          bottom = Math.max(bottom, y)
+        }
+      }
+      return { x: (left + right + 1) / 2, y: (top + bottom + 1) / 2, found: right >= left }
+    }, screenshot.toString('base64'))
+    expect(inkCenter.found).toBe(true)
+    await scrollTimeline(page, heroWalkOutEnd + 0.05)
+    const origin = page.locator('.scene-period-opening circle').first()
+    const panelBounds = (await page.locator('#skills').boundingBox())!
+    expect(Math.abs(Number(await origin.getAttribute('cx')) + panelBounds.x - bounds.x - inkCenter.x)).toBeLessThan(3)
+    expect(Math.abs(Number(await origin.getAttribute('cy')) + panelBounds.y - bounds.y - inkCenter.y)).toBeLessThan(3)
+  }
 })
 
 test('section reveals remain partial until further scrolling and reverse with scroll', async ({
@@ -394,16 +469,16 @@ test('section reveals remain partial until further scrolling and reverse with sc
   await expect(panel).toHaveCSS('visibility', 'hidden')
   const descriptionSize = await description.evaluate((element) => getComputedStyle(element).fontSize)
   await expect(page.locator('.skills-intro')).toHaveCSS('font-size', descriptionSize)
-  await scrollToProgress(heroParagraphEnd + 0.1)
+  await scrollToProgress(heroWalkOutEnd + 0.1)
   await expect(panel).toHaveCSS('visibility', 'visible')
   await page.waitForTimeout(1000)
   const radius = () => panel.evaluate((el) => parseFloat(getComputedStyle(el).clipPath.slice(7)))
   const partial = await radius()
   expect(partial).toBeGreaterThan(0)
   await expect(panel).not.toHaveCSS('clip-path', 'none')
-  await scrollToProgress(heroParagraphEnd + 0.32)
+  await scrollToProgress(heroWalkOutEnd + 0.32)
   await expect.poll(radius).toBeGreaterThan(partial * 1.5)
-  await scrollToProgress(heroParagraphEnd + 0.04)
+  await scrollToProgress(heroWalkOutEnd + 0.04)
   await expect.poll(radius).toBeLessThan(partial)
   await scrollToProgress(sceneStops[1])
   await expect(panel).toHaveCSS('clip-path', 'none')
@@ -611,7 +686,7 @@ test('mobile night mode shares the header and menu styling', async ({ page }) =>
   await expect(footerLiquid).toHaveCSS('fill', 'rgb(0, 0, 0)')
   await expect(socials.getByRole('link', { name: /GitHub/ })).toHaveCSS('color', 'rgb(255, 255, 255)')
   const githubIcon = socials.getByRole('link', { name: /GitHub/ })
-  await expect(githubIcon).toHaveCSS('width', '44px')
+  await expect(githubIcon).toHaveCSS('width', '40px')
   await expect(githubIcon.locator('svg')).toHaveCSS('width', '24px')
   await expect(socials.getByRole('link', { name: /LinkedIn/ })).toBeVisible()
   await expect(socials.getByRole('link', { name: 'Email', exact: true })).toHaveAttribute(

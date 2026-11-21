@@ -178,7 +178,9 @@ export const skillSegments = skills.map((skill, index) => ({
 export const skillTravel = skillSegments.reduce((sum, segment) => sum + segment.duration, 0)
 export const heroFillEnd = 1
 export const heroParagraphEnd = heroFillEnd + 1.08
-const skillIntroStart = heroParagraphEnd + 0.4
+export const heroWalkOutStart = heroParagraphEnd - 0.18
+export const heroWalkOutEnd = heroParagraphEnd + 0.14
+const skillIntroStart = heroWalkOutEnd + 0.4
 const skillTitleTravel = 0.9
 const skillParagraphTravel = 1.44
 export const skillParagraphEnd = skillIntroStart + skillTitleTravel + skillParagraphTravel
@@ -190,15 +192,17 @@ export const sceneStops = [
   skillStart + skillTravel + 2.65,
 ]
 export const sceneDuration = sceneStops[sceneStops.length - 1] + 0.65
-const sectionEnds = [heroParagraphEnd, sceneStops[2] - 1, sceneStops[3] - 1, sceneDuration]
-export const sectionScrollRanges = sceneStops.map((start, index) => ({
-  start,
-  end: sectionEnds[index],
-}))
+export const sectionScrollRanges = [
+  { start: sceneStops[0], end: heroWalkOutEnd, sceneIndex: 0 },
+  { start: sceneStops[1], end: skillParagraphEnd, sceneIndex: 1 },
+  { start: skillStart, end: sceneStops[2] - 1, sceneIndex: 1, label: 'Work projects' },
+  { start: sceneStops[2], end: sceneStops[3] - 1, sceneIndex: 2 },
+  { start: sceneStops[3], end: sceneDuration, sceneIndex: 3 },
+]
 
 export function getScrollSection(position: number) {
-  for (let index = sceneStops.length - 1; index > 0; index--) {
-    if (position >= sceneStops[index]) return index
+  for (let index = sectionScrollRanges.length - 1; index > 0; index--) {
+    if (position >= sectionScrollRanges[index].start) return index
   }
   return 0
 }

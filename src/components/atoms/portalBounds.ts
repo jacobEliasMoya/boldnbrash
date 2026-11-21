@@ -14,12 +14,16 @@ export function getPortalBounds(portal: Element): DOMRect {
   if (!ink) {
     measurement.font = font
     ink = measurement.measureText('.')
-    metrics.set(font, ink)
+    if (document.fonts.check(font, '.')) metrics.set(font, ink)
   }
-  const box = glyph.getBoundingClientRect()
+  const text = document.createRange()
+  text.selectNodeContents(glyph)
+  const inkStart = text.getBoundingClientRect().left
   const baseline = portal.getBoundingClientRect().top
-  return new DOMRect(box.left - ink.actualBoundingBoxLeft,
+  return new DOMRect(
+    inkStart - ink.actualBoundingBoxLeft,
     baseline - ink.actualBoundingBoxAscent,
     ink.actualBoundingBoxLeft + ink.actualBoundingBoxRight,
-    ink.actualBoundingBoxAscent + ink.actualBoundingBoxDescent)
+    ink.actualBoundingBoxAscent + ink.actualBoundingBoxDescent,
+  )
 }

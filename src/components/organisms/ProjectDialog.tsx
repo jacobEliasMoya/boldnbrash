@@ -1,7 +1,7 @@
 'use client'
 
-import { DotIcon } from '@/components/atoms/DotIcon'
-import { playDotClick } from '@/components/atoms/dotMotion'
+import { DotIcon } from '@/components/atoms/dot-icons/DotIcon'
+import { playDotClick } from '@/components/atoms/dot-icons/dotMotion'
 import { useEffect, useRef } from 'react'
 import { animate, motion, useAnimationControls, useReducedMotion } from 'motion/react'
 import { ProjectCover } from '@/components/atoms/ProjectCover'
