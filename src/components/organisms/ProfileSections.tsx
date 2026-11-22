@@ -67,18 +67,23 @@ export function ProfileSections() {
           role="region"
           aria-labelledby="about-title"
         >
-          <div className="about-sheet">
-            <p className="eyebrow">About</p>
-            <h2 id="about-title">How I work.</h2>
-            <p className="about-summary">
-              My favorite part of a project is figuring out what would make someone’s day easier. I
-              like talking it through, trying a small first version, and paying attention to where
-              people get stuck. I want the next person who opens the code to feel at home, too.
-            </p>
-            <details className="about-details" open>
-              <summary>
-                Experience <span className="about-toggle" aria-hidden="true" />
-              </summary>
+          <div className="about-update">
+            <div className="about-bio">
+              <p className="eyebrow about-status">Under construction</p>
+              <h2 id="about-title">A little about me.</h2>
+              <p className="about-summary">
+                I’m Jacob Moya, a software engineer in Southern California. I like figuring out how
+                things work and making them more fun to use.
+              </p>
+              <div className="about-actions">
+                <ProfileLinks placement="about" />
+                <a href="#contact" data-portal="contact">
+                  Get in touch <span aria-hidden="true">↗</span>
+                </a>
+              </div>
+            </div>
+            <section className="about-experience" aria-labelledby="about-experience-title">
+              <h3 id="about-experience-title">Experience.</h3>
               <ul>
                 <li>
                   <strong>Inenvi</strong>
@@ -97,13 +102,7 @@ export function ProfileSections() {
                   <span>Junior Web Developer · 2019–2021</span>
                 </li>
               </ul>
-            </details>
-            <div className="about-actions">
-              <ProfileLinks placement="about" />
-              <a href="#contact" data-portal="contact">
-                Get in touch <span aria-hidden="true">↗</span>
-              </a>
-            </div>
+            </section>
           </div>
         </div>
       </div>

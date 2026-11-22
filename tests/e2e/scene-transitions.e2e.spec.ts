@@ -34,7 +34,7 @@ test.beforeEach(async ({ page }) => {
   await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 15000 })
 })
 
-test('Work opens the About intro and the paper profile leads to Contact', async ({ page }) => {
+test('Work opens the About intro and the profile leads to Contact', async ({ page }) => {
   const index = skillSegments.length - 1
 
   await page.evaluate(
@@ -80,8 +80,10 @@ test('Work opens the About intro and the paper profile leads to Contact', async 
   expect(profileCoversPeriod).toBe(true)
   await page.mouse.wheel(0, 120)
   await expect(page.getByRole('slider', { name: 'About profile scroll position' })).toBeVisible()
-  await expect(about.getByRole('heading', { name: 'How I work.' })).toBeVisible()
-  await expect(about.locator('.about-details')).toHaveJSProperty('open', true)
+  await expect(about.getByRole('heading', { name: 'A little about me.' })).toBeVisible()
+  await expect(about.getByText('Under construction')).toBeVisible()
+  await expect(about.getByRole('heading', { name: 'Experience.' })).toBeVisible()
+  await expect(about.getByText('Inenvi')).toBeVisible()
   await about.getByRole('link', { name: 'Get in touch' }).click()
   await expect(page.locator('#contact')).toHaveAttribute('aria-hidden', 'false')
 })

@@ -4357,29 +4357,42 @@ ul {
   }
 }
 
-/* The paper stays inside the liquid frame while tall content scrolls independently. */
+/* Keep both About views on the same canvas while tall content scrolls independently. */
 .scene-about {
-  --about-paper: #fff2db;
-  --about-ink: #181022;
-  --about-accent: #620dc7;
   --skills-title-base: var(--ink);
   background: var(--canvas);
 }
 
 :root[data-theme='dark'] .scene-about {
-  --about-paper: #30223b;
-  --about-ink: #fff2db;
-  --about-accent: #dfbaff;
   background: var(--canvas);
 }
 
-.about-scroll {
-  border-radius: 24px;
+.portfolio[data-enhanced] .scene-about {
+  /* A profile deep link must not scroll the stationary reveal layer. */
+  overflow: clip;
 }
 
 .about-reveal {
+  position: relative;
+  isolation: isolate;
+  overflow: clip;
   background: var(--canvas);
   padding: clamp(82px, 11dvh, 118px) max(var(--gutter), 26px) max(24px, var(--frame-inset));
+}
+
+.about-reveal::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: 83%;
+  left: 13%;
+  width: max(64vw, 105svh);
+  aspect-ratio: 1;
+  background: color-mix(in srgb, var(--ink) 8%, var(--canvas));
+  mask: url('/jm-symbol.svg') center / contain no-repeat;
+  transform: translate(-50%, -50%);
+  translate: var(--background-x, 0px) var(--background-y, 0px);
+  pointer-events: none;
 }
 
 .portfolio[data-enhanced] .about-reveal {
@@ -4390,36 +4403,41 @@ ul {
   height: 100%;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: var(--about-accent) transparent;
+  scrollbar-color: var(--blue) transparent;
 }
 
-.about-sheet {
-  --fold: clamp(34px, 6vw, 100px);
-  position: relative;
+.about-update {
+  display: grid;
+  align-content: center;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr);
+  gap: clamp(32px, 7vw, 106px);
+  width: min(100%, 1180px);
   min-height: 100%;
-  padding: clamp(22px, 3vw, 54px);
-  border-radius: inherit;
-  clip-path: polygon(0 0, calc(100% - var(--fold)) 0, 100% var(--fold), 100% 100%, 0 100%);
-  background: var(--about-paper);
-  color: var(--about-ink);
+  margin-inline: auto;
+  padding-block: 24px;
 }
 
-.about-sheet::after {
+.about-update h2 {
+  margin: 0.16em 0 0.3em;
+  font: 900 clamp(42px, 6vw, 84px)/0.98 var(--display);
+  text-wrap: balance;
+}
+
+.about-status {
+  width: fit-content;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 5px 10px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--blue) 8%, var(--canvas));
+  color: var(--blue);
+}
+
+.about-status::before {
   content: '';
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: var(--fold);
+  width: 12px;
   aspect-ratio: 1;
-  background: linear-gradient(35deg, #ab55ff, #421180);
-  border-bottom-left-radius: 12px;
-  pointer-events: none;
-}
-
-.about-sheet h2 {
-  margin: 0.16em 0 0.2em;
-  max-width: calc(100% - var(--fold) / 2);
-  font: 900 clamp(38px, 6vw, 104px)/0.98 var(--display);
+  background: repeating-linear-gradient(-45deg, currentColor 0 2px, transparent 2px 4px);
 }
 
 .about-summary {
@@ -4428,43 +4446,21 @@ ul {
   font: var(--body-copy-size)/1.55 var(--mono);
 }
 
-.about-sheet .about-details {
-  border-block: 1px solid color-mix(in srgb, currentColor 40%, transparent);
+.about-experience h3 {
+  margin: 0 0 16px;
+  font: 900 clamp(28px, 3vw, 46px)/1 var(--display);
 }
 
-.about-sheet .about-details summary {
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.about-sheet .about-details ul {
+.about-experience li {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px 28px;
-  max-height: none;
-  overflow: visible;
+  gap: 4px;
+  padding-block: 13px;
+  border-top: 1px solid color-mix(in srgb, currentColor 28%, transparent);
+  font: clamp(13px, 1.15vw, 16px)/1.4 var(--mono);
 }
 
-.about-sheet .about-details li span {
-  color: inherit;
-}
-
-.about-sheet .about-details li {
-  margin-bottom: 0;
-  font-size: clamp(13px, 1.25vw, 17px);
-}
-
-.about-toggle::before {
-  content: '+';
-  color: var(--about-accent);
-}
-
-.about-details[open] .about-toggle::before {
-  content: '\2212';
-}
-
-.about-sheet .about-details[open] .about-toggle {
-  transform: none;
+.about-experience li:last-child {
+  border-bottom: 1px solid color-mix(in srgb, currentColor 28%, transparent);
 }
 
 .about-actions {
@@ -4477,7 +4473,7 @@ ul {
 }
 
 .about-actions > a {
-  color: var(--about-accent);
+  color: var(--blue);
   font: 700 14px/1.5 var(--mono);
   text-decoration: underline;
   text-underline-offset: 0.24em;
@@ -4492,13 +4488,15 @@ ul {
     padding-inline: max(18px, calc(var(--frame-inset) + 6px));
   }
 
-  .about-sheet {
-    padding-inline: 18px;
+  .about-reveal::before {
+    top: 94%;
+    left: 10%;
+    width: max(152vw, 90svh);
   }
 
-  .about-sheet .about-details ul {
+  .about-update {
     grid-template-columns: 1fr;
-    gap: 8px;
+    gap: 36px;
   }
 }
 

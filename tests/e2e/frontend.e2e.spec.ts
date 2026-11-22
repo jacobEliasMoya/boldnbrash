@@ -656,7 +656,7 @@ test('about navigation and history work by keyboard', async ({ page }) => {
   await expect(page.locator('#about')).toHaveAttribute('aria-hidden', 'false')
   await page.getByRole('link', { name: 'Read more about Jacob' }).click()
   await expect(page.locator('#about .about-reveal')).toHaveCSS('clip-path', /^circle\(/)
-  await expect(page.locator('#about .about-details')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Experience.' })).toBeVisible()
   await page.getByRole('link', { name: 'Contact', exact: true }).click()
   await expect(page.getByRole('link', { name: 'Get in touch' })).toHaveAttribute('href', /^mailto:/)
   await page.goBack()
