@@ -172,20 +172,20 @@ export const heroWalkOutEnd = heroParagraphEnd + 0.14
 const skillIntroStart = heroWalkOutEnd + 0.4
 const skillTitleTravel = 0.9
 const skillParagraphTravel = 1.44
+const introPeriodTravel = 0.9
 export const skillParagraphEnd = skillIntroStart + skillTitleTravel + skillParagraphTravel
-export const skillStart = skillParagraphEnd + 0.9
-export const sceneStops = [
-  0,
-  skillIntroStart,
-  skillStart + skillTravel + 1,
-  skillStart + skillTravel + 2.65,
-]
+export const skillStart = skillParagraphEnd + introPeriodTravel
+const aboutStart = skillStart + skillTravel + 1
+export const aboutIntroEnd = aboutStart + skillTitleTravel + skillParagraphTravel
+export const aboutProfileStart = aboutIntroEnd + introPeriodTravel
+export const sceneStops = [0, skillIntroStart, aboutStart, aboutProfileStart + 1.65]
 export const sceneDuration = sceneStops[sceneStops.length - 1] + 0.65
 export const sectionScrollRanges = [
   { start: sceneStops[0], end: heroWalkOutEnd, sceneIndex: 0 },
   { start: sceneStops[1], end: skillParagraphEnd, sceneIndex: 1 },
   { start: skillStart, end: sceneStops[2] - 1, sceneIndex: 1, label: 'Work projects' },
-  { start: sceneStops[2], end: sceneStops[3] - 1, sceneIndex: 2 },
+  { start: aboutStart, end: aboutIntroEnd, sceneIndex: 2 },
+  { start: aboutProfileStart, end: sceneStops[3] - 1, sceneIndex: 2, label: 'About profile' },
   { start: sceneStops[3], end: sceneDuration, sceneIndex: 3 },
 ]
 
@@ -213,8 +213,12 @@ export function getSkillPosition(progress: number) {
 }
 
 // Each project is a resting point. Between them, both wheels use the same fractional position.
+export const workProjectId = (title: string) =>
+  `work-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+
 export const projectStops = skills.flatMap((skill, skillIndex) =>
-  skill.projects.map((_, projectIndex) => ({
+  skill.projects.map((project, projectIndex) => ({
+    id: workProjectId(project.title),
     skillIndex,
     projectIndex,
     position: skillSegments[skillIndex].start + projectIndex + 0.95,

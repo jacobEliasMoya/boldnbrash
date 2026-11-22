@@ -1,5 +1,7 @@
 import { heroAnimationTravel, heroEntranceDuration, heroEntranceTravel } from '../atoms/heroFrames'
 import {
+  aboutIntroEnd,
+  aboutProfileStart,
   heroWalkOutEnd,
   sceneStops,
   skillParagraphEnd,
@@ -50,23 +52,43 @@ export function fromPlaybackTime(seconds: number) {
   return skillEnd + (seconds - skillEndSeconds) * sceneUnitsPerSecond
 }
 
-// Give the work introduction twice its normal reading time during showcase playback.
-const workIntroStartTime = toPlaybackTime(sceneStops[1])
-const workIntroEndTime = toPlaybackTime(skillParagraphEnd)
-const workIntroExtraTime = workIntroEndTime - workIntroStartTime
+// Add reading time without stretching the reveals on either side.
+const showcaseReading = [
+  { start: sceneStops[1], end: skillParagraphEnd, stretch: 2 },
+  { start: sceneStops[2], end: aboutIntroEnd, stretch: 2.5 },
+  { start: aboutProfileStart, end: sceneStops[3] - 1, stretch: 6 },
+].map(({ start, end, stretch }) => ({
+  start: toPlaybackTime(start),
+  end: toPlaybackTime(end),
+  stretch,
+}))
 
 export function toShowcaseTime(progress: number) {
   const time = toPlaybackTime(progress)
 
-  return time + Math.max(0, Math.min(workIntroExtraTime, time - workIntroStartTime))
+  return showcaseReading.reduce(
+    (showcaseTime, { start, end, stretch }) =>
+      showcaseTime + Math.max(0, Math.min(end - start, time - start)) * (stretch - 1),
+    time,
+  )
 }
 
 export function fromShowcaseTime(time: number) {
-  if (time <= workIntroStartTime) return fromPlaybackTime(time)
+  let playbackTime = time
 
-  if (time < workIntroEndTime + workIntroExtraTime) {
-    return fromPlaybackTime(workIntroStartTime + (time - workIntroStartTime) / 2)
+  for (const { start, end, stretch } of showcaseReading) {
+    if (playbackTime <= start) break
+
+    const addedTime = (end - start) * (stretch - 1)
+
+    if (playbackTime < end + addedTime) {
+      playbackTime = start + (playbackTime - start) / stretch
+
+      break
+    }
+
+    playbackTime -= addedTime
   }
 
-  return fromPlaybackTime(time - workIntroExtraTime)
+  return fromPlaybackTime(playbackTime)
 }

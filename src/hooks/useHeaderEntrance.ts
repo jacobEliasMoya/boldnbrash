@@ -2,6 +2,12 @@
 
 import { useSyncExternalStore } from 'react'
 import { dotReboundScale, dotReboundTransition } from '@/components/atoms/dot-icons/dotMotion'
+import {
+  heroHeadlineStart,
+  heroLetterStep,
+  heroTextEntranceDelay,
+  heroTextEntranceDuration,
+} from '@/components/atoms/heroFrames'
 
 const mobileQuery = '(max-width: 760px)'
 const entranceDuration = 0.42
@@ -26,6 +32,11 @@ export function getMobileHeaderPop(delay: number, reduced: boolean | null) {
 
 const logoDelay = 0.08
 const overlapStep = entranceDuration / 3
+// The first two homepage letters finish before the desktop labels start dropping.
+const firstLinkDelay =
+  heroTextEntranceDelay(heroHeadlineStart + heroLetterStep) + heroTextEntranceDuration
+const linkStagger = 0.07
+const desktopControlStep = 0.7 / 3
 
 function subscribe(onChange: () => void) {
   const media = window.matchMedia(mobileQuery)
@@ -40,15 +51,16 @@ const getServerSnapshot = () => false
 
 export function useHeaderEntrance(linkCount = 4) {
   const mobile = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
+  const lastLinkDelay = firstLinkDelay + (linkCount - 1) * linkStagger
 
   // Reuse the dot-click rebound, starting the next control one third of the way in.
   return {
     mobile,
     duration: mobile ? entranceDuration : 0.7,
     logoDelay,
-    linkDelay: (index: number) => logoDelay + (0.7 / 3) * (index + 1),
-    playDelay: mobile ? logoDelay + overlapStep : logoDelay + (0.7 / 3) * (linkCount + 1),
-    themeDelay: mobile ? logoDelay + overlapStep * 2 : logoDelay + (0.7 / 3) * (linkCount + 2),
+    linkDelay: (index: number) => firstLinkDelay + index * linkStagger,
+    playDelay: mobile ? logoDelay + overlapStep : lastLinkDelay + desktopControlStep,
+    themeDelay: mobile ? logoDelay + overlapStep * 2 : lastLinkDelay + desktopControlStep * 2,
     menuDelay: mobile ? logoDelay + overlapStep * 3 : 0.22,
   }
 }

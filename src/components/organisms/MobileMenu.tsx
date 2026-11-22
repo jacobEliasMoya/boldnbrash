@@ -28,18 +28,22 @@ const menuPopStart = { opacity: 0, scale: 0.84 }
 const menuPopEnd = { opacity: 1, scale: 1 }
 const menuPop = { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const }
 const numberStagger = 0.07
+const linkPopStart = { opacity: 0, scale: 0.78, y: 8 }
+const linkPopEnd = { opacity: 1, scale: 1, y: 0 }
 const labelFill = { '--letter-fill': '100%' }
 const labelFillRest = { '--letter-fill': '0%' }
 
 export function MobileMenu({
   scenes,
   active,
+  tone,
   introReady,
   onNavigate,
   onOpenChange,
 }: {
   scenes: readonly Scene[]
   active: number
+  tone: 'paper' | 'dark'
   introReady: boolean
   onNavigate: (index: number) => void
   onOpenChange: (open: boolean) => void
@@ -74,8 +78,10 @@ export function MobileMenu({
   const wheelInput = useRef({ delta: 0, time: 0 })
   const [gathering, setGathering] = useState(false)
   const [phase, setPhase] = useState<Phase>('menu')
-  const [entrance, setEntrance] = useState<'waiting' | 'links' | 'socials'>('waiting')
-  const [socialsRaised, setSocialsRaised] = useState(false)
+  const [entrance, setEntrance] = useState<'waiting' | 'links' | 'liquid' | 'socials'>('waiting')
+  const showSocials = useCallback(() => {
+    setEntrance((stage) => (stage === 'liquid' ? 'socials' : stage))
+  }, [])
   const [selection, setSelection] = useState<{
     index: number
     x: number
@@ -206,7 +212,7 @@ export function MobileMenu({
 
           if (entryRing.current) entryRing.current.style.visibility = 'hidden'
 
-          setEntrance('socials')
+          setEntrance((stage) => (stage === 'waiting' ? 'links' : stage))
           setPhase('menu')
         },
       })
@@ -350,7 +356,7 @@ export function MobileMenu({
       <BlendedLogo
         enabled={introReady && reduceMotion === false}
         ready={introReady}
-        tone={scenes[active]?.id === 'contact' ? 'dark' : 'paper'}
+        tone={tone}
         control
         menu
       >
@@ -394,7 +400,6 @@ export function MobileMenu({
               setPhase(reduceMotion ? 'menu' : 'opening')
               numbersStarted.current = false
               setEntrance(reduceMotion ? 'socials' : 'waiting')
-              setSocialsRaised(false)
               setSelection(null)
               setOpen(true)
               onOpenChange(true)
@@ -448,7 +453,8 @@ export function MobileMenu({
                   reduced={!!reduceMotion}
                   onCovered={handleCovered}
                   socialOffset={socialOffset}
-                  selectionReady={!!reduceMotion || socialsRaised}
+                  selectionReady={entrance === 'liquid' || entrance === 'socials'}
+                  onSelectionRaised={showSocials}
                 />
                 <div className="mobile-menu-heading">
                   <a
@@ -483,7 +489,7 @@ export function MobileMenu({
                 <nav
                   className="mobile-menu-links"
                   aria-label="Mobile portfolio"
-                  inert={phase !== 'menu' || entrance !== 'socials'}
+                  inert={phase !== 'menu'}
                   onWheel={(event) => {
                     if (phase !== 'menu') return
 
@@ -571,7 +577,33 @@ export function MobileMenu({
                           </motion.span>
                         ))}
                       </span>
-                      <span className="mobile-menu-label">
+                      <motion.span
+                        className="mobile-menu-label"
+                        initial={reduceMotion ? false : linkPopStart}
+                        animate={
+                          !reduceMotion && entrance === 'waiting' ? linkPopStart : linkPopEnd
+                        }
+                        transition={{
+                          type: 'spring',
+                          duration: reduceMotion ? 0 : 0.23,
+                          bounce: 0.35,
+                          delay: reduceMotion ? 0 : (index + 2) * numberStagger,
+                          opacity: {
+                            duration: reduceMotion ? 0 : 0.12,
+                            delay: reduceMotion ? 0 : (index + 2) * numberStagger,
+                          },
+                        }}
+                        onAnimationComplete={(target) => {
+                          if (
+                            index === scenes.length - 1 &&
+                            typeof target === 'object' &&
+                            'scale' in target &&
+                            target.scale === 1
+                          ) {
+                            setEntrance((stage) => (stage === 'links' ? 'liquid' : stage))
+                          }
+                        }}
+                      >
                         <motion.span
                           className="mobile-menu-label-fill"
                           initial={false}
@@ -611,7 +643,7 @@ export function MobileMenu({
                           aria-hidden="true"
                           style={{ backgroundColor: 'var(--ink)' }}
                         />
-                      </span>
+                      </motion.span>
                     </a>
                   ))}
                 </nav>
@@ -620,7 +652,6 @@ export function MobileMenu({
                   inactive={phase !== 'menu' || entrance !== 'socials'}
                   raised={entrance === 'socials'}
                   onSlide={(offset) => socialOffset.set(offset)}
-                  onRaised={() => setSocialsRaised(true)}
                 />
                 {selection && (
                   <svg

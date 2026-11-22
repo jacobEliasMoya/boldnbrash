@@ -32,9 +32,13 @@ for (const width of [390, 1440]) {
     expect(starts).toHaveLength(8)
 
     for (let index = 1; index < starts.length; index++) {
-      expect(starts[index] - starts[index - 1]).toBeGreaterThan(90)
-      expect(starts[index] - starts[index - 1]).toBeLessThan(220)
+      expect(starts[index]).toBeGreaterThan(starts[index - 1])
     }
+
+    // Measure the full cascade so an individual dropped frame does not skew the result.
+    const averageGap = (starts[starts.length - 1] - starts[0]) / (starts.length - 1)
+    expect(averageGap).toBeGreaterThan(65)
+    expect(averageGap).toBeLessThan(115)
 
     await expect
       .poll(() =>

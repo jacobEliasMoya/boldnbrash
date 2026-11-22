@@ -462,7 +462,8 @@ ul {
 .hero-period-glyph {
   display: inline-block;
 }
-.hero-period > [data-portal] {
+.hero-period > [data-portal],
+.skills-about-portal {
   display: inline-block;
   width: 0;
   height: 0;
@@ -3105,22 +3106,22 @@ ul {
 .skills-duet.skills-index {
   display: block;
 }
-.skills-duet .skills-heading {
+:is(.skills-duet, .about-pages) .skills-heading {
   text-align: center;
   width: 100%;
   max-width: 1000px;
   margin-inline: auto;
 }
-.skills-duet .skills-heading .eyebrow {
+:is(.skills-duet, .about-pages) .skills-heading .eyebrow {
   justify-content: center;
 }
-.skills-duet .skills-heading .skills-intro {
+:is(.skills-duet, .about-pages) .skills-heading .skills-intro {
   margin-inline: auto;
   max-width: 46ch;
   border-left: 0;
   padding-left: 0;
 }
-.skills-duet .skills-heading h2 {
+:is(.skills-duet, .about-pages) .skills-heading h2 {
   border-bottom: 1px solid #cbbcff66;
   margin-inline: auto;
   max-width: 14ch;
@@ -3361,7 +3362,7 @@ ul {
   .skills-duet .skill-project-card .artwork-frame {
     display: none;
   }
-  .skills-duet .skills-heading h2 {
+  :is(.skills-duet, .about-pages) .skills-heading h2 {
     font-size: 40px;
     margin: 12px auto;
     padding-bottom: 12px;
@@ -3422,7 +3423,7 @@ ul {
   opacity: 0;
 }
 
-.skills-duet .skills-heading {
+:is(.skills-duet, .about-pages) .skills-heading {
   max-width: 1280px;
   container-type: inline-size;
   --skills-heading-size: min(clamp(64px, 10vw, 152px), 15cqw);
@@ -3431,7 +3432,7 @@ ul {
   position: relative;
   display: flow-root;
 }
-.skills-duet .skills-heading h2 {
+:is(.skills-duet, .about-pages) .skills-heading h2 {
   position: relative;
   z-index: 2;
   font-size: var(--skills-heading-size);
@@ -3446,11 +3447,11 @@ ul {
   white-space: nowrap;
 }
 @media (max-width: 900px) {
-  .skills-duet .skills-heading {
+  :is(.skills-duet, .about-pages) .skills-heading {
     --skills-heading-size: min(14cqw, 138px);
   }
 }
-.skills-duet .skills-heading .skills-intro {
+:is(.skills-duet, .about-pages) .skills-heading .skills-intro {
   font-size: clamp(16px, 1.65vw, 24px);
   max-width: 52ch;
   text-wrap: pretty;
@@ -3469,7 +3470,7 @@ ul {
 }
 :is(
   .portfolio .hero-copy .hero-description,
-  .skills-index .skills-heading .skills-intro,
+  :is(.skills-index, .about-pages) .skills-heading .skills-intro,
   .about-copy > p,
   .skills-category-note
 ) {
@@ -3487,12 +3488,12 @@ ul {
   }
 }
 @media (max-width: 900px) {
-  .skills-duet .skills-heading h2 {
+  :is(.skills-duet, .about-pages) .skills-heading h2 {
     margin: 0 auto 10px;
   }
 }
 @media (max-height: 400px) {
-  .skills-duet .skills-heading h2 {
+  :is(.skills-duet, .about-pages) .skills-heading h2 {
     font-size: min(var(--skills-heading-size), 7vw, 62px);
     margin: 14px auto;
   }
@@ -3530,10 +3531,14 @@ ul {
   border-radius: 50%;
   background: var(--canvas);
 }
-.skills-reveal {
+.portfolio[data-enhanced] .intro-period-reveal {
   position: absolute;
   z-index: 3;
   inset: 0;
+  background: var(--canvas);
+}
+
+.skills-reveal {
   padding: inherit;
   display: grid;
   align-items: center;
@@ -3601,24 +3606,25 @@ ul {
   background: var(--canvas);
   --skills-title-base: var(--ink);
 }
-.skills-duet .skills-heading {
+:is(.skills-duet, .about-pages) .skills-heading {
   color: var(--skills-title-base);
 }
-.skills-duet .skills-heading .skills-intro,
-.skills-duet .skills-heading .eyebrow > span {
+:is(.skills-duet, .about-pages) .skills-heading .skills-intro,
+:is(.skills-duet, .about-pages) .skills-heading .eyebrow > span {
   color: var(--skills-title-base);
 }
 .skills-title-fill,
 .portfolio-loader-text-fill {
-  display: inline-block;
-  padding-inline: 0.08em;
-  margin-inline: -0.08em;
-  color: transparent;
-  background: linear-gradient(
+  --title-fill-paint: linear-gradient(
     90deg,
     var(--blue) 0 var(--title-fill, 0%),
     var(--ink) var(--title-fill, 0%) 100%
   );
+  display: inline-block;
+  padding-inline: 0.08em;
+  margin-inline: -0.08em;
+  color: transparent;
+  background: var(--title-fill-paint);
   background-clip: text;
   -webkit-background-clip: text;
 }
@@ -4349,4 +4355,246 @@ ul {
     + .project-detail-close {
     color: #efebe1;
   }
+}
+
+/* The paper stays inside the liquid frame while tall content scrolls independently. */
+.scene-about {
+  --about-paper: #fff2db;
+  --about-ink: #181022;
+  --about-accent: #620dc7;
+  --skills-title-base: var(--ink);
+  background: var(--canvas);
+}
+
+:root[data-theme='dark'] .scene-about {
+  --about-paper: #30223b;
+  --about-ink: #fff2db;
+  --about-accent: #dfbaff;
+  background: var(--canvas);
+}
+
+.about-scroll {
+  border-radius: 24px;
+}
+
+.about-reveal {
+  background: var(--canvas);
+  padding: clamp(82px, 11dvh, 118px) max(var(--gutter), 26px) max(24px, var(--frame-inset));
+}
+
+.portfolio[data-enhanced] .about-reveal {
+  clip-path: circle(0px);
+}
+
+.portfolio[data-enhanced] .about-scroll {
+  height: 100%;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--about-accent) transparent;
+}
+
+.about-sheet {
+  --fold: clamp(34px, 6vw, 100px);
+  position: relative;
+  min-height: 100%;
+  padding: clamp(22px, 3vw, 54px);
+  border-radius: inherit;
+  clip-path: polygon(0 0, calc(100% - var(--fold)) 0, 100% var(--fold), 100% 100%, 0 100%);
+  background: var(--about-paper);
+  color: var(--about-ink);
+}
+
+.about-sheet::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: var(--fold);
+  aspect-ratio: 1;
+  background: linear-gradient(35deg, #ab55ff, #421180);
+  border-bottom-left-radius: 12px;
+  pointer-events: none;
+}
+
+.about-sheet h2 {
+  margin: 0.16em 0 0.2em;
+  max-width: calc(100% - var(--fold) / 2);
+  font: 900 clamp(38px, 6vw, 104px)/0.98 var(--display);
+}
+
+.about-summary {
+  max-width: 60ch;
+  margin-bottom: 28px;
+  font: var(--body-copy-size)/1.55 var(--mono);
+}
+
+.about-sheet .about-details {
+  border-block: 1px solid color-mix(in srgb, currentColor 40%, transparent);
+}
+
+.about-sheet .about-details summary {
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.about-sheet .about-details ul {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 28px;
+  max-height: none;
+  overflow: visible;
+}
+
+.about-sheet .about-details li span {
+  color: inherit;
+}
+
+.about-sheet .about-details li {
+  margin-bottom: 0;
+  font-size: clamp(13px, 1.25vw, 17px);
+}
+
+.about-toggle::before {
+  content: '+';
+  color: var(--about-accent);
+}
+
+.about-details[open] .about-toggle::before {
+  content: '\2212';
+}
+
+.about-sheet .about-details[open] .about-toggle {
+  transform: none;
+}
+
+.about-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.about-actions > a {
+  color: var(--about-accent);
+  font: 700 14px/1.5 var(--mono);
+  text-decoration: underline;
+  text-underline-offset: 0.24em;
+}
+
+.about-actions .profile-links-about {
+  margin: 0;
+}
+
+@media (max-width: 760px) {
+  .about-reveal {
+    padding-inline: max(18px, calc(var(--frame-inset) + 6px));
+  }
+
+  .about-sheet {
+    padding-inline: 18px;
+  }
+
+  .about-sheet .about-details ul {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
+.about-introduction {
+  display: grid;
+  align-content: center;
+  min-height: min(80svh, 760px);
+}
+
+.about-next:hover,
+.about-next:focus-visible {
+  color: var(--blue);
+}
+
+/* Match Work's open canvas and offset the watermark toward the opposite edge. */
+.scene-about::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: 62%;
+  left: 92%;
+  width: max(88vw, 132svh);
+  aspect-ratio: 1;
+  background: color-mix(in srgb, var(--ink) 7%, var(--canvas));
+  mask: url('/jm-symbol.svg') center / contain no-repeat;
+  transform: translate(-50%, -50%);
+  translate: var(--background-x, 0px) var(--background-y, 0px);
+  pointer-events: none;
+}
+
+:root[data-theme='dark'] .scene-about::before {
+  background: var(--blue);
+  opacity: 0.12;
+}
+
+@media (max-width: 760px) {
+  .scene-about::before {
+    top: 35%;
+    left: 98%;
+    width: max(190vw, 108svh);
+  }
+}
+
+.portfolio[data-enhanced] .about-introduction,
+.portfolio[data-enhanced] .about-reveal {
+  min-height: 0;
+  margin-bottom: 0;
+}
+
+.portfolio[data-enhanced] .about-introduction {
+  position: absolute;
+  inset: 0;
+  width: calc(100% - 2 * var(--gutter));
+}
+
+[data-intro-drop],
+.intro-title-glyph {
+  display: inline-block;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* The scene aperture can expose the intro before Motion starts its text sequence. */
+  .portfolio[data-enhanced]
+    :is(.scene-skills, .scene-about):not([data-intro-drop-started])
+    .skills-heading {
+    visibility: hidden;
+  }
+
+  .portfolio[data-enhanced] [data-intro-drop] {
+    opacity: 0;
+  }
+}
+
+/* The moving letters need solid ink. After they settle, restore the scroll-driven fill. */
+.skills-title-fill[data-intro-title] {
+  position: relative;
+  background: none;
+}
+
+.skills-title-fill [data-intro-drop='letter'] {
+  color: var(--ink);
+}
+
+.intro-title-paint {
+  display: none;
+  position: absolute;
+  inset: 0;
+  padding: inherit;
+  background: var(--title-fill-paint);
+  background-clip: text;
+}
+
+[data-intro-drop-complete] .intro-title-paint {
+  display: block;
+}
+
+[data-intro-drop-complete] .skills-title-fill [data-intro-drop='letter'] {
+  visibility: hidden;
 }

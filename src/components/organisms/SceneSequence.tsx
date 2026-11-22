@@ -4,6 +4,7 @@ import { Children, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   animate,
   motionValue,
+  stagger,
   motion,
   MotionConfig,
   useReducedMotion,
@@ -17,6 +18,8 @@ import {
   heroWalkOutStart,
   heroWalkOutEnd,
   sceneStops,
+  aboutIntroEnd,
+  aboutProfileStart,
   sectionScrollRanges,
   getScrollSection,
   skillSegments,
@@ -34,7 +37,12 @@ import { ThemeToggle } from '@/components/atoms/ThemeToggle'
 import { MobileMenu } from './MobileMenu'
 import { heroAnimationTravel, heroExitStart } from '@/components/atoms/heroFrames'
 import { getPortalBounds } from '@/components/atoms/portalBounds'
-import { circleRevealTransition, getPeriodOpening } from '@/components/atoms/periodOpening'
+import {
+  circleRevealTransition,
+  getIntroPeriodGeometry,
+  getPeriodOpening,
+  introPeriodRevealDuration,
+} from '@/components/atoms/periodOpening'
 import {
   toPlaybackTime,
   fromPlaybackTime,
@@ -68,7 +76,7 @@ const wordmarkDropStart = -100
 
 const origins = [
   [50, 50],
-  [85, 80],
+  [65, 30],
   [82, 72],
 ]
 
@@ -89,9 +97,91 @@ export function SceneSequence({ children }: { children: ReactNode }) {
   const sceneOpenings = useRef<(SVGCircleElement | null)[]>([])
   const [enhanced, setEnhanced] = useState(false)
   const [active, setActive] = useState(0)
+  const activeScene = scenes[active].id
+  const headerTone = activeScene === 'contact' ? 'dark' : 'paper'
   const [menuOpen, setMenuOpen] = useState(false)
   const toggleShowcase = useRef<(() => void) | null>(null)
+  const resumeShowcaseAfterAboutDrop = useRef<(() => void) | null>(null)
   const [showcasePlaying, setShowcasePlaying] = useState(false)
+
+  useEffect(() => {
+    if (
+      !enhanced ||
+      !introReady ||
+      reduceMotion ||
+      (activeScene !== 'skills' && activeScene !== 'about')
+    )
+      return
+
+    const panel = panels.current[active]
+
+    if (!panel) return
+
+    const letters = Array.from(panel.querySelectorAll<HTMLElement>('[data-intro-drop="letter"]'))
+    const words = Array.from(panel.querySelectorAll<HTMLElement>('[data-intro-drop="word"]'))
+    const tokens = [...letters, ...words]
+    const secondLine = letters.filter((letter) => letter.closest('.skills-title-line:nth-child(2)'))
+    const firstLine = letters.slice(0, letters.length - secondLine.length)
+    const letterGap = 0.036
+    const spring = { type: 'spring', duration: 0.45, bounce: 0.1 } as const
+    const appear = { type: 'tween' as const, duration: spring.duration, times: [0, 0.001, 1] }
+
+    // Prepare every token before making the heading visible to the scene reveal.
+    for (const token of tokens) token.style.opacity = '0'
+
+    // Compress the loader's stagger for the longer headings, then hand off to the words.
+    const entrance = animate([
+      [
+        firstLine,
+        { y: ['-0.85em', '0em'], opacity: [0, 1, 1] },
+        { ...spring, delay: stagger(letterGap), opacity: appear },
+      ],
+      [
+        secondLine,
+        { y: ['-0.18em', '0em'], opacity: [0, 1, 1] },
+        {
+          ...spring,
+          at: firstLine.length * letterGap,
+          delay: stagger(letterGap),
+          opacity: appear,
+        },
+      ],
+      [
+        words,
+        { y: ['-0.8em', '0em'], opacity: [0, 1, 1] },
+        {
+          ...spring,
+          at: (letters.length - 1) * letterGap + 0.24,
+          delay: stagger(0.042),
+          opacity: appear,
+        },
+      ],
+    ])
+    panel.dataset.introDropStarted = ''
+
+    let disposed = false
+
+    void entrance.then(() => {
+      if (disposed) return
+
+      panel.dataset.introDropComplete = ''
+      if (activeScene === 'about') resumeShowcaseAfterAboutDrop.current?.()
+
+      window.dispatchEvent(new Event('scroll'))
+    })
+
+    return () => {
+      disposed = true
+      panel.removeAttribute('data-intro-drop-started')
+      panel.removeAttribute('data-intro-drop-complete')
+      entrance.stop()
+
+      for (const token of tokens) {
+        token.style.removeProperty('opacity')
+        token.style.removeProperty('transform')
+      }
+    }
+  }, [active, activeScene, enhanced, introReady, reduceMotion])
 
   // Layout and floating copies share one entrance clock, so they cannot reset the liquid.
   useEffect(() => {
@@ -264,7 +354,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       { start: heroWalkOutEnd, end: sceneStops[1] },
       { start: skillParagraphEnd, end: skillStart },
       ...sceneStops.slice(2).map((end) => ({ start: end - 1, end })),
-    ]
+      { start: aboutIntroEnd, end: aboutProfileStart },
+    ].sort((first, second) => first.start - second.start)
     let sceneTransition: {
       range: (typeof transitionRanges)[number]
       direction: number
@@ -275,6 +366,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     let transitionExpectedY = 0
     let lastSkillProgress = -1
     let lastSkillIntro = -1
+    let lastSkillTextIntro = -1
+    let lastAboutIntro = -1
     let lastJakeProgress = -1
     let lastHeroParagraph = -1
     let lastHeroFill = -1
@@ -351,13 +444,18 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       const transition = { range, direction, stop: undefined as (() => void) | undefined }
 
       sceneTransition = transition
+      // The initiating click may already have queued a scroll event at this position.
+      transitionExpectedY = scrollY
 
       if (touchInput && touch) touch.transitionDirection = direction
 
       transitionLatch = { direction, lastInput: now }
       track.current?.setAttribute('data-transitioning', direction > 0 ? 'forward' : 'backward')
 
-      const duration = range.end === skillStart ? 0.72 : circleRevealTransition.duration
+      const duration =
+        range.end === skillStart || range.end === aboutProfileStart
+          ? introPeriodRevealDuration
+          : circleRevealTransition.duration
       const control = animate(displayed, target, {
         duration: Math.max(
           0.24,
@@ -459,6 +557,10 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     }
 
     // Route wheel and touch input through the same scene and project boundaries.
+    function introTextReady(index: number) {
+      return media.matches || panels.current[index]?.hasAttribute('data-intro-drop-complete')
+    }
+
     function advanceInput(pixels: number, target: Element | null, touchInput = false) {
       const node = track.current
 
@@ -467,6 +569,17 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       if (target?.closest('dialog, input, textarea, select, [contenteditable="true"]')) return false
 
       const direction = Math.sign(pixels)
+      const introEnd = current === 1 ? skillParagraphEnd : current === 2 ? aboutIntroEnd : null
+
+      // Consume forward input during the drop instead of queuing a fill jump behind it.
+      if (
+        direction > 0 &&
+        introEnd !== null &&
+        displayed >= sceneStops[current] - 0.005 &&
+        displayed <= introEnd &&
+        !introTextReady(current)
+      )
+        return true
 
       while (target && target !== node) {
         const element = target as HTMLElement
@@ -494,28 +607,31 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       if (distance <= 0) return false
 
       gesturePlayback = touchInput
+      const readingIntro =
+        introEnd !== null && requested >= sceneStops[current] && requested <= introEnd + 0.01
 
       // Mobile's clipped skills surface can consume native scroll chaining.
       // Forward the same travel to the document after nested scroll areas have
       // had a chance to handle it; keep the skills timeline free of a queue.
-      if (current === 1) {
+      if (current === 1 || readingIntro) {
         let travel = touchInput ? pixels * 1.25 : pixels
 
-        if (
-          !sceneTransition &&
-          requested >= sceneStops[1] &&
-          requested <= skillParagraphEnd + 0.01
-        ) {
+        if (!sceneTransition && readingIntro) {
+          const readingSpeed = current === 2 ? 0.65 : 1
+          travel *= readingSpeed
+
           // Cap how far a wheel burst can lead the painted intro. Preserve small
           // deltas and leave enough room for the words to pass at a readable pace.
           if (!touchInput) {
-            const lead = Math.max(0, 0.12 - direction * (requested - displayed))
+            const lead = Math.max(0, 0.12 * readingSpeed - direction * (requested - displayed))
 
-            travel = direction * Math.min(Math.abs(pixels), 56, (lead * distance) / sceneDuration)
+            travel =
+              direction *
+              Math.min(Math.abs(travel), 56 * readingSpeed, (lead * distance) / sceneDuration)
           }
 
-          if (direction > 0 && displayed < skillParagraphEnd - 0.02) {
-            const endY = start + (skillParagraphEnd * distance) / sceneDuration
+          if (direction > 0 && displayed < introEnd - 0.02) {
+            const endY = start + (introEnd * distance) / sceneDuration
 
             travel = Math.min(travel, Math.max(0, endY - scrollY))
           }
@@ -524,6 +640,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         }
 
         if (
+          current === 1 &&
           touchInput &&
           touch &&
           displayed >= skillStart &&
@@ -754,8 +871,9 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       const targetTime = toPlaybackTime(requested)
       const difference = Math.abs(targetTime - currentTime)
       const heroPlayback = Math.min(displayed, requested) < heroWalkOutEnd
-      const skillsIntroPlayback =
-        current === 1 && Math.min(displayed, requested) < skillParagraphEnd
+      const introPlayback =
+        (current === 1 && Math.min(displayed, requested) < skillParagraphEnd) ||
+        (current === 2 && Math.min(displayed, requested) < aboutIntroEnd)
 
       if (difference < 0.000001) {
         displayed = requested
@@ -768,7 +886,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       // Keep velocity when a new gesture target arrives. Use the same spring for
       // wheel and touch through the walk and text fill so a wheel notch cannot restart an ease-out.
       const control = animate(playbackClock, targetTime, {
-        ...(skillsIntroPlayback
+        ...(introPlayback
           ? {
               type: 'spring' as const,
               stiffness: 230,
@@ -945,15 +1063,30 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         0,
         Math.min(1, (progress - sceneStops[1]) / (skillStart - sceneStops[1])),
       )
+      const skillTextIntro = introTextReady(1) ? skillIntro : 0
 
-      if (skillProgress !== lastSkillProgress || skillIntro !== lastSkillIntro) {
+      if (
+        skillProgress !== lastSkillProgress ||
+        skillIntro !== lastSkillIntro ||
+        skillTextIntro !== lastSkillTextIntro
+      ) {
         lastSkillProgress = skillProgress
         lastSkillIntro = skillIntro
+        lastSkillTextIntro = skillTextIntro
         window.dispatchEvent(
           new CustomEvent('portfolio:skills-progress', {
-            detail: { progress: skillProgress, intro: skillIntro },
+            detail: { progress: skillProgress, intro: skillIntro, textIntro: skillTextIntro },
           }),
         )
+      }
+
+      const aboutIntro = introTextReady(2)
+        ? Math.max(0, Math.min(1, (progress - sceneStops[2]) / (aboutIntroEnd - sceneStops[2])))
+        : 0
+
+      if (aboutIntro !== lastAboutIntro) {
+        lastAboutIntro = aboutIntro
+        window.dispatchEvent(new CustomEvent('portfolio:about-intro', { detail: aboutIntro }))
       }
 
       let visible = 0
@@ -993,7 +1126,10 @@ export function SceneSequence({ children }: { children: ReactNode }) {
             Math.max(x, panelBounds.width - x),
             Math.max(y, panelBounds.height - y),
           )
-          const startingRadius = index === 1 && portalBounds ? portalBounds.width / 2 : 0
+          const startingRadius =
+            (index === 1 || scenes[index].id === 'about') && portalBounds
+              ? portalBounds.width / 2
+              : 0
           const aperture = getPeriodOpening(reveal, startingRadius, radius)
 
           panel.style.clipPath =
@@ -1011,6 +1147,34 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         }
 
         panel.style.visibility = index === 0 || reveal > 0 ? 'visible' : 'hidden'
+
+        if (scenes[index].id === 'about') {
+          const options = panel.querySelector<HTMLElement>('.about-reveal')
+          const intro = panel.querySelector<HTMLElement>('.about-introduction')
+          const opening = Math.max(
+            0,
+            Math.min(1, (progress - aboutIntroEnd) / (aboutProfileStart - aboutIntroEnd)),
+          )
+
+          if (options && intro) {
+            options.inert = opening < 1
+            intro.inert = opening >= 1
+            panel.dataset.aboutStage =
+              opening === 0 ? 'intro' : opening >= 1 ? 'profile' : 'opening'
+
+            const period = intro.querySelector('.about-next .skills-title-period')
+
+            if (period) {
+              const { x, y, dot, radius } = getIntroPeriodGeometry(
+                options.getBoundingClientRect(),
+                period.getBoundingClientRect(),
+              )
+              const aperture = opening > 0 ? getPeriodOpening(opening, dot, radius).innerRadius : 0
+
+              options.style.clipPath = `circle(${aperture}px at ${x}px ${y}px)`
+            }
+          }
+        }
 
         if (reveal > 0.7) visible = index
       })
@@ -1043,7 +1207,15 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     // Defer focus until navigation finishes so focus does not interrupt scrolling.
     function settleFocus() {
       if (pendingFocus !== null) {
-        panels.current[pendingFocus]?.focus({ preventScroll: true })
+        const panel = panels.current[pendingFocus]
+        const profile =
+          panel?.dataset.aboutStage === 'profile'
+            ? panel.querySelector<HTMLElement>('.about-scroll')
+            : null
+
+        const destination = profile ?? panel
+
+        destination?.focus({ preventScroll: true })
         pendingFocus = null
       }
     }
@@ -1092,10 +1264,40 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           panel.style.visibility = ''
           panel.inert = false
           panel.removeAttribute('aria-hidden')
+
+          if (scenes[panels.current.indexOf(panel)]?.id === 'about') {
+            panel.removeAttribute('data-about-stage')
+            panel
+              .querySelectorAll<HTMLElement>('.about-reveal, .about-introduction')
+              .forEach((layer) => {
+                layer.inert = false
+                layer.style.removeProperty('clip-path')
+              })
+          }
         })
       }
 
       schedule()
+    }
+
+    function resolveHash(hash: string) {
+      const project = projectStops.find((stop) => `#${stop.id}` === hash)
+
+      if (project) {
+        return {
+          index: scenes.findIndex((scene) => scene.id === 'skills'),
+          position: skillStart + project.position,
+        }
+      }
+
+      const options = hash === '#about-profile'
+
+      return {
+        index: hash
+          ? scenes.findIndex((scene) => `#${scene.id}` === (options ? '#about' : hash))
+          : 0,
+        position: options ? aboutProfileStart : undefined,
+      }
     }
 
     function navigate(event: MouseEvent) {
@@ -1103,16 +1305,38 @@ export function SceneSequence({ children }: { children: ReactNode }) {
 
       if (!anchor || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return
 
-      const index = scenes.findIndex((scene) => `#${scene.id}` === anchor.getAttribute('href'))
+      const hash = anchor.getAttribute('href')
+      if (!hash) return
+
+      const { index, position } = resolveHash(hash)
 
       if (index < 0 || !track.current || media.matches) return
 
       event.preventDefault()
-      history.pushState(null, '', `#${scenes[index].id}`)
-      goTo(index)
+      history.pushState(null, '', hash)
+
+      if (
+        hash === '#about-profile' &&
+        current === index &&
+        anchor.classList.contains('about-next')
+      ) {
+        const node = track.current
+
+        // Skip the reading distance, then use the same circular expansion as a scroll.
+        goTo(index, true, aboutIntroEnd)
+        const start = window.scrollY + node.getBoundingClientRect().top
+        const distance =
+          node.offsetHeight - (node.firstElementChild?.clientHeight ?? window.innerHeight)
+
+        pendingFocus = index
+
+        if (triggerSceneTransition(120, aboutProfileStart, start, distance, false)) return
+      }
+
+      goTo(index, true, position)
     }
 
-    function goTo(index: number, immediate = true) {
+    function goTo(index: number, immediate = true, position = sceneStops[index]) {
       pauseShowcase()
       cancelSceneTransition()
       cancelSnap()
@@ -1127,14 +1351,14 @@ export function SceneSequence({ children }: { children: ReactNode }) {
 
       // Direct navigation lands on a fully opened scene.
       window.scrollTo({
-        top: start + (distance * sceneStops[index]) / sceneDuration,
+        top: start + (distance * position) / sceneDuration,
         behavior: 'instant',
       })
       pendingFocus = index
 
       if (immediate) {
-        timeline.jump(sceneStops[index])
-        render(sceneStops[index], true)
+        timeline.jump(position)
+        render(position, true)
       }
 
       update()
@@ -1211,11 +1435,9 @@ export function SceneSequence({ children }: { children: ReactNode }) {
 
     // Restore deep links using the same navigation path as the scene controls.
     function restoreHash() {
-      const index = window.location.hash
-        ? scenes.findIndex((scene) => `#${scene.id}` === window.location.hash)
-        : 0
+      const { index, position } = resolveHash(window.location.hash)
 
-      if (index >= 0 && !media.matches) goTo(index, true)
+      if (index >= 0 && !media.matches) goTo(index, true, position)
     }
 
     function pauseShowcase() {
@@ -1266,6 +1488,9 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       const distance = node.offsetHeight - (node.firstElementChild?.clientHeight ?? innerHeight)
       const from = displayed >= sceneDuration - 0.01 ? 0 : toShowcaseTime(displayed)
       const end = toShowcaseTime(sceneDuration)
+      const aboutStartTime = toShowcaseTime(sceneStops[2])
+      const aboutReadingEndTime = toShowcaseTime(aboutIntroEnd)
+      let stopSegment: (() => void) | undefined
 
       showcaseExpectedY = scrollY
 
@@ -1280,17 +1505,41 @@ export function SceneSequence({ children }: { children: ReactNode }) {
 
       setShowcasePlaying(true)
 
-      const control = animate(from, end, {
-        duration: end - from,
-        ease: 'linear',
-        onUpdate: playFrame,
-        onComplete: () => {
-          stopShowcasePlayback = undefined
-          setShowcasePlaying(false)
-        },
-      })
+      function playSegment(first: number, last: number, onComplete: () => void) {
+        const control = animate(first, last, {
+          duration: last - first,
+          ease: 'linear',
+          onUpdate: playFrame,
+          onComplete,
+        })
 
-      stopShowcasePlayback = () => control.stop()
+        stopSegment = () => control.stop()
+      }
+
+      function finishShowcase() {
+        stopShowcasePlayback = undefined
+        setShowcasePlaying(false)
+      }
+
+      function readAbout(first: number) {
+        const resume = () => {
+          resumeShowcaseAfterAboutDrop.current = null
+          playSegment(first, end, finishShowcase)
+        }
+
+        // Keep the reading clock at the scene entrance until the drop finishes.
+        if (introTextReady(2)) resume()
+        else resumeShowcaseAfterAboutDrop.current = resume
+      }
+
+      stopShowcasePlayback = () => {
+        stopSegment?.()
+        resumeShowcaseAfterAboutDrop.current = null
+      }
+
+      if (from < aboutStartTime) playSegment(from, aboutStartTime, () => readAbout(aboutStartTime))
+      else if (from < aboutReadingEndTime) readAbout(from)
+      else playSegment(from, end, finishShowcase)
     }
 
     const stopRendering = timeline.on('change', render)
@@ -1404,7 +1653,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         </a>
         <header id="portfolio-header">
           <motion.div
-            className={`site-header tone-${scenes[active]?.id === 'contact' ? 'dark' : 'paper'}`}
+            className={`site-header tone-${headerTone}`}
             initial={false}
             animate={clientReady ? { opacity: introReady ? 1 : 0 } : undefined}
             style={clientReady ? { y: headerEntranceY } : undefined}
@@ -1417,7 +1666,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
               headerY={headerEntranceY}
               enabled={enhanced}
               ready={introReady}
-              tone={scenes[active]?.id === 'contact' ? 'dark' : 'paper'}
+              tone={headerTone}
             >
               <motion.a
                 className="wordmark"
@@ -1450,11 +1699,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
                 <span className="wordmark-symbol" aria-hidden="true" />
               </motion.a>
             </BlendedLogo>
-            <BlendedNav
-              enabled={enhanced}
-              ready={introReady}
-              tone={scenes[active]?.id === 'contact' ? 'dark' : 'paper'}
-            >
+            <BlendedNav enabled={enhanced} ready={introReady} tone={headerTone}>
               {scenes.map((scene, index) => (
                 <motion.a
                   key={scene.id}
@@ -1473,7 +1718,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
                       : undefined
                   }
                   transition={{
-                    duration: reduceMotion ? 0 : headerEntrance.duration,
+                    duration: reduceMotion ? 0 : 0.55,
                     delay: reduceMotion ? 0 : headerEntrance.linkDelay(index),
                     ease: [0.22, 1, 0.36, 1],
                   }}
@@ -1517,13 +1762,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
                 </motion.a>
               ))}
             </BlendedNav>
-            {enhanced && introReady && !menuOpen && (
-              <BlendedLogo
-                enabled={enhanced}
-                ready={introReady}
-                tone={scenes[active]?.id === 'contact' ? 'dark' : 'paper'}
-                control
-              >
+            {enhanced && introReady && (
+              <BlendedLogo enabled={enhanced} ready={introReady} tone={headerTone} control>
                 <motion.button
                   type="button"
                   className="showcase-toggle"
@@ -1573,17 +1813,13 @@ export function SceneSequence({ children }: { children: ReactNode }) {
                 </motion.button>
               </BlendedLogo>
             )}
-            <BlendedLogo
-              enabled={enhanced}
-              ready={introReady}
-              tone={scenes[active]?.id === 'contact' ? 'dark' : 'paper'}
-              control
-            >
-              <ThemeToggle />
+            <BlendedLogo enabled={enhanced} ready={introReady} tone={headerTone} control>
+              <ThemeToggle linkCount={scenes.length} />
             </BlendedLogo>
             <MobileMenu
               scenes={scenes}
               active={active}
+              tone={headerTone}
               introReady={introReady}
               onOpenChange={setMenuOpen}
               onNavigate={(index) => {

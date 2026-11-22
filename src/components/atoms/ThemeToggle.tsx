@@ -24,8 +24,14 @@ function subscribe(onChange: () => void) {
 
 const toggleSpring = { type: 'spring' as const, stiffness: 340, damping: 26 }
 
-export function ThemeToggle({ inline = false }: { inline?: boolean }) {
-  const headerEntrance = useHeaderEntrance()
+export function ThemeToggle({
+  inline = false,
+  linkCount,
+}: {
+  inline?: boolean
+  linkCount?: number
+}) {
+  const headerEntrance = useHeaderEntrance(linkCount)
   const dark = useSyncExternalStore(
     subscribe,
     () => document.documentElement.dataset.theme === 'dark',

@@ -4,7 +4,9 @@ const metrics = new Map<string, TextMetrics>()
 /** Text boxes include leading and side bearings; portals need the visible ink. */
 export function getPortalBounds(portal: Element): DOMRect {
   const period = portal.closest('.hero-period')
-  const glyph = period?.querySelector('.hero-period-glyph')
+  const glyph =
+    period?.querySelector('.hero-period-glyph') ??
+    portal.parentElement?.querySelector('[data-portal-glyph]')
 
   if (!glyph) return portal.getBoundingClientRect()
 

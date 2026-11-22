@@ -19,20 +19,24 @@ export function useBlendBounds<T extends HTMLElement>(
   } | null>(null)
 
   useEffect(() => {
-    if (!enabled || !anchor.current) return
+    const element = anchor.current
+
+    if (!enabled || !element) return
+
+    let disposed = false
+
+    // A queued frame or observer can run after React detaches or replaces the ref.
+    const isCurrentAnchor = () => !disposed && anchor.current === element && element.isConnected
 
     const measure = () => {
-      if (
-        visibleOnly &&
-        (!anchor.current!.checkVisibility() || anchor.current!.closest('[inert]'))
-      ) {
+      if (visibleOnly && (!element.checkVisibility() || element.closest('[inert]'))) {
         setBounds(null)
 
         return
       }
 
-      const rect = anchor.current!.getBoundingClientRect()
-      const header = headerY ? anchor.current!.closest('.site-header') : null
+      const rect = element.getBoundingClientRect()
+      const header = headerY ? element.closest('.site-header') : null
       const headerOffset = header
         ? new DOMMatrixReadOnly(getComputedStyle(header).transform).m42
         : 0
@@ -52,12 +56,14 @@ export function useBlendBounds<T extends HTMLElement>(
     }
     const observer = new ResizeObserver(followLayout)
 
-    observer.observe(anchor.current)
+    observer.observe(element)
 
     // The header finishes its entrance after its dimensions have settled.
     let frame = 0
     let started = performance.now()
     const followEntrance = () => {
+      if (!isCurrentAnchor()) return
+
       measure()
 
       if (performance.now() - started < 2600) frame = requestAnimationFrame(followEntrance)
@@ -66,6 +72,8 @@ export function useBlendBounds<T extends HTMLElement>(
     frame = requestAnimationFrame(followEntrance)
 
     function followLayout() {
+      if (!isCurrentAnchor()) return
+
       started = performance.now()
       cancelAnimationFrame(frame)
       frame = requestAnimationFrame(followEntrance)
@@ -74,6 +82,7 @@ export function useBlendBounds<T extends HTMLElement>(
     window.addEventListener('resize', followLayout)
 
     return () => {
+      disposed = true
       observer.disconnect()
       cancelAnimationFrame(frame)
       window.removeEventListener('resize', followLayout)

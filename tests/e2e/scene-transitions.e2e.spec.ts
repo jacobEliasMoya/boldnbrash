@@ -5,6 +5,9 @@ import {
   sceneDuration,
   sceneStops,
   skillStart,
+  skillSegments,
+  aboutIntroEnd,
+  aboutProfileStart,
 } from '../../src/components/organisms/skillsTimeline'
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000'
@@ -29,6 +32,58 @@ async function moveToBoundary(page: Page, progress: number) {
 test.beforeEach(async ({ page }) => {
   await page.goto(baseURL)
   await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 15000 })
+})
+
+test('Work opens the About intro and the paper profile leads to Contact', async ({ page }) => {
+  const index = skillSegments.length - 1
+
+  await page.evaluate(
+    (detail) => window.dispatchEvent(new CustomEvent('portfolio:select-skill', { detail })),
+    { index, offset: skillSegments[index].duration - 0.01 },
+  )
+  await expect(page.locator('.skills-about-portal')).toBeAttached()
+  await moveToBoundary(page, sceneStops[2] - 1 + 0.02)
+  await page.mouse.move(10, 400)
+  await page.mouse.wheel(0, 120)
+
+  const about = page.locator('#about')
+
+  await expect(about).toHaveCSS('clip-path', 'none')
+  await expect(page.getByRole('slider', { name: 'About scroll position' })).toBeVisible()
+  await expect(about.locator('.about-introduction')).toBeVisible()
+  const profile = about.locator('.about-reveal')
+  await expect(profile).toHaveCSS('clip-path', /^circle\(0px(?: at .*?)?\)$/)
+  await expect(about).toHaveAttribute('data-intro-drop-complete', '')
+
+  await moveToBoundary(page, aboutIntroEnd + (aboutProfileStart - aboutIntroEnd) * 0.35)
+  await expect(about).toHaveAttribute('data-about-stage', 'opening')
+  await expect(about.locator('.about-introduction')).toHaveCSS('visibility', 'visible')
+  const canvas = await page
+    .locator('#skills .skills-reveal')
+    .evaluate((layer) => getComputedStyle(layer).backgroundColor)
+  await expect(profile).toHaveCSS('background-color', canvas)
+
+  const profileCoversPeriod = await profile.evaluate((element) => {
+    const profile = element as HTMLElement
+    const period = profile.parentElement!.querySelector('.about-next .skills-title-period')!
+    const { x, y, width, height } = period.getBoundingClientRect()
+    const inert = profile.inert
+
+    // Hit-test the visual stacking without enabling the profile during the animation.
+    profile.inert = false
+    const top = document.elementFromPoint(x + width / 2, y + height / 2)
+    profile.inert = inert
+
+    return profile.contains(top)
+  })
+
+  expect(profileCoversPeriod).toBe(true)
+  await page.mouse.wheel(0, 120)
+  await expect(page.getByRole('slider', { name: 'About profile scroll position' })).toBeVisible()
+  await expect(about.getByRole('heading', { name: 'How I work.' })).toBeVisible()
+  await expect(about.locator('.about-details')).toHaveJSProperty('open', true)
+  await about.getByRole('link', { name: 'Get in touch' }).click()
+  await expect(page.locator('#contact')).toHaveAttribute('aria-hidden', 'false')
 })
 
 for (const input of ['touch', 'wheel'] as const) {
@@ -96,20 +151,22 @@ for (const input of ['touch', 'wheel'] as const) {
 
 test('one scroll completes a page reveal and backscroll reverses it', async ({ page }) => {
   await page.evaluate(() =>
-    window.dispatchEvent(new CustomEvent('portfolio:select-scene', { detail: 2 })),
+    document.querySelector<HTMLAnchorElement>('#about a[href="#about-profile"]')?.click(),
   )
+  await expect(page.locator('#about')).toHaveAttribute('data-about-stage', 'profile')
 
   const progress = () =>
     page.locator('.scene-track').getAttribute('data-playback-progress').then(Number)
 
-  await page.mouse.move(500, 400)
+  await page.mouse.move(10, 400)
   await moveToBoundary(page, sceneStops[3] - 1 - 0.01)
   await page.mouse.wheel(0, 60)
   await expect.poll(progress).toBeCloseTo(sceneStops[3], 2)
 
   await page.evaluate(() =>
-    window.dispatchEvent(new CustomEvent('portfolio:select-scene', { detail: 2 })),
+    document.querySelector<HTMLAnchorElement>('#about a[href="#about-profile"]')?.click(),
   )
+  await expect(page.locator('#about')).toHaveAttribute('data-about-stage', 'profile')
   await moveToBoundary(page, sceneStops[3] - 1 - 0.01)
   await page.mouse.wheel(0, 60)
   await expect(page.locator('.scene-track')).toHaveAttribute('data-transitioning', 'forward')

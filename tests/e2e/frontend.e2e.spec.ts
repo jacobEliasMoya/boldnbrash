@@ -626,7 +626,7 @@ test('section reveals remain partial until further scrolling and reverse with sc
     (element) => getComputedStyle(element).fontSize,
   )
 
-  await expect(page.locator('.skills-intro')).toHaveCSS('font-size', descriptionSize)
+  await expect(page.locator('#skills .skills-intro')).toHaveCSS('font-size', descriptionSize)
   await scrollToProgress(heroWalkOutEnd + 0.1)
   await expect(panel).toHaveCSS('visibility', 'visible')
   await page.waitForTimeout(1000)
@@ -654,7 +654,9 @@ test('about navigation and history work by keyboard', async ({ page }) => {
   await page.getByRole('link', { name: 'About', exact: true }).click()
   await expect(page).toHaveURL(/#about$/)
   await expect(page.locator('#about')).toHaveAttribute('aria-hidden', 'false')
-  await expect(page.locator('#about .about-details')).toHaveCount(2)
+  await page.getByRole('link', { name: 'Read more about Jacob' }).click()
+  await expect(page.locator('#about .about-reveal')).toHaveCSS('clip-path', /^circle\(/)
+  await expect(page.locator('#about .about-details')).toBeVisible()
   await page.getByRole('link', { name: 'Contact', exact: true }).click()
   await expect(page.getByRole('link', { name: 'Get in touch' })).toHaveAttribute('href', /^mailto:/)
   await page.goBack()
@@ -763,7 +765,7 @@ test('skill categories retain the card layout, stack, and scroll progression', a
       await scrollTimeline(page, skillStart + skillSegments[index].start + position + 1.1)
       await expect(
         page.locator('.skills-category-pill[data-active] .skills-category-current h3').last(),
-      ).toHaveText(skill.name)
+      ).toHaveText(`${skill.name}.`)
       await expect(
         page.locator('.skills-category-pill[data-active] .skills-technologies'),
       ).toHaveText(skill.technologies.join(' \u00b7 '))
@@ -783,7 +785,7 @@ test('skill categories retain the card layout, stack, and scroll progression', a
   await scrollTimeline(page, skillStart + 1.1)
   await expect(
     page.locator('.skills-category-pill[data-active] .skills-category-current h3').last(),
-  ).toHaveText('Frontend Development')
+  ).toHaveText('Frontend Development.')
   await expect(page.locator('.skills-project-deck[aria-hidden="false"]')).toHaveAttribute(
     'data-project',
     '0',
@@ -853,7 +855,7 @@ test('mobile category controls stay usable and project information fits the card
       await page.getByRole('button', { name: 'Select ' + skill.name, exact: true }).click()
       await expect(
         page.locator('.skills-category-pill[data-active] .skills-category-current h3').last(),
-      ).toHaveText(skill.name)
+      ).toHaveText(`${skill.name}.`)
       await scrollTimeline(page, skillStart + skillSegments[skills.indexOf(skill)].start + 1.1)
 
       const card = page.getByRole('article', { name: skill.projects[0].title, exact: true })
@@ -1328,7 +1330,7 @@ test.describe('mobile wheel input', () => {
     await page.goto(`${baseURL}/#skills`)
     await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 15000 })
 
-    const lines = page.locator('.skills-title-fill')
+    const lines = page.locator('#skills .skills-title-fill')
 
     await expect(lines.first()).toHaveCSS('--title-fill', '0%')
     await page.mouse.move(180, 400)

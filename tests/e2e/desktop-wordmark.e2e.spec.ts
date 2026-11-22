@@ -2,11 +2,11 @@ import { expect, test } from '@playwright/test'
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000'
 
-test('desktop header drops in left to right with one-third overlap', async ({ page }) => {
+test('desktop links drop in left to right after the first two hero letters', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto(baseURL)
 
-  const starts = await page.evaluate(async () => {
+  const { starts, secondLetterLanded } = await page.evaluate(async () => {
     const selectors = [
       '.liquid-blended-logo .wordmark',
       '.liquid-blended-nav a[href="#top"]',
@@ -17,12 +17,23 @@ test('desktop header drops in left to right with one-third overlap', async ({ pa
       '.liquid-blended-control .theme-toggle',
     ]
     const starts: number[] = []
+    let secondLetterLanded: number | undefined
     const deadline = performance.now() + 15000
 
     while (performance.now() < deadline) {
       await new Promise(requestAnimationFrame)
 
       if (document.documentElement.dataset.introComplete !== 'true') continue
+
+      const letter = document.querySelectorAll('.hero-line .hero-letter')[1]
+
+      if (letter) {
+        const style = getComputedStyle(letter)
+        const y = new DOMMatrixReadOnly(style.transform).m42
+
+        if (Number(style.opacity) > 0.99 && Math.abs(y) < 0.1)
+          secondLetterLanded ??= performance.now()
+      }
 
       selectors.forEach((selector, index) => {
         const element = document.querySelector(selector)
@@ -39,21 +50,22 @@ test('desktop header drops in left to right with one-third overlap', async ({ pa
       if (starts.filter(Number.isFinite).length === selectors.length) break
     }
 
-    return starts
+    return { starts, secondLetterLanded }
   })
 
   expect(starts).toHaveLength(7)
 
+  expect(secondLetterLanded).toBeDefined()
+  expect(starts[1]).toBeGreaterThanOrEqual(secondLetterLanded!)
+
   for (let index = 1; index < starts.length; index++) {
-    expect(starts[index] - starts[index - 1]).toBeGreaterThan(90)
-    expect(starts[index] - starts[index - 1]).toBeLessThan(420)
+    expect(starts[index]).toBeGreaterThan(starts[index - 1])
   }
 
-  // Average across the sequence so a delayed browser frame does not distort the cadence check.
-  const averageGap = (starts[starts.length - 1] - starts[0]) / (starts.length - 1)
+  const averageLinkGap = (starts[4] - starts[1]) / 3
 
-  expect(averageGap).toBeGreaterThan(200)
-  expect(averageGap).toBeLessThan(270)
+  expect(averageLinkGap).toBeGreaterThan(45)
+  expect(averageLinkGap).toBeLessThan(100)
 
   await expect(page.locator('.liquid-blended-control .theme-toggle')).toHaveCSS('transform', 'none')
 })

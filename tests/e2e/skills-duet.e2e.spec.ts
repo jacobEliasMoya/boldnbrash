@@ -67,7 +67,7 @@ for (const viewport of [
       await page.goto(`${baseURL}/#skills`)
       await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 15000 })
 
-      const paragraph = page.locator('.skills-intro')
+      const paragraph = page.locator('#skills .skills-intro')
       const words = paragraph.locator('.word-emphasis')
 
       await expect(words.first()).toBeVisible()
@@ -88,7 +88,10 @@ for (const viewport of [
         )
       await scrollToPhase(page, titleEnd + ((skillParagraphEnd - titleEnd) * 2.5) / count)
       await expect.poll(activeWords).toEqual([2])
-      await expect(page.locator('.skills-title-fill').last()).toHaveCSS('--title-fill', '100%')
+      await expect(page.locator('#skills .skills-title-fill').last()).toHaveCSS(
+        '--title-fill',
+        '100%',
+      )
 
       const playback = () =>
         page.locator('.scene-track').getAttribute('data-playback-progress').then(Number)

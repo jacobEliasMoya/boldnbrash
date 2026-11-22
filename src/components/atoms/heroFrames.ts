@@ -10,6 +10,14 @@ export const heroExitStart = 0.42
 export const heroAnimationTravel = 0.65
 export const heroWalkInEnd = heroEntranceTravel / 2 / heroAnimationTravel
 
+export const heroHeadlineStart = 0.98
+export const heroLetterStep = 0.055
+export const heroTextEntranceTempo = 0.65
+export const heroTextEntranceDuration = 0.65 * heroTextEntranceTempo
+
+export const heroTextEntranceDelay = (cue: number) =>
+  Math.max(0, cue - 0.72) * heroTextEntranceTempo * 0.9
+
 export function getHeroWaveExitPose(progress: number) {
   const waveEnd = heroEntranceTravel / heroAnimationTravel
   const poseProgress =

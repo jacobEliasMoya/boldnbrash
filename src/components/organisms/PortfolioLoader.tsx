@@ -27,7 +27,7 @@ const openerDuration = 1150
 const introLines = ['I’m Jake']
 const copyStartsAt = frameStarts[13] + 300
 const letterFallDuration = 0.45
-const letterFallStagger = letterFallDuration / 3
+const letterFallStagger = 0.09
 const fallingGlyphCount = introLines.join('').replace(/\s/g, '').length + 1
 const copyLandedAt =
   copyStartsAt + ((fallingGlyphCount - 1) * letterFallStagger + letterFallDuration) * 1000

@@ -1,6 +1,12 @@
 'use client'
 
 import { HeroMark } from '@/components/atoms/HeroMark'
+import {
+  heroHeadlineStart,
+  heroLetterStep,
+  heroTextEntranceDelay,
+  heroTextEntranceDuration,
+} from '@/components/atoms/heroFrames'
 import { WordEmphasis } from '@/components/atoms/WordEmphasis'
 import { motion, useReducedMotion } from 'motion/react'
 import { useIntroReady } from '@/hooks/useIntroReady'
@@ -17,17 +23,15 @@ function subscribeMobile(onChange: () => void) {
 
 const entrance = { opacity: 0, y: 10 }
 const entered = { opacity: 1, y: 0 }
-const letterStep = 0.055
-const entranceTempo = 0.65
 const heroParticlesEnabled = false
 const headline = ['Plan It.', 'Build It.', 'Launch It'] as const
 
 function entranceTransition(delay: number, reduceMotion: boolean | null) {
   return {
     type: 'spring' as const,
-    duration: reduceMotion ? 0 : 0.65 * entranceTempo,
+    duration: reduceMotion ? 0 : heroTextEntranceDuration,
     bounce: reduceMotion ? 0 : 0.12,
-    delay: reduceMotion ? 0 : Math.max(0, delay - 0.72) * entranceTempo * 0.9,
+    delay: reduceMotion ? 0 : heroTextEntranceDelay(delay),
   }
 }
 
@@ -55,7 +59,7 @@ function AnimatedLetters({
             key={`${letter}-${index}`}
             initial={false}
             animate={clientReady ? (introReady ? entered : entrance) : undefined}
-            transition={entranceTransition(start + index * letterStep, reduceMotion)}
+            transition={entranceTransition(start + index * heroLetterStep, reduceMotion)}
           >
             {letter}
           </motion.span>
@@ -117,7 +121,7 @@ export function PortfolioHero() {
             <span key={text} className="hero-line">
               <AnimatedLetters
                 text={text}
-                start={0.98 + index * 0.33}
+                start={heroHeadlineStart + index * 0.33}
                 reduceMotion={reduceMotion}
                 introReady={introReady}
               />{' '}
@@ -136,7 +140,10 @@ export function PortfolioHero() {
               aria-label="Explore selected projects and skills"
               initial={false}
               animate={clientReady ? (introReady ? entered : entrance) : undefined}
-              transition={entranceTransition(1.64 + headline[2].length * letterStep, reduceMotion)}
+              transition={entranceTransition(
+                1.64 + headline[2].length * heroLetterStep,
+                reduceMotion,
+              )}
               onAnimationComplete={() => {
                 if (!introReady) return
 

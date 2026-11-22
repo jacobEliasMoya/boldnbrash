@@ -1,5 +1,7 @@
 'use client'
 
+import { IntroDropText } from '@/components/atoms/IntroDropText'
+
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import {
   cancelFrame,
@@ -15,7 +17,7 @@ import { ProjectCover } from '@/components/atoms/ProjectCover'
 import { ProjectCTA } from '@/components/atoms/ProjectCTA'
 import { WordEmphasis } from '@/components/atoms/WordEmphasis'
 import { ProjectDialog } from './ProjectDialog'
-import { getPeriodOpening } from '@/components/atoms/periodOpening'
+import { getIntroPeriodGeometry, getPeriodOpening } from '@/components/atoms/periodOpening'
 import {
   clamp,
   getSkillFrame,
@@ -23,6 +25,7 @@ import {
   skills,
   skillParagraphEndPortion,
   skillTitleFillPortion,
+  workProjectId,
 } from './skillsTimeline'
 
 type Project = (typeof skills)[number]['projects'][number]
@@ -114,7 +117,17 @@ function SkillCategoryPill({
         </span>
         <div className="skills-category-copy">
           <p className="skills-technologies">{skill.technologies.join(' \u00b7 ')}</p>
-          <h3>{skill.name}</h3>
+          <h3>
+            {skill.name}
+            {index === skills.length - 1 && active ? (
+              <>
+                <span data-portal-glyph>.</span>
+                <span className="skills-about-portal" data-portal="about" aria-hidden="true" />
+              </>
+            ) : (
+              '.'
+            )}
+          </h3>
         </div>
         {skill.note && <p className="skills-category-note">{skill.note}</p>}
         {animated && (
@@ -180,6 +193,7 @@ function SkillProjects({
         {skill.projects.map((project, position) => (
           <article
             key={`${skill.name}-${project.title}`}
+            id={workProjectId(project.title)}
             className="scene-project skill-project-card"
             aria-label={project.title}
             data-visible={
@@ -215,7 +229,7 @@ function SkillProjects({
 }
 
 export function SkillsScene() {
-  const [selection, setSelection] = useState({ ...getSkillFrame(0), intro: 0 })
+  const [selection, setSelection] = useState({ ...getSkillFrame(0), intro: 0, textIntro: 0 })
   const [pinned, setPinned] = useState(false)
   const [openedProject, setOpenedProject] = useState<Project | null>(null)
   const [projectOrigin, setProjectOrigin] = useState<{ x: number; y: number } | null>(null)
@@ -259,11 +273,11 @@ export function SkillsScene() {
   const revealStart = skillParagraphEndPortion
   const fillDuration = skillTitleFillPortion / 2
   const paragraphProgress = clamp(
-    (selection.intro - skillTitleFillPortion) / (revealStart - skillTitleFillPortion),
+    (selection.textIntro - skillTitleFillPortion) / (revealStart - skillTitleFillPortion),
   )
   const expansion = animated ? clamp((selection.intro - revealStart) / (1 - revealStart)) : 1
   const titleFill = (line: number) =>
-    animated ? clamp(selection.intro / fillDuration - line) * 100 : 0
+    animated ? clamp(selection.textIntro / fillDuration - line) * 100 : 0
   const openingRadius =
     expansion > 0 ? getPeriodOpening(expansion, portal.dot, portal.radius).innerRadius : 0
 
@@ -277,20 +291,12 @@ export function SkillsScene() {
     const measure = () => {
       if (disposed) return
 
-      const bounds = element.getBoundingClientRect()
-      const point = dot.getBoundingClientRect()
-      const x = point.left + point.width / 2 - bounds.left
-      const y = point.top + point.height / 2 - bounds.top
-
       setPortal({
-        x,
-        y,
-        dot: point.width / 2,
+        ...getIntroPeriodGeometry(element.getBoundingClientRect(), dot.getBoundingClientRect()),
         borderWidth:
           parseFloat(
             getComputedStyle(document.documentElement).getPropertyValue('--frame-inset'),
           ) || 12,
-        radius: Math.hypot(Math.max(x, bounds.width - x), Math.max(y, bounds.height - y)) + 2,
       })
     }
 
@@ -333,10 +339,12 @@ export function SkillsScene() {
   }, [selection.index, selection.ringPosition, ringPosition])
   useEffect(() => {
     function update(event: Event) {
-      const { progress, intro } = (event as CustomEvent<{ progress: number; intro: number }>).detail
+      const { progress, intro, textIntro } = (
+        event as CustomEvent<{ progress: number; intro: number; textIntro: number }>
+      ).detail
 
       setPinned(true)
-      setSelection({ ...getSkillFrame(progress), intro })
+      setSelection({ ...getSkillFrame(progress), intro, textIntro })
     }
 
     window.addEventListener('portfolio:skills-progress', update)
@@ -383,28 +391,34 @@ export function SkillsScene() {
             <span className="skills-title-line" aria-hidden="true">
               <span
                 className="skills-title-fill"
+                data-intro-title=""
                 style={{ '--title-fill': `${titleFill(0)}%` } as CSSProperties}
               >
-                Here’s What
+                <IntroDropText text="Here’s What" />
               </span>
             </span>
             <span className="skills-title-line" aria-hidden="true">
               <span
                 className="skills-title-fill"
+                data-intro-title=""
                 style={{ '--title-fill': `${titleFill(1)}%` } as CSSProperties}
               >
-                I’m Building
+                <IntroDropText text="I’m Building" />
               </span>
-              <span ref={period} className="skills-title-period" />
+              <span ref={period} className="skills-title-period" data-intro-drop="letter" />
             </span>
           </h2>
         </div>
         <p className="skills-intro">
-          <WordEmphasis text={introText} progress={paragraphProgress} enabled={animated} />
+          <WordEmphasis text={introText} progress={paragraphProgress} enabled={animated} dropIn />
         </p>
       </div>
       {animated ? (
-        <div className="skills-reveal" inert={expansion < 1} aria-hidden={expansion < 1}>
+        <div
+          className="skills-reveal intro-period-reveal"
+          inert={expansion < 1}
+          aria-hidden={expansion < 1}
+        >
           <div className="skills-performance">
             <div className="skills-projects">
               {skills.map((skill, index) => (
@@ -502,7 +516,9 @@ export function SkillsScene() {
           ))}
         </div>
       )}
-      <span className="skills-index-portal" data-portal="about" aria-hidden="true" />
+      {selection.index !== skills.length - 1 && (
+        <span className="skills-index-portal" data-portal="about" aria-hidden="true" />
+      )}
       <ProjectDialog
         project={openedProject}
         origin={projectOrigin}

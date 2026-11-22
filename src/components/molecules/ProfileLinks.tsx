@@ -22,13 +22,11 @@ export function ProfileLinks({
   inactive = false,
   raised = true,
   onSlide,
-  onRaised,
 }: {
   placement: 'about' | 'menu'
   inactive?: boolean
   raised?: boolean
   onSlide?: (offset: number) => void
-  onRaised?: () => void
 }) {
   const reduced = useReducedMotion()
   const menu = placement === 'menu'
@@ -42,9 +40,6 @@ export function ProfileLinks({
       animate={menu ? { y: !raised && !reduced ? menuSocialStartOffset : 0 } : undefined}
       onUpdate={({ y }) => {
         if (typeof y === 'number') onSlide?.(y)
-      }}
-      onAnimationComplete={(definition) => {
-        if (typeof definition === 'object' && 'y' in definition && definition.y === 0) onRaised?.()
       }}
       transition={
         reduced ? { duration: 0 } : { duration: menu ? 0.26 : 0.38, ease: [0.22, 1, 0.36, 1] }

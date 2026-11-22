@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, type RefObject } from 'react'
 import {
+  animate,
   motion,
   useMotionValue,
   useMotionValueEvent,
@@ -28,6 +29,7 @@ export function MobileMenuLiquid({
   onCovered,
   socialOffset,
   selectionReady,
+  onSelectionRaised,
 }: {
   panel: RefObject<HTMLDivElement | null>
   index: number
@@ -35,12 +37,13 @@ export function MobileMenuLiquid({
   onCovered: (index: number | null) => void
   socialOffset: MotionValue<number>
   selectionReady: boolean
+  onSelectionRaised: () => void
 }) {
   const geometry = useRef({ height: 0, depth: 64, radius: 36, numbers: [] as NumberBox[] })
   const target = useMotionValue(0)
   const position = useSpring(target, { stiffness: 190, damping: 24, mass: 0.9 })
   const trailing = useSpring(target, { stiffness: 115, damping: 22, mass: 1.1 })
-  const selectionDepth = useSpring(0, { stiffness: 230, damping: 30, mass: 0.9 })
+  const selectionDepth = useMotionValue(0)
   const path = useMotionValue('')
   const socialPath = useMotionValue('')
   const footer = useRef({ width: 0, bottom: 0, center: 0, radius: 1, depth: 0 })
@@ -106,8 +109,17 @@ export function MobileMenuLiquid({
   useMotionValueEvent(trailing, 'change', () => draw(position.get()))
   useMotionValueEvent(selectionDepth, 'change', () => draw(position.get()))
   useEffect(() => {
-    if (selectionReady) selectionDepth.set(1)
-  }, [selectionReady, selectionDepth])
+    if (!selectionReady || reduced) return
+
+    const rise = animate(selectionDepth, 1, {
+      type: 'spring',
+      duration: 0.32,
+      bounce: 0.1,
+      onComplete: onSelectionRaised,
+    })
+
+    return () => rise.stop()
+  }, [selectionReady, selectionDepth, reduced, onSelectionRaised])
 
   const drawFooter = useCallback(
     (offset: number) => {
