@@ -45,6 +45,7 @@
   --scroll-pill-width: 14px;
   --scroll-liquid-depth: 23px;
   --scroll-liquid-radius: 46px;
+  --portfolio-pill-radius: 64px;
   --blue: #3814ff;
   --accent: #ffc857;
   --accent-ink: #805000;
@@ -240,7 +241,7 @@ ul {
   color: var(--ink);
 }
 .scene-about {
-  color-scheme: light;
+  --skills-title-base: var(--ink);
   background: var(--canvas);
   color: var(--ink);
 }
@@ -355,6 +356,15 @@ ul {
   color: var(--ink);
 }
 
+/* Mix the tint once so the hero's gradient cannot change the watermark color. */
+.scene-top::before,
+.scene-skills::after,
+.skills-reveal::before,
+.scene-about::before,
+.experience::before {
+  background-color: color-mix(in srgb, var(--blue) 12%, var(--canvas));
+}
+
 /* The actual JM silhouette supplies the background geometry. */
 .scene-top::before,
 .scene-skills::after {
@@ -372,15 +382,11 @@ ul {
   top: 50%;
   left: 68%;
   width: max(88vw, 132svh);
-  background: var(--blue);
-  opacity: 0.12;
 }
 .scene-skills::after {
   top: 58%;
   left: 3%;
   width: max(88vw, 132svh);
-  background: #f0f0f3;
-  opacity: 0.1;
 }
 @media (max-width: 760px) {
   .scene-top::before {
@@ -495,7 +501,6 @@ ul {
   .scene-top::before {
     left: 61%;
     width: max(76vw, 110svh);
-    opacity: 0.09;
   }
 }
 .hero-mark img {
@@ -2481,11 +2486,6 @@ ul {
   --accent-ink: var(--accent);
   color-scheme: dark;
 }
-:root[data-theme='dark'] .scene-about {
-  color-scheme: dark;
-  background: #1b1b22;
-  color: var(--ink);
-}
 :root[data-theme='dark'] .scene-contact {
   background: #23115e;
 }
@@ -2930,13 +2930,29 @@ ul {
   }
 }
 
+:root[data-theme='dark'] .portfolio[data-experience-active] {
+  --experience-frame: #fff8eb;
+}
+
+.portfolio[data-experience-active] .site-scrollbar-thumb {
+  background: #8c6aa4;
+}
+
+:root[data-theme='dark'] .portfolio[data-experience-active] .wordmark-contrast {
+  color: #151119;
+}
+
+:root[data-theme='dark'] .portfolio[data-experience-active] .liquid-blended-logo .wordmark-symbol {
+  background: var(--experience-frame);
+}
+
 /* The liquid continues the solid frame without blending with scene backgrounds. */
 .portfolio[data-enhanced] .liquid-boundary {
   mix-blend-mode: normal;
-  fill: #000;
+  fill: var(--experience-frame, #000);
 }
 :root[data-theme='dark'] .portfolio[data-enhanced] .liquid-boundary {
-  fill: #fff;
+  fill: var(--experience-frame, #fff);
 }
 /* Explicit surface colours avoid complementary green text over purple scenes. */
 .liquid-blended-nav,
@@ -2948,10 +2964,10 @@ ul {
 }
 .portfolio .liquid-surround {
   z-index: 70;
-  fill: #000;
+  fill: var(--experience-frame, #000);
 }
 :root[data-theme='dark'] .portfolio .liquid-surround {
-  fill: #fff;
+  fill: var(--experience-frame, #fff);
 }
 .liquid-blended-nav[data-tone='dark'],
 .liquid-blended-logo[data-tone='dark'],
@@ -3172,7 +3188,7 @@ ul {
   display: block;
   height: auto;
   padding: clamp(24px, 3vw, 42px);
-  border-radius: 64px;
+  border-radius: var(--portfolio-pill-radius);
   transform-origin: center;
   backface-visibility: hidden;
   overflow: visible;
@@ -3261,6 +3277,10 @@ ul {
   transform: none;
 }
 @media (max-width: 900px) {
+  :root {
+    --portfolio-pill-radius: 40px;
+  }
+
   .portfolio[data-enhanced] .scene-skills {
     overflow: hidden;
   }
@@ -3282,7 +3302,6 @@ ul {
   }
   .skills-duet .skills-category-pill {
     padding: 16px 22px;
-    border-radius: 40px;
   }
   .skills-duet .skills-category-current h3 {
     font-size: clamp(26px, 6vw, 38px);
@@ -3426,7 +3445,13 @@ ul {
 :is(.skills-duet, .about-pages) .skills-heading {
   max-width: 1280px;
   container-type: inline-size;
-  --skills-heading-size: min(clamp(64px, 10vw, 152px), 15cqw);
+  --intro-inline-padding: 0px;
+  --intro-heading-fit: 152px;
+  --skills-heading-size: min(
+    clamp(64px, 10vw, 152px),
+    calc(15cqw + var(--intro-inline-padding) * 0.3),
+    var(--intro-heading-fit)
+  );
 }
 .skills-title-stack {
   position: relative;
@@ -3448,7 +3473,23 @@ ul {
 }
 @media (max-width: 900px) {
   :is(.skills-duet, .about-pages) .skills-heading {
-    --skills-heading-size: min(14cqw, 138px);
+    --skills-heading-size: min(
+      calc(14cqw + var(--intro-inline-padding) * 0.28),
+      var(--intro-heading-fit),
+      138px
+    );
+  }
+}
+@media (max-width: 760px), (pointer: coarse) and (max-height: 560px) {
+  /* Keep the original heading size when its longest line fits inside the added padding. */
+  :is(.skills-duet, .about-pages) .skills-heading {
+    --intro-inline-padding: clamp(14px, 4vw, 22px);
+    --intro-heading-fit: 15.75cqw;
+    padding-inline: var(--intro-inline-padding);
+  }
+
+  .about-pages .skills-heading {
+    --intro-heading-fit: 13.45cqw;
   }
 }
 :is(.skills-duet, .about-pages) .skills-heading .skills-intro {
@@ -3535,7 +3576,6 @@ ul {
   position: absolute;
   z-index: 3;
   inset: 0;
-  background: var(--canvas);
 }
 
 .skills-reveal {
@@ -3562,8 +3602,6 @@ ul {
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background: #d9d9e0;
-  opacity: 0.45;
   -webkit-mask: url('/jm-symbol.svg') 68% 50% / max(88vw, 132svh) no-repeat;
   mask: url('/jm-symbol.svg') 68% 50% / max(88vw, 132svh) no-repeat;
   translate: var(--background-x, 0px) var(--background-y, 0px);
@@ -3595,12 +3633,6 @@ ul {
     mask-size: min(224vw, 960px);
   }
 }
-:root[data-theme='dark'] .scene-skills::after,
-:root[data-theme='dark'] .skills-reveal::before {
-  background: var(--blue);
-  opacity: 0.12;
-}
-
 /* The white introduction opens from its period into the skills canvas. */
 .scene-skills {
   background: var(--canvas);
@@ -3722,10 +3754,6 @@ ul {
 }
 .scene-skills::before {
   display: none;
-}
-.scene-skills::after {
-  background: #d9d9e0;
-  opacity: 0.45;
 }
 
 .mobile-menu-dialog[data-transitioning]::backdrop {
@@ -4357,146 +4385,154 @@ ul {
   }
 }
 
-/* Keep both About views on the same canvas while tall content scrolls independently. */
-.scene-about {
-  --skills-title-base: var(--ink);
-  background: var(--canvas);
-}
-
-:root[data-theme='dark'] .scene-about {
-  background: var(--canvas);
-}
-
-.portfolio[data-enhanced] .scene-about {
-  /* A profile deep link must not scroll the stationary reveal layer. */
-  overflow: clip;
-}
-
 .about-reveal {
-  position: relative;
-  isolation: isolate;
-  overflow: clip;
   background: var(--canvas);
-  padding: clamp(82px, 11dvh, 118px) max(var(--gutter), 26px) max(24px, var(--frame-inset));
-}
-
-.about-reveal::before {
-  content: '';
-  position: absolute;
-  z-index: -1;
-  top: 83%;
-  left: 13%;
-  width: max(64vw, 105svh);
-  aspect-ratio: 1;
-  background: color-mix(in srgb, var(--ink) 8%, var(--canvas));
-  mask: url('/jm-symbol.svg') center / contain no-repeat;
-  transform: translate(-50%, -50%);
-  translate: var(--background-x, 0px) var(--background-y, 0px);
-  pointer-events: none;
+  color: var(--ink);
 }
 
 .portfolio[data-enhanced] .about-reveal {
   clip-path: circle(0px);
 }
 
-.portfolio[data-enhanced] .about-scroll {
-  height: 100%;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--blue) transparent;
+/* Experience reads as a list without the sticky stage. */
+.experience {
+  --experience-width: min(72vw, 1240px);
+  --experience-gap: clamp(14px, 2.6dvh, 26px);
+  --experience-watermark-size: max(88vw, 132svh);
+  --experience-watermark-x: calc(22% - var(--experience-watermark-size) * 0.28);
+  position: relative;
+  isolation: isolate;
+  min-height: 100dvh;
+  padding-block: clamp(94px, 14dvh, 148px) 48px;
 }
 
-.about-update {
+/* Clip the watermark to the scene without clipping the liquid at the viewport floor. */
+.experience::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  mask: url('/jm-symbol.svg') no-repeat;
+  mask-size: var(--experience-watermark-size);
+  mask-position: calc(var(--experience-watermark-x) + var(--background-x, 0px))
+    calc(64% + var(--experience-watermark-size) * 0.14 + var(--background-y, 0px));
+  pointer-events: none;
+}
+
+.experience-heading {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  font: 900 clamp(42px, 5vw, 76px)/1 var(--display);
+}
+
+.experience-guide {
+  display: none;
+}
+
+.experience-roles {
+  display: grid;
+  justify-items: center;
+  gap: var(--experience-gap);
+  margin-top: var(--experience-gap);
+  list-style: none;
+}
+
+.experience-role {
+  --experience-pill: #b9a6c8;
+  --experience-ink: #151119;
+  width: var(--experience-width);
+  min-height: clamp(112px, 18dvh, 198px);
   display: grid;
   align-content: center;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr);
-  gap: clamp(32px, 7vw, 106px);
-  width: min(100%, 1180px);
-  min-height: 100%;
-  margin-inline: auto;
-  padding-block: 24px;
-}
-
-.about-update h2 {
-  margin: 0.16em 0 0.3em;
-  font: 900 clamp(42px, 6vw, 84px)/0.98 var(--display);
-  text-wrap: balance;
-}
-
-.about-status {
-  width: fit-content;
   gap: 8px;
-  margin-bottom: 12px;
-  padding: 5px 10px;
-  border-radius: 5px;
-  background: color-mix(in srgb, var(--blue) 8%, var(--canvas));
-  color: var(--blue);
+  padding: clamp(15px, 1.8dvh, 26px) clamp(32px, 5.5vw, 96px);
+  border-radius: var(--portfolio-pill-radius);
+  background: var(--experience-pill);
+  color: var(--experience-ink);
 }
 
-.about-status::before {
-  content: '';
-  width: 12px;
-  aspect-ratio: 1;
-  background: repeating-linear-gradient(-45deg, currentColor 0 2px, transparent 2px 4px);
+.experience-role[data-tone='plum'] {
+  --experience-pill: #493448;
+  --experience-ink: #fff8eb;
 }
 
-.about-summary {
-  max-width: 60ch;
-  margin-bottom: 28px;
-  font: var(--body-copy-size)/1.55 var(--mono);
+.experience-role[data-tone='mauve'] {
+  --experience-pill: #a489b6;
 }
 
-.about-experience h3 {
-  margin: 0 0 16px;
-  font: 900 clamp(28px, 3vw, 46px)/1 var(--display);
+.experience-role h3 {
+  font: 900 clamp(35px, 7.2vw, 104px)/0.91 var(--display);
+  overflow-wrap: anywhere;
 }
 
-.about-experience li {
-  display: grid;
-  gap: 4px;
-  padding-block: 13px;
-  border-top: 1px solid color-mix(in srgb, currentColor 28%, transparent);
-  font: clamp(13px, 1.15vw, 16px)/1.4 var(--mono);
-}
-
-.about-experience li:last-child {
-  border-bottom: 1px solid color-mix(in srgb, currentColor 28%, transparent);
-}
-
-.about-actions {
+.experience-meta {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-top: 24px;
+  gap: 4px 20px;
+  font: clamp(15px, 1.9vw, 29px)/1.3 var(--mono);
 }
 
-.about-actions > a {
-  color: var(--blue);
-  font: 700 14px/1.5 var(--mono);
-  text-decoration: underline;
-  text-underline-offset: 0.24em;
+.portfolio[data-enhanced] .scene-about {
+  overflow: clip;
 }
 
-.about-actions .profile-links-about {
+.portfolio[data-enhanced] .experience {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+  padding-bottom: 0;
+}
+
+.portfolio[data-enhanced] .experience-guide {
+  display: block;
+  margin-top: 1.35em;
+  text-align: center;
+  font: 14px/1.5 var(--mono);
+  color: color-mix(in srgb, var(--ink) 68%, #a489b6);
+}
+
+.portfolio[data-enhanced] .experience[data-experience-started] .experience-guide {
+  visibility: hidden;
+}
+
+.portfolio[data-enhanced] .experience-stage {
+  position: absolute;
+  inset: 0;
+  clip-path: inset(var(--experience-list-top, 100%) 0 0);
+}
+
+.portfolio[data-enhanced] .experience-roles {
   margin: 0;
 }
 
-@media (max-width: 760px) {
-  .about-reveal {
-    padding-inline: max(18px, calc(var(--frame-inset) + 6px));
+.portfolio[data-enhanced] .experience-role {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  translate: -50% var(--experience-y, 100dvh);
+}
+
+.portfolio[data-enhanced] .experience-role:not([data-visible='true']) {
+  visibility: hidden;
+}
+
+@media (max-width: 760px), (pointer: coarse) and (max-height: 560px) {
+  .experience {
+    --experience-width: calc(100% - 2 * max(42px, var(--gutter)));
+    --experience-watermark-size: max(190vw, 108svh);
+    --experience-watermark-x: calc(12% - var(--experience-watermark-size) * 0.38);
+    padding-top: clamp(82px, 13dvh, 110px);
   }
 
-  .about-reveal::before {
-    top: 94%;
-    left: 10%;
-    width: max(152vw, 90svh);
+  .experience-role {
+    min-height: clamp(96px, 15dvh, 140px);
+    padding-inline: clamp(21px, 7vw, 44px);
   }
 
-  .about-update {
-    grid-template-columns: 1fr;
-    gap: 36px;
+  .experience-role h3 {
+    font-size: clamp(25px, 8.7vw, 54px);
   }
 }
 
@@ -4520,16 +4556,10 @@ ul {
   left: 92%;
   width: max(88vw, 132svh);
   aspect-ratio: 1;
-  background: color-mix(in srgb, var(--ink) 7%, var(--canvas));
   mask: url('/jm-symbol.svg') center / contain no-repeat;
   transform: translate(-50%, -50%);
   translate: var(--background-x, 0px) var(--background-y, 0px);
   pointer-events: none;
-}
-
-:root[data-theme='dark'] .scene-about::before {
-  background: var(--blue);
-  opacity: 0.12;
 }
 
 @media (max-width: 760px) {

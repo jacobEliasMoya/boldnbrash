@@ -1,3 +1,5 @@
+import { experienceTravel } from './experienceTimeline'
+
 export const skills = [
   {
     name: 'Frontend Development',
@@ -177,15 +179,16 @@ export const skillParagraphEnd = skillIntroStart + skillTitleTravel + skillParag
 export const skillStart = skillParagraphEnd + introPeriodTravel
 const aboutStart = skillStart + skillTravel + 1
 export const aboutIntroEnd = aboutStart + skillTitleTravel + skillParagraphTravel
-export const aboutProfileStart = aboutIntroEnd + introPeriodTravel
-export const sceneStops = [0, skillIntroStart, aboutStart, aboutProfileStart + 1.65]
+export const experienceStart = aboutIntroEnd + introPeriodTravel
+export const experienceEnd = experienceStart + experienceTravel
+export const sceneStops = [0, skillIntroStart, aboutStart, experienceEnd + 1.65]
 export const sceneDuration = sceneStops[sceneStops.length - 1] + 0.65
 export const sectionScrollRanges = [
   { start: sceneStops[0], end: heroWalkOutEnd, sceneIndex: 0 },
   { start: sceneStops[1], end: skillParagraphEnd, sceneIndex: 1 },
   { start: skillStart, end: sceneStops[2] - 1, sceneIndex: 1, label: 'Work projects' },
   { start: aboutStart, end: aboutIntroEnd, sceneIndex: 2 },
-  { start: aboutProfileStart, end: sceneStops[3] - 1, sceneIndex: 2, label: 'About profile' },
+  { start: experienceStart, end: sceneStops[3] - 1, sceneIndex: 2, label: 'Experience' },
   { start: sceneStops[3], end: sceneDuration, sceneIndex: 3 },
 ]
 

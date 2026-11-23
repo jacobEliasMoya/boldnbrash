@@ -19,7 +19,8 @@ import {
   heroWalkOutEnd,
   sceneStops,
   aboutIntroEnd,
-  aboutProfileStart,
+  experienceStart,
+  experienceEnd,
   sectionScrollRanges,
   getScrollSection,
   skillSegments,
@@ -49,6 +50,8 @@ import {
   toShowcaseTime,
   fromShowcaseTime,
 } from './scrollPlayback'
+import { ExperienceMotion } from './ExperienceMotion'
+import type { ExperienceDock } from './experienceTimeline'
 import { useIntroReady } from '@/hooks/useIntroReady'
 import { useClientReady } from '@/hooks/useClientReady'
 import {
@@ -88,6 +91,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
   const headerEntranceY = useMotionValue(-24)
   const wordmarkEntranceY = useMotionValue(wordmarkDropStart)
   const timeline = useMotionValue(0)
+  const experienceProgress = useMotionValue(0)
+  const experienceDock = useMotionValue<ExperienceDock | null>(null)
   const scrollProgress = useMotionValue(0)
   const scrollRecess = useSpring(1, { stiffness: 340, damping: 34, mass: 0.85 })
   const [scrollSection, setScrollSection] = useState(0)
@@ -98,6 +103,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
   const [enhanced, setEnhanced] = useState(false)
   const [active, setActive] = useState(0)
   const activeScene = scenes[active].id
+  const experienceActive = activeScene === 'about' && scrollRange.label === 'Experience'
   const headerTone = activeScene === 'contact' ? 'dark' : 'paper'
   const [menuOpen, setMenuOpen] = useState(false)
   const toggleShowcase = useRef<(() => void) | null>(null)
@@ -354,7 +360,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       { start: heroWalkOutEnd, end: sceneStops[1] },
       { start: skillParagraphEnd, end: skillStart },
       ...sceneStops.slice(2).map((end) => ({ start: end - 1, end })),
-      { start: aboutIntroEnd, end: aboutProfileStart },
+      { start: aboutIntroEnd, end: experienceStart },
     ].sort((first, second) => first.start - second.start)
     let sceneTransition: {
       range: (typeof transitionRanges)[number]
@@ -453,7 +459,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       track.current?.setAttribute('data-transitioning', direction > 0 ? 'forward' : 'backward')
 
       const duration =
-        range.end === skillStart || range.end === aboutProfileStart
+        range.end === skillStart || range.end === experienceStart
           ? introPeriodRevealDuration
           : circleRevealTransition.duration
       const control = animate(displayed, target, {
@@ -986,6 +992,9 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       if (media.matches) return
 
       const progress = Math.max(0, Math.min(sceneDuration, value))
+      experienceProgress.set(
+        Math.max(0, Math.min(1, (progress - experienceStart) / (experienceEnd - experienceStart))),
+      )
       const section = getScrollSection(progress)
       const range = sectionScrollRanges[section]
       const nextStart = sectionScrollRanges[section + 1]?.start
@@ -1153,7 +1162,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           const intro = panel.querySelector<HTMLElement>('.about-introduction')
           const opening = Math.max(
             0,
-            Math.min(1, (progress - aboutIntroEnd) / (aboutProfileStart - aboutIntroEnd)),
+            Math.min(1, (progress - aboutIntroEnd) / (experienceStart - aboutIntroEnd)),
           )
 
           if (options && intro) {
@@ -1210,7 +1219,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         const panel = panels.current[pendingFocus]
         const profile =
           panel?.dataset.aboutStage === 'profile'
-            ? panel.querySelector<HTMLElement>('.about-scroll')
+            ? panel.querySelector<HTMLElement>('.experience')
             : null
 
         const destination = profile ?? panel
@@ -1238,6 +1247,24 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       armSnap()
 
       if (!frame) frame = window.requestAnimationFrame(update)
+    }
+
+    function resizeScene() {
+      const node = track.current
+
+      if (node && current === 2 && !media.matches && !sceneTransition && !stopShowcasePlayback) {
+        // Browser chrome can resize the stage while a pill is parked at the floor.
+        const start = scrollY + node.getBoundingClientRect().top
+        const distance =
+          node.offsetHeight - (node.firstElementChild?.clientHeight ?? window.innerHeight)
+
+        window.scrollTo({
+          top: start + (distance * requested) / sceneDuration,
+          behavior: 'instant',
+        })
+      }
+
+      schedule()
     }
 
     function setup() {
@@ -1296,7 +1323,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         index: hash
           ? scenes.findIndex((scene) => `#${scene.id}` === (options ? '#about' : hash))
           : 0,
-        position: options ? aboutProfileStart : undefined,
+        position: options ? experienceStart : undefined,
       }
     }
 
@@ -1330,7 +1357,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
 
         pendingFocus = index
 
-        if (triggerSceneTransition(120, aboutProfileStart, start, distance, false)) return
+        if (triggerSceneTransition(120, experienceStart, start, distance, false)) return
       }
 
       goTo(index, true, position)
@@ -1565,7 +1592,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     document.addEventListener('touchmove', moveTouch, { passive: false })
     document.addEventListener('touchend', endTouch, { passive: true })
     document.addEventListener('touchcancel', endTouch, { passive: true })
-    window.addEventListener('resize', schedule)
+    window.addEventListener('resize', resizeScene)
     document.addEventListener('click', navigate)
     window.addEventListener('portfolio:select-skill', selectSkill)
     window.addEventListener('portfolio:select-scene', selectScene)
@@ -1609,7 +1636,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       document.removeEventListener('touchmove', moveTouch)
       document.removeEventListener('touchend', endTouch)
       document.removeEventListener('touchcancel', endTouch)
-      window.removeEventListener('resize', schedule)
+      window.removeEventListener('resize', resizeScene)
       document.removeEventListener('click', navigate)
       window.removeEventListener('portfolio:select-skill', selectSkill)
       window.removeEventListener('portfolio:select-scene', selectScene)
@@ -1618,7 +1645,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       window.removeEventListener('hashchange', restoreHash)
       media.removeEventListener('change', setup)
     }
-  }, [timeline, scrollProgress, scrollRecess])
+  }, [timeline, scrollProgress, scrollRecess, experienceProgress])
 
   // Switching from document flow to a sticky stage changes the track geometry.
   useEffect(() => {
@@ -1634,12 +1661,14 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         className="portfolio"
         data-enhanced={enhanced ? '' : undefined}
         data-menu-open={menuOpen ? '' : undefined}
+        data-experience-active={experienceActive ? '' : undefined}
       >
         <LiquidBoundary
           headerY={headerEntranceY}
           wordmarkY={wordmarkEntranceY}
           scrollProgress={scrollProgress}
           scrollRecess={scrollRecess}
+          experienceDock={experienceDock}
         />
         {enhanced && introReady && !menuOpen && (
           <ScrollPill
@@ -1852,7 +1881,15 @@ export function SceneSequence({ children }: { children: ReactNode }) {
                 tabIndex={-1}
                 aria-label={scenes[index].label}
               >
-                {child}
+                {scenes[index].id === 'about' ? (
+                  <ExperienceMotion.Provider
+                    value={{ enhanced, progress: experienceProgress, dock: experienceDock }}
+                  >
+                    {child}
+                  </ExperienceMotion.Provider>
+                ) : (
+                  child
+                )}
               </section>
             ))}
             <svg className="scene-period-opening" aria-hidden="true" focusable="false">

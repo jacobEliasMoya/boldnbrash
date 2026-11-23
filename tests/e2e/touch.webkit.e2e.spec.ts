@@ -1,5 +1,14 @@
 import { expect, test, type Page } from '@playwright/test'
-import { projectStops, skillStart } from '../../src/components/organisms/skillsTimeline'
+import {
+  experienceEntryTravel,
+  experiencePillTravel,
+} from '../../src/components/organisms/experienceTimeline'
+import {
+  experienceStart,
+  projectStops,
+  sceneDuration,
+  skillStart,
+} from '../../src/components/organisms/skillsTimeline'
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000'
 
@@ -43,6 +52,66 @@ test.beforeEach(async ({ page }) => {
   await page.goto(baseURL)
   await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 12000 })
   await expect(page.locator('.portfolio')).toHaveAttribute('data-enhanced', '')
+})
+
+test('the mobile liquid matches the pill corner radius throughout its entrance', async ({
+  page,
+}) => {
+  await page.goto(`${baseURL}/#about-profile`)
+  await expect(page.locator('#about')).toHaveAttribute('data-about-stage', 'profile')
+
+  const track = page.locator('.scene-track')
+  const pill = page.locator('[data-role="biziq-developer-i"]')
+  const start = experienceStart + 2 * experienceEntryTravel
+
+  for (const phase of [0.43, 0.61, 0.43]) {
+    const progress = start + phase * experiencePillTravel
+
+    await track.evaluate(
+      (element, { progress, duration }) => {
+        const start = scrollY + element.getBoundingClientRect().top
+        const travel = element.clientHeight - element.firstElementChild!.clientHeight
+
+        window.scrollTo({ top: start + (travel * progress) / duration, behavior: 'instant' })
+      },
+      { progress, duration: sceneDuration },
+    )
+    await expect
+      .poll(() => track.getAttribute('data-playback-progress').then(Number))
+      .toBeCloseTo(progress, 2)
+    await expect(pill).toHaveAttribute('data-docked', '')
+
+    const widths = await pill.evaluate((element) => {
+      const bounds = element.getBoundingClientRect()
+      const radius = parseFloat(getComputedStyle(element).borderTopLeftRadius)
+      const swell = document.querySelector<SVGPathElement>('.liquid-experience-shoulders')!
+      const inverse = swell.getScreenCTM()!.inverse()
+
+      // Measure outward from the actual CSS edge along the top and both rounded corners.
+      return [-1, 1].flatMap((side) =>
+        [0, Math.PI / 6, Math.PI / 4, Math.PI / 2.4].map((angle) => {
+          const centerX = side < 0 ? bounds.left + radius : bounds.right - radius
+          const centerY = bounds.top + radius
+          let inside = radius
+          let outside = radius + 24
+
+          for (let step = 0; step < 8; step++) {
+            const distance = (inside + outside) / 2
+            const x = centerX + side * Math.sin(angle) * distance
+            const y = centerY - Math.cos(angle) * distance
+
+            if (swell.isPointInFill(new DOMPoint(x, y).matrixTransform(inverse))) inside = distance
+            else outside = distance
+          }
+
+          return inside - radius
+        }),
+      )
+    })
+
+    expect(Math.min(...widths)).toBeGreaterThan(4)
+    expect(Math.max(...widths) - Math.min(...widths)).toBeLessThan(1)
+  }
 })
 
 test('vertical touch input advances and reverses the scene clock', async ({ page }) => {

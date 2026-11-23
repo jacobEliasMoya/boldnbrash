@@ -1,13 +1,16 @@
 import { expect, test, type Page } from '@playwright/test'
+import sharp from 'sharp'
+import {
+  experienceEntryTravel,
+  experiencePillTravel,
+} from '../../src/components/organisms/experienceTimeline'
 import {
   heroWalkOutEnd,
   skillParagraphEnd,
   sceneDuration,
   sceneStops,
   skillStart,
-  skillSegments,
-  aboutIntroEnd,
-  aboutProfileStart,
+  experienceStart,
 } from '../../src/components/organisms/skillsTimeline'
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000'
@@ -34,57 +37,142 @@ test.beforeEach(async ({ page }) => {
   await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 15000 })
 })
 
-test('Work opens the About intro and the profile leads to Contact', async ({ page }) => {
-  const index = skillSegments.length - 1
-
-  await page.evaluate(
-    (detail) => window.dispatchEvent(new CustomEvent('portfolio:select-skill', { detail })),
-    { index, offset: skillSegments[index].duration - 0.01 },
-  )
-  await expect(page.locator('.skills-about-portal')).toBeAttached()
-  await moveToBoundary(page, sceneStops[2] - 1 + 0.02)
-  await page.mouse.move(10, 400)
-  await page.mouse.wheel(0, 120)
+test('Experience docks the entering role to the viewport and reverses cleanly', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto(baseURL + '/#about-profile')
+  await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 15000 })
+  await expect(page.locator('#about')).toHaveAttribute('data-about-stage', 'profile')
+  await expect(page.getByRole('heading', { name: 'Experience.' })).toBeVisible()
 
   const about = page.locator('#about')
+  const canvas = about.locator('.about-reveal')
+  const nightMode = page.getByRole('button', { name: 'Night mode' })
+  const third = about.locator('[data-role="biziq-developer-i"]')
+  const thirdStart = experienceStart + experienceEntryTravel * 2
+  const midEntry = thirdStart + experiencePillTravel * 0.43
 
-  await expect(about).toHaveCSS('clip-path', 'none')
-  await expect(page.getByRole('slider', { name: 'About scroll position' })).toBeVisible()
-  await expect(about.locator('.about-introduction')).toBeVisible()
-  const profile = about.locator('.about-reveal')
-  await expect(profile).toHaveCSS('clip-path', /^circle\(0px(?: at .*?)?\)$/)
-  await expect(about).toHaveAttribute('data-intro-drop-complete', '')
+  await moveToBoundary(page, midEntry)
+  await expect(third).toHaveAttribute('data-docked', '')
+  await expect(about.locator('.experience-role')).toHaveCount(4)
 
-  await moveToBoundary(page, aboutIntroEnd + (aboutProfileStart - aboutIntroEnd) * 0.35)
-  await expect(about).toHaveAttribute('data-about-stage', 'opening')
-  await expect(about.locator('.about-introduction')).toHaveCSS('visibility', 'visible')
-  const canvas = await page
-    .locator('#skills .skills-reveal')
-    .evaluate((layer) => getComputedStyle(layer).backgroundColor)
-  await expect(profile).toHaveCSS('background-color', canvas)
+  async function expectDockPixels(frame: number[]) {
+    const { data, info } = await sharp(await page.screenshot({ scale: 'css' }))
+      .removeAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true })
+    const pixel = (x: number, y = info.height - 1) => {
+      const offset = (y * info.width + x) * info.channels
 
-  const profileCoversPeriod = await profile.evaluate((element) => {
-    const profile = element as HTMLElement
-    const period = profile.parentElement!.querySelector('.about-next .skills-title-period')!
-    const { x, y, width, height } = period.getBoundingClientRect()
-    const inert = profile.inert
+      return Array.from(data.subarray(offset, offset + 3))
+    }
 
-    // Hit-test the visual stacking without enabling the profile during the animation.
-    profile.inert = false
-    const top = document.elementFromPoint(x + width / 2, y + height / 2)
-    profile.inert = inert
+    // Sample the last row of pixels to catch seams and check the pill's fixed width.
+    for (const x of [info.width * 0.5, info.width * 0.6, info.width * 0.7])
+      expect(pixel(Math.round(x))).toEqual([164, 137, 182])
 
-    return profile.contains(top)
-  })
+    const entering = (await third.boundingBox())!
 
-  expect(profileCoversPeriod).toBe(true)
+    // The rising frame wraps over the pill as well as around its sides.
+    expect(pixel(Math.round(info.width / 2), Math.floor(entering.y - 8))).toEqual(frame)
+
+    // Both shoulders rise above the flat frame outside the pill's outline.
+    expect(pixel(Math.floor(entering.x - 12), info.height - 18)).toEqual(frame)
+    expect(pixel(Math.ceil(entering.x + entering.width + 12), info.height - 18)).toEqual(frame)
+
+    for (const x of [4, Math.floor(entering.x - 4), Math.ceil(entering.x + entering.width + 4)]) {
+      const outside = pixel(x)
+
+      for (const [index, channel] of frame.entries())
+        expect(Math.abs(outside[index] - channel)).toBeLessThanOrEqual(2)
+    }
+  }
+
+  await expect(canvas).toHaveCSS('background-color', 'rgb(255, 255, 255)')
+  await expect(canvas).toHaveCSS('color', 'rgb(8, 8, 9)')
+  await expectDockPixels([0, 0, 0])
+
+  await nightMode.click()
+  await expect(canvas).toHaveCSS('background-color', 'rgb(16, 16, 20)')
+  await expect(canvas).toHaveCSS('color', 'rgb(239, 235, 225)')
+  await expectDockPixels([255, 248, 235])
+
+  await moveToBoundary(page, thirdStart + experiencePillTravel * 0.71)
+  const lifting = (await third.boundingBox())!
+  const swell = page.locator('.liquid-experience-shoulders')
+  expect(lifting.y + lifting.height).toBeLessThan(900)
+  expect(lifting.y + lifting.height).toBeGreaterThan(888)
+  await expect(third).toHaveAttribute('data-docked', '')
+  await expect(swell).toHaveAttribute('d', / Q/)
+
+  await moveToBoundary(page, thirdStart + experiencePillTravel * 0.76)
+  const cleared = (await third.boundingBox())!
+  const recoil = page.locator('.liquid-experience-recoil')
+  expect(cleared.y + cleared.height).toBeLessThan(888)
+  await expect(third).not.toHaveAttribute('data-docked')
+  await expect(swell).toHaveAttribute('d', / Q/)
+
+  // The spring can still overlap the pill after it clears the flat frame.
+  const pillPixel = await sharp(await page.screenshot({ scale: 'css' }))
+    .extract({ left: 720, top: Math.floor(cleared.y + cleared.height - 8), width: 1, height: 1 })
+    .removeAlpha()
+    .raw()
+    .toBuffer()
+  expect(Array.from(pillPixel)).toEqual([164, 137, 182])
+
+  const inwardDip = thirdStart + experiencePillTravel * 0.86
+  // Leave a strong pointer pull on the floor while the pill's liquid recoils.
+  await page.mouse.move(860, 891)
+  const pointerLiquid = page.locator('.liquid-boundary')
+  await expect(pointerLiquid).toHaveAttribute('data-edge', 'bottom')
+  await expect
+    .poll(() => pointerLiquid.getAttribute('data-pull-depth').then(Number))
+    .toBeGreaterThan(24)
+  await moveToBoundary(page, inwardDip)
+  await expect(recoil).toHaveAttribute('d', / Q/)
+  await expect(swell).toHaveAttribute('d', '')
+
+  // The dip cuts into the painted frame while the viewport floor stays cream.
+  const { data, info } = await sharp(await page.screenshot({ scale: 'css' }))
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true })
+  const framePixel = (y: number, x = Math.floor(info.width / 2)) => {
+    const offset = (y * info.width + x) * info.channels
+
+    return Array.from(data.subarray(offset, offset + 3))
+  }
+  // The old edge must leave no antialiased line above the dip.
+  const canvasPixel = framePixel(info.height - 14)
+  expect(framePixel(info.height - 13)).toEqual(canvasPixel)
+  expect(framePixel(info.height - 12)).toEqual(canvasPixel)
+  expect(framePixel(info.height - 1)).toEqual([255, 248, 235])
+  // Both the canvas and the JM watermark are dark across the former floating bump.
+  for (let y = info.height - 60; y < info.height - 13; y++)
+    expect(framePixel(y, 860)[0]).toBeLessThan(50)
+  await page.mouse.move(10, 400)
+
+  await moveToBoundary(page, thirdStart + experiencePillTravel * 1.045)
+  await expect(recoil).toHaveAttribute('d', '')
+  await expect(swell).toHaveAttribute('d', / Q/)
+
+  await moveToBoundary(page, thirdStart + experienceEntryTravel * 0.99)
+  await expect(third).not.toHaveAttribute('data-docked')
+  await expect(recoil).toHaveAttribute('d', '')
+  await expect(swell).toHaveAttribute('d', '')
+  const settled = (await third.boundingBox())!
+  expect(settled.y + settled.height).toBeLessThan(900)
+
+  await moveToBoundary(page, inwardDip)
+  await expect(recoil).toHaveAttribute('d', / Q/)
+
+  await moveToBoundary(page, midEntry)
+  await expect(third).toHaveAttribute('data-docked', '')
+
+  await moveToBoundary(page, sceneStops[3] - 1 - 0.01)
+  await page.mouse.move(10, 400)
   await page.mouse.wheel(0, 120)
-  await expect(page.getByRole('slider', { name: 'About profile scroll position' })).toBeVisible()
-  await expect(about.getByRole('heading', { name: 'A little about me.' })).toBeVisible()
-  await expect(about.getByText('Under construction')).toBeVisible()
-  await expect(about.getByRole('heading', { name: 'Experience.' })).toBeVisible()
-  await expect(about.getByText('Inenvi')).toBeVisible()
-  await about.getByRole('link', { name: 'Get in touch' }).click()
   await expect(page.locator('#contact')).toHaveAttribute('aria-hidden', 'false')
 })
 
@@ -153,9 +241,9 @@ for (const input of ['touch', 'wheel'] as const) {
 
 test('one scroll completes a page reveal and backscroll reverses it', async ({ page }) => {
   await page.evaluate(() =>
-    document.querySelector<HTMLAnchorElement>('#about a[href="#about-profile"]')?.click(),
+    window.dispatchEvent(new CustomEvent('portfolio:select-scene', { detail: 2 })),
   )
-  await expect(page.locator('#about')).toHaveAttribute('data-about-stage', 'profile')
+  await expect(page.locator('#about')).toHaveAttribute('aria-hidden', 'false')
 
   const progress = () =>
     page.locator('.scene-track').getAttribute('data-playback-progress').then(Number)
@@ -166,9 +254,9 @@ test('one scroll completes a page reveal and backscroll reverses it', async ({ p
   await expect.poll(progress).toBeCloseTo(sceneStops[3], 2)
 
   await page.evaluate(() =>
-    document.querySelector<HTMLAnchorElement>('#about a[href="#about-profile"]')?.click(),
+    window.dispatchEvent(new CustomEvent('portfolio:select-scene', { detail: 2 })),
   )
-  await expect(page.locator('#about')).toHaveAttribute('data-about-stage', 'profile')
+  await expect(page.locator('#about')).toHaveAttribute('aria-hidden', 'false')
   await moveToBoundary(page, sceneStops[3] - 1 - 0.01)
   await page.mouse.wheel(0, 60)
   await expect(page.locator('.scene-track')).toHaveAttribute('data-transitioning', 'forward')

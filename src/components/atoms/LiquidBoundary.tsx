@@ -1,29 +1,46 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useId, useRef } from 'react'
 import type { MotionValue } from 'motion/react'
 import { introCompleteEvent } from '@/hooks/useIntroReady'
+import type { ExperienceDock } from '@/components/organisms/experienceTimeline'
+import {
+  closedLiquidCurve,
+  liquidFrameCorner,
+  liquidFrameOverlap,
+  liquidPull,
+  wordmarkPullPower,
+  wordmarkPullRadius,
+} from './liquidContour'
 
 export function LiquidBoundary({
   headerY,
   wordmarkY,
   scrollProgress,
   scrollRecess,
+  experienceDock,
 }: {
   headerY: MotionValue<number>
   wordmarkY: MotionValue<number>
   scrollProgress: MotionValue<number>
   scrollRecess: MotionValue<number>
+  experienceDock: MotionValue<ExperienceDock | null>
 }) {
   const root = useRef<SVGSVGElement>(null)
   const surround = useRef<SVGSVGElement>(null)
   const parked = useRef<SVGPathElement>(null)
   const scrollLiquid = useRef<SVGPathElement>(null)
+  const boundaryPaint = useRef<SVGGElement>(null)
+  const surroundPaint = useRef<SVGGElement>(null)
+  const dockCut = useRef<SVGPathElement>(null)
+  const dockShoulders = useRef<SVGPathElement>(null)
+  const dockRecoil = useRef<SVGPathElement>(null)
+  const maskId = useId()
 
   useEffect(() => {
     const svg = root.current
     const path = svg?.querySelector('path')
-    const surroundPath = surround.current?.querySelector('path')
+    const surroundPath = surroundPaint.current?.querySelector('path')
     const parkedPath = parked.current
 
     if (!svg || !path) return
@@ -35,7 +52,7 @@ export function LiquidBoundary({
     let width = 0
     let height = 0
     let perimeter = 1
-    let corner = 25
+    let corner = liquidFrameCorner
     let segments: number[] = []
     let basePoints: ReturnType<typeof pointAt>[] = []
     let position = 0
@@ -56,6 +73,39 @@ export function LiquidBoundary({
     let scrollBottom = 31
     let scrollReach = 23
     let scrollRadius = 46
+    let surroundLeft = 0
+    let surroundTop = 0
+    let experienceOwnsFloor = false
+    let pointerFloorPresence = 1
+
+    function paintExperience(shape: ExperienceDock | null) {
+      const ownsFloor = shape !== null
+
+      if (ownsFloor !== experienceOwnsFloor) {
+        experienceOwnsFloor = ownsFloor
+
+        // Remove the competing pull before the recoil mask can cut it off from the frame.
+        if (ownsFloor) pointerFloorPresence = 0
+
+        paintPointerContour()
+        schedule()
+      }
+
+      const masked = shape?.cut || shape?.recoil
+
+      for (const group of [boundaryPaint.current, surroundPaint.current]) {
+        if (masked) group?.setAttribute('mask', `url(#${maskId})`)
+        else group?.removeAttribute('mask')
+      }
+
+      const transform = shape ? `translate(${shape.x - surroundLeft} ${shape.y - surroundTop})` : ''
+      dockCut.current?.setAttribute('transform', transform)
+      dockCut.current?.setAttribute('d', shape?.cut ?? '')
+      dockShoulders.current?.setAttribute('transform', transform)
+      dockShoulders.current?.setAttribute('d', shape?.shoulders ?? '')
+      dockRecoil.current?.setAttribute('transform', transform)
+      dockRecoil.current?.setAttribute('d', shape?.recoil ?? '')
+    }
 
     svg.dataset.mode = media.matches ? 'static' : 'pointer'
 
@@ -115,18 +165,6 @@ export function LiquidBoundary({
       }
     }
 
-    function closedCurve(vertices: { x: number; y: number }[]) {
-      const first = vertices[0]
-      const last = vertices[vertices.length - 1]
-      let d = `M${(last.x + first.x) / 2},${(last.y + first.y) / 2}`
-      for (let i = 0; i < vertices.length; i++) {
-        const a = vertices[i]
-        const b = vertices[(i + 1) % vertices.length]
-        d += ` Q${a.x},${a.y} ${(a.x + b.x) / 2},${(a.y + b.y) / 2}`
-      }
-      return d + ' Z'
-    }
-
     let outside = ''
     let flatPath = ''
     let flatPathPainted = false
@@ -135,10 +173,23 @@ export function LiquidBoundary({
       const direction = pointAt(position)
       const points = basePoints.map((base, i) => {
         const s = (perimeter * i) / basePoints.length
-        const amount = depth * Math.exp(-((Math.abs(arcDelta(position, s)) / radius) ** power))
+        const amount = liquidPull(Math.abs(arcDelta(position, s)), depth, radius, power)
         return { x: base.x + direction.nx * amount, y: base.y + direction.ny * amount }
       })
-      return outside + closedCurve(points)
+      return outside + closedLiquidCurve(points)
+    }
+
+    function paintPointerContour() {
+      const distanceFromFloor = height - pointAt(position).y
+      const awayFromFloor = Math.max(0, Math.min(1, (distanceFromFloor - corner) / (2 * corner)))
+      const presence = pointerFloorPresence + (1 - pointerFloorPresence) * awayFromFloor
+      const visibleDepth = depth * presence
+      const flat = visibleDepth < 0.01
+
+      if (flat && flatPathPainted) return
+
+      path!.setAttribute('d', flat ? flatPath : contour(position, visibleDepth, radius, power))
+      flatPathPainted = flat
     }
 
     function paint(time: number) {
@@ -162,12 +213,10 @@ export function LiquidBoundary({
       radius += (targetRadius - radius) * ease
       power += (targetPower - power) * ease
 
-      const flat = depth < 0.01 && targetDepth === 0
+      // Use the pointer's existing easing when handing the floor back after Experience.
+      if (!experienceOwnsFloor) pointerFloorPresence += (1 - pointerFloorPresence) * ease
 
-      if (!flat || !flatPathPainted) {
-        path!.setAttribute('d', flat ? flatPath : contour(position, depth, radius, power))
-        flatPathPainted = flat
-      }
+      paintPointerContour()
 
       const scrollY =
         scrollTop + Math.max(0, height - scrollTop - scrollBottom) * scrollProgress.get()
@@ -204,7 +253,10 @@ export function LiquidBoundary({
         const key = `${width}:${height}:${anchor}:${wordmark.width}:${parkedDepth}`
 
         if (key !== parkedGeometry) {
-          parkedPath?.setAttribute('d', contour(anchor, parkedDepth, wordmark.width * 0.7 + 20, 4))
+          parkedPath?.setAttribute(
+            'd',
+            contour(anchor, parkedDepth, wordmarkPullRadius(wordmark.width), wordmarkPullPower),
+          )
           parkedGeometry = key
         }
       } else if (parkedGeometry) {
@@ -291,7 +343,8 @@ export function LiquidBoundary({
         Math.abs(arcDelta(position, targetPosition)) +
           Math.abs(depth - targetDepth) +
           Math.abs(radius - targetRadius) +
-          Math.abs(power - targetPower) <
+          Math.abs(power - targetPower) +
+          (experienceOwnsFloor ? 0 : 1 - pointerFloorPresence) <
         0.01
 
       frame = settled && !idle ? 0 : requestAnimationFrame(paint)
@@ -305,6 +358,8 @@ export function LiquidBoundary({
 
     function measure() {
       const bounds = (surround.current ?? svg!).getBoundingClientRect()
+      surroundLeft = bounds.left
+      surroundTop = bounds.top
 
       frameInset =
         parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--frame-inset')) ||
@@ -326,7 +381,7 @@ export function LiquidBoundary({
       surroundPath?.setAttribute('transform', `translate(${frameInset} ${frameInset})`)
       parkedPath?.setAttribute('transform', `translate(${frameInset} ${frameInset})`)
       scrollLiquid.current?.setAttribute('transform', `translate(${frameInset} ${frameInset})`)
-      corner = Math.min(25, width / 2, height / 2)
+      corner = Math.min(liquidFrameCorner, width / 2, height / 2)
 
       const quarter = (Math.PI * corner) / 2
       segments = [
@@ -345,18 +400,22 @@ export function LiquidBoundary({
         pointAt((perimeter * index) / sampleCount),
       )
       outside = `M${-frameInset},${-frameInset} H${width + frameInset} V${height + frameInset} H${-frameInset} Z `
-      flatPath = outside + closedCurve(basePoints)
+      flatPath = outside + closedLiquidCurve(basePoints)
       flatPathPainted = false
       // The subpixel overlap keeps the antialiased join solid.
       surroundPath?.setAttribute(
         'd',
         outside +
-          closedCurve(
-            basePoints.map((base) => ({ x: base.x + base.nx * 0.75, y: base.y + base.ny * 0.75 })),
+          closedLiquidCurve(
+            basePoints.map((base) => ({
+              x: base.x + base.nx * liquidFrameOverlap,
+              y: base.y + base.ny * liquidFrameOverlap,
+            })),
           ),
       )
       position = wrap(position)
       targetPosition = wrap(targetPosition)
+      paintExperience(experienceDock.get())
       schedule()
     }
 
@@ -531,6 +590,7 @@ export function LiquidBoundary({
     const stopFollowing = [headerY, wordmarkY, scrollProgress, scrollRecess].map((value) =>
       value.on('change', schedule),
     )
+    const stopExperience = experienceDock.on('change', paintExperience)
 
     measure()
     armIdle()
@@ -549,6 +609,7 @@ export function LiquidBoundary({
     return () => {
       cancelAnimationFrame(frame)
       stopFollowing.forEach((unsubscribe) => unsubscribe())
+      stopExperience()
       document.querySelectorAll<HTMLElement>('[data-liquid-covered]').forEach((control) => {
         delete control.dataset.liquidCovered
       })
@@ -566,17 +627,29 @@ export function LiquidBoundary({
       document.removeEventListener('focusout', unfocus)
       media.removeEventListener('change', preferenceChanged)
     }
-  }, [headerY, wordmarkY, scrollProgress, scrollRecess])
+  }, [headerY, wordmarkY, scrollProgress, scrollRecess, experienceDock, maskId])
 
   return (
     <>
       <svg ref={root} className="liquid-boundary" aria-hidden="true" focusable="false">
-        <path fillRule="evenodd" />
+        <g ref={boundaryPaint}>
+          <path fillRule="evenodd" />
+        </g>
       </svg>
       <svg ref={surround} className="liquid-surround" aria-hidden="true" focusable="false">
-        <path fillRule="evenodd" />
-        <path ref={parked} className="liquid-wordmark-parked" fillRule="evenodd" />
-        <path ref={scrollLiquid} className="liquid-scroll-pill" fillRule="evenodd" />
+        <defs>
+          <mask id={maskId} maskUnits="userSpaceOnUse" x="-2" y="-2" width="101%" height="101%">
+            <rect x="-2" y="-2" width="101%" height="101%" fill="white" />
+            <path ref={dockCut} fill="black" />
+            <path ref={dockRecoil} className="liquid-experience-recoil" fill="black" />
+          </mask>
+        </defs>
+        <g ref={surroundPaint}>
+          <path fillRule="evenodd" />
+          <path ref={parked} className="liquid-wordmark-parked" fillRule="evenodd" />
+          <path ref={scrollLiquid} className="liquid-scroll-pill" fillRule="evenodd" />
+          <path ref={dockShoulders} className="liquid-experience-shoulders" />
+        </g>
       </svg>
     </>
   )

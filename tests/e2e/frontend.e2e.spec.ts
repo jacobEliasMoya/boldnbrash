@@ -654,8 +654,12 @@ test('about navigation and history work by keyboard', async ({ page }) => {
   await page.getByRole('link', { name: 'About', exact: true }).click()
   await expect(page).toHaveURL(/#about$/)
   await expect(page.locator('#about')).toHaveAttribute('aria-hidden', 'false')
-  await page.getByRole('link', { name: 'Read more about Jacob' }).click()
-  await expect(page.locator('#about .about-reveal')).toHaveCSS('clip-path', /^circle\(/)
+  await expect(page.locator('#about')).toHaveAttribute('data-intro-drop-complete', '')
+  await expect(page.locator('.about-introduction .skills-intro')).toHaveText(
+    'Hey, I’m Jacob, a software engineer in Southern California. I’m curious about how things work, and I like making things fun to use.',
+  )
+  await page.getByRole('link', { name: 'Read more about Jacob' }).press('Enter')
+  await expect(page.locator('#about')).toHaveAttribute('data-about-stage', 'profile')
   await expect(page.getByRole('heading', { name: 'Experience.' })).toBeVisible()
   await page.getByRole('link', { name: 'Contact', exact: true }).click()
   await expect(page.getByRole('link', { name: 'Get in touch' })).toHaveAttribute('href', /^mailto:/)
@@ -688,16 +692,11 @@ test('mobile retains reveals and scrollable content; reduced motion retains docu
     .click()
   await expect(page.getByRole('dialog', { name: 'Mobile navigation' })).not.toBeVisible()
   await expect(page.locator('#about')).toHaveAttribute('aria-hidden', 'false')
-  await expect(
-    page.getByRole('heading', { name: 'Curious by nature. Hands on by choice.' }),
-  ).toBeInViewport()
-
-  const work = page.locator('#about')
-
-  await work.evaluate((el) => {
-    el.scrollTop = el.scrollHeight
-  })
-  await expect(work.locator('.scene-footnote').last()).toBeInViewport()
+  await expect(page.getByRole('heading', { name: 'Get To Know Me Some More' })).toBeInViewport()
+  await expect(page.locator('#about')).toHaveAttribute('data-intro-drop-complete', '')
+  await page.getByRole('link', { name: 'Read more about Jacob' }).click()
+  await expect(page.locator('#about')).toHaveAttribute('data-about-stage', 'profile')
+  await expect(page.getByRole('heading', { name: 'Experience.' })).toBeInViewport()
   await page.getByRole('link', { name: 'Jacob Moya home' }).click()
   await expect(page.locator('#top')).toHaveAttribute('aria-hidden', 'false')
   await page.setViewportSize({ width: 1440, height: 900 })
@@ -705,6 +704,9 @@ test('mobile retains reveals and scrollable content; reduced motion retains docu
   await page.reload()
   await expect(page.locator('.portfolio')).not.toHaveAttribute('data-enhanced')
   await expect(page.locator('#contact')).not.toHaveJSProperty('inert', true)
+  await expect(
+    page.getByRole('list', { name: 'Job experience' }).getByRole('listitem'),
+  ).toHaveCount(4)
 })
 
 async function scrollTimeline(page: Page, value: number, settled = true) {

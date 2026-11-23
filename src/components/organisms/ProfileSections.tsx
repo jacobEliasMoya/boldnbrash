@@ -1,10 +1,16 @@
 'use client'
 
-import { useEffect, useState, type CSSProperties } from 'react'
-import { ProfileLinks } from '@/components/molecules/ProfileLinks'
+import { useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { IntroDropText } from '@/components/atoms/IntroDropText'
 import { WordEmphasis } from '@/components/atoms/WordEmphasis'
 import { clamp, skillParagraphEndPortion, skillTitleFillPortion } from './skillsTimeline'
+import { ExperienceMotion } from './ExperienceMotion'
+import {
+  experienceRoles,
+  getExperienceDock,
+  getExperiencePositions,
+  type ExperienceDock,
+} from './experienceTimeline'
 
 function AboutIntroduction() {
   const [progress, setProgress] = useState(0)
@@ -55,54 +61,165 @@ function AboutIntroduction() {
   )
 }
 
+function ExperienceRole({
+  record,
+  last,
+}: {
+  record: (typeof experienceRoles)[number]
+  last: boolean
+}) {
+  return (
+    <li
+      className="experience-role"
+      data-role={record.id}
+      data-tone={record.tone}
+      data-portal={last ? 'contact' : undefined}
+    >
+      <h3>{record.employer}</h3>
+      <div className="experience-meta">
+        <span>{record.role}</span>
+        <span>{record.dates}</span>
+      </div>
+    </li>
+  )
+}
+
 export function ProfileSections() {
+  const motion = useContext(ExperienceMotion)
+  const root = useRef<HTMLDivElement>(null)
+  const heading = useRef<HTMLHeadingElement>(null)
+  const enhanced = motion?.enhanced ?? false
+  const progress = motion?.progress
+  const dock = motion?.dock
+
+  useLayoutEffect(() => {
+    const element = root.current
+    const title = heading.current
+
+    if (!enhanced || !element || !title || !progress || !dock) return
+
+    const roles = Array.from(element.querySelectorAll<HTMLElement>('.experience-role'))
+    const list = element.querySelector('ol')!
+    const viewport = window.visualViewport
+    let viewportWidth = 0
+    let floor = 0
+    let x = 0
+    let y = 0
+    let top = 0
+    let inset = 0
+    let gap = 0
+    let boxes: { width: number; height: number; radius: number }[] = []
+
+    const paint = () => {
+      const position = progress.get()
+      const poses = getExperiencePositions(
+        position,
+        boxes.map((box) => box.height),
+        top,
+        floor,
+        gap,
+        inset,
+      )
+      let shape: ExperienceDock | null = null
+
+      for (const [index, role] of roles.entries()) {
+        const pose = poses[index]
+        const box = boxes[index]
+        const outline = pose.entering
+          ? getExperienceDock(
+              { ...box, x: viewportWidth / 2, top: pose.y },
+              floor,
+              inset,
+              viewportWidth,
+              pose.release,
+            )
+          : null
+
+        role.style.setProperty('--experience-y', `${pose.y}px`)
+        role.dataset.visible = String(pose.visible)
+        role.inert = !pose.visible || pose.entering
+        role.toggleAttribute('data-docked', outline?.touching ?? false)
+
+        if (outline) shape = { ...outline, x, y }
+      }
+
+      // Move the frame opening in the same update as the CSS pill.
+      dock.set(shape)
+      element.toggleAttribute('data-experience-started', position > 0)
+    }
+
+    const measure = () => {
+      const bounds = element.getBoundingClientRect()
+      const styles = getComputedStyle(element)
+      x = bounds.left
+      y = bounds.top
+      viewportWidth = bounds.width
+      // Mobile browser chrome can change the visible floor without changing the layout viewport.
+      floor =
+        (viewport && viewport.scale === 1 ? viewport.offsetTop + viewport.height : innerHeight) - y
+      inset = parseFloat(styles.getPropertyValue('--frame-inset')) || 12
+      gap = parseFloat(getComputedStyle(list).rowGap) || 20
+      top = title.getBoundingClientRect().bottom - y + gap
+      boxes = roles.map((role) => {
+        const bounds = role.getBoundingClientRect()
+        const pillStyles = getComputedStyle(role)
+
+        return {
+          width: bounds.width,
+          height: bounds.height,
+          radius: parseFloat(pillStyles.borderTopLeftRadius),
+        }
+      })
+
+      element.style.setProperty('--experience-list-top', `${top}px`)
+      paint()
+    }
+
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    observer.observe(title)
+    roles.forEach((role) => observer.observe(role))
+    const stop = progress.on('change', paint)
+
+    viewport?.addEventListener('resize', measure)
+    viewport?.addEventListener('scroll', measure)
+    measure()
+
+    return () => {
+      observer.disconnect()
+      stop()
+      viewport?.removeEventListener('resize', measure)
+      viewport?.removeEventListener('scroll', measure)
+      dock.set(null)
+      element.removeAttribute('data-experience-started')
+
+      for (const role of roles) {
+        role.inert = false
+        role.removeAttribute('data-visible')
+        role.removeAttribute('data-docked')
+      }
+    }
+  }, [enhanced, progress, dock])
+
   return (
     <div className="about-pages">
       <AboutIntroduction />
       <div className="about-reveal intro-period-reveal">
-        <div
-          id="about-profile"
-          className="about-scroll"
-          tabIndex={0}
-          role="region"
-          aria-labelledby="about-title"
-        >
-          <div className="about-update">
-            <div className="about-bio">
-              <p className="eyebrow about-status">Under construction</p>
-              <h2 id="about-title">A little about me.</h2>
-              <p className="about-summary">
-                I’m Jacob Moya, a software engineer in Southern California. I like figuring out how
-                things work and making them more fun to use.
-              </p>
-              <div className="about-actions">
-                <ProfileLinks placement="about" />
-                <a href="#contact" data-portal="contact">
-                  Get in touch <span aria-hidden="true">↗</span>
-                </a>
-              </div>
-            </div>
-            <section className="about-experience" aria-labelledby="about-experience-title">
-              <h3 id="about-experience-title">Experience.</h3>
-              <ul>
-                <li>
-                  <strong>Inenvi</strong>
-                  <span>Software Engineer · 2025–Present</span>
-                </li>
-                <li>
-                  <strong>BIZIQ</strong>
-                  <span>Web Developer II · 2022–2025</span>
-                </li>
-                <li>
-                  <strong>BIZIQ</strong>
-                  <span>Web Developer I · 2021–2022</span>
-                </li>
-                <li>
-                  <strong>VAREP National</strong>
-                  <span>Junior Web Developer · 2019–2021</span>
-                </li>
-              </ul>
-            </section>
+        <div ref={root} id="about-profile" className="experience" tabIndex={-1}>
+          <h2 ref={heading} className="experience-heading">
+            Experience.
+          </h2>
+          <p className="experience-guide">Scroll to explore</p>
+          <div className="experience-stage">
+            <ol className="experience-roles" aria-label="Job experience">
+              {experienceRoles.map((record, index) => (
+                <ExperienceRole
+                  key={record.id}
+                  record={record}
+                  last={index === experienceRoles.length - 1}
+                />
+              ))}
+            </ol>
           </div>
         </div>
       </div>

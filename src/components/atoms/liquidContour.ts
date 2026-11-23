@@ -15,9 +15,21 @@ export function closedLiquidCurve(vertices: Point[]) {
   return path + ' Z'
 }
 
+export function liquidPull(distance: number, depth: number, radius: number, power: number) {
+  return depth * Math.exp(-((distance / radius) ** power))
+}
+
+export const wordmarkPullPower = 4
+export const liquidFrameCorner = 25
+export const liquidFrameOverlap = 0.75
+
+export function wordmarkPullRadius(width: number, scale = 1) {
+  return width * 0.7 + 20 * scale
+}
+
 // The site boundary and loader share the same sampled, rounded perimeter.
 export function createLiquidFrame(width: number, height: number, inset: number) {
-  const corner = Math.min(25, width / 2, height / 2)
+  const corner = Math.min(liquidFrameCorner, width / 2, height / 2)
   const quarter = (Math.PI * corner) / 2
   const segments = [
     width - 2 * corner,
@@ -85,10 +97,99 @@ export function liquidContour(
     )
     // A growing pill stretches the same liquid influence along the perimeter.
     const falloff = Math.max(0, distance - stretch)
-    const amount = depth * Math.exp(-((falloff / radius) ** power))
+    const amount = liquidPull(falloff, depth, radius, power)
 
     return { x: base.x + direction.nx * amount, y: base.y + direction.ny * amount }
   })
 
   return frame.outside + closedLiquidCurve(points)
+}
+
+type RoundedPill = { width: number; corner: number; rim: number }
+
+type BottomLiquidPull = {
+  width: number
+  floor: number
+  inset: number
+  center: number
+  depth: number
+  radius: number
+  power: number
+  stretch: number
+  roundedPill?: RoundedPill
+}
+
+function roundedLiquidSwell(pull: BottomLiquidPull, pill: RoundedPill) {
+  const { width, floor, inset, center, depth, radius, power, stretch } = pull
+  const side = inset + liquidFrameOverlap
+  const frameEdge = floor - side
+  const pillLeft = center - pill.width / 2
+  const gutter = pillLeft - pill.rim - side
+  const footRadius = Math.min(liquidFrameCorner, gutter * 0.42)
+  const footX = side + footRadius
+  const footPull = liquidPull(Math.max(0, center - footX - stretch), depth, radius, power)
+  const footY = frameEdge - footPull * 0.38
+  const sideY = footY - footRadius
+
+  const top = frameEdge - depth
+  const corner = pill.corner + pill.rim
+  const capStart = pillLeft + pill.corner
+
+  // Share the pill's corner center at full contact. Shorten the arc as it blends into the floor.
+  const angle = Math.acos(1 - Math.min(1, ((footY - top) * 0.8) / corner))
+  const tangentX = Math.cos(angle)
+  const tangentY = Math.sin(angle)
+  const shoulderX = capStart - corner * tangentY
+  const shoulderY = top + corner * (1 - tangentX)
+  const capHandle = (4 / 3) * Math.tan(angle / 4) * corner
+
+  // Both curves use the same tangent where the rounded shoulder meets the frame.
+  const run = shoulderX - footX
+  const rise = footY - shoulderY
+  const blendHandle = Math.min(run / (1 + tangentX), rise / (1 + tangentY)) * 0.72
+  const entryX = shoulderX - blendHandle * tangentX
+  const entryY = shoulderY + blendHandle * tangentY
+  const exitX = shoulderX + capHandle * tangentX
+  const exitY = shoulderY - capHandle * tangentY
+  const footHandle = footRadius * 0.55228475
+  const mirror = (x: number) => 2 * center - x
+
+  return [
+    `M0 ${sideY} H${side}`,
+    `C${side} ${sideY + footHandle} ${footX - footHandle} ${footY} ${footX} ${footY}`,
+    `C${footX + run / 2} ${footY} ${entryX} ${entryY} ${shoulderX} ${shoulderY}`,
+    `C${exitX} ${exitY} ${capStart - capHandle} ${top} ${capStart} ${top}`,
+    `H${mirror(capStart)}`,
+    `C${mirror(capStart - capHandle)} ${top} ${mirror(exitX)} ${exitY} ${mirror(shoulderX)} ${shoulderY}`,
+    `C${mirror(entryX)} ${entryY} ${mirror(footX + run / 2)} ${footY} ${mirror(footX)} ${footY}`,
+    `C${mirror(footX - footHandle)} ${footY} ${mirror(side)} ${sideY + footHandle} ${mirror(side)} ${sideY}`,
+    `H${width} V${floor + 2} H0 Z`,
+  ].join(' ')
+}
+
+export function bottomLiquidContour(pull: BottomLiquidPull) {
+  const { width, floor, inset, center, depth, radius, power, stretch, roundedPill } = pull
+  const inward = depth < 0
+
+  if (roundedPill && !inward) return roundedLiquidSwell(pull, roundedPill)
+
+  // Sample along the straight edge so a wide pull cannot fold the viewport corners.
+  const left = inward ? Math.min(width / 2, inset + liquidFrameCorner) : 0
+  const right = width - left
+  const frameEdge = floor - inset - liquidFrameOverlap
+  const count = Math.max(2, Math.ceil((right - left) / 4))
+  const points = Array.from({ length: count + 1 }, (_, index) => {
+    const x = left + ((right - left) * index) / count
+    const side = Math.min(x - left, right - x)
+    const distance = Math.max(0, Math.abs(x - center) - stretch)
+    const edge = Math.min(1, side / (2 * inset))
+    const displacement = liquidPull(distance, depth, radius, power) * edge * edge * (3 - 2 * edge)
+
+    return { x, y: frameEdge - displacement }
+  })
+
+  // Extend the recoil mask past the old edge to remove its antialiased pixels, too.
+  const closeAt = inward ? frameEdge - 2 : floor + 2
+
+  return closedLiquidCurve([...points, { x: right, y: closeAt }, { x: left, y: closeAt }])
 }

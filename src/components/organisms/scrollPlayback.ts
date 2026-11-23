@@ -1,7 +1,8 @@
 import { heroAnimationTravel, heroEntranceDuration, heroEntranceTravel } from '../atoms/heroFrames'
 import {
   aboutIntroEnd,
-  aboutProfileStart,
+  experienceEnd,
+  experienceStart,
   heroWalkOutEnd,
   sceneStops,
   skillParagraphEnd,
@@ -56,7 +57,8 @@ export function fromPlaybackTime(seconds: number) {
 const showcaseReading = [
   { start: sceneStops[1], end: skillParagraphEnd, stretch: 2 },
   { start: sceneStops[2], end: aboutIntroEnd, stretch: 2.5 },
-  { start: aboutProfileStart, end: sceneStops[3] - 1, stretch: 6 },
+  { start: experienceStart, end: experienceEnd, stretch: 2.2 },
+  { start: experienceEnd, end: sceneStops[3] - 1, stretch: 6 },
 ].map(({ start, end, stretch }) => ({
   start: toPlaybackTime(start),
   end: toPlaybackTime(end),
