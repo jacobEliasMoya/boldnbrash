@@ -16,6 +16,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Prefer Motion values and transforms for linked visual properties. Drive elements that must move together from a shared animation clock; avoid stacking smoothing layers that make one element lag behind another.
 - Use Motion sequencing and stagger controls for overlapping entrances. Preserve the requested order and overlap, and allow animations to reverse or respond promptly when input changes direction.
 - Use the existing liquid renderer and shared visual primitives where applicable. Check viewport bounds, pull limits, and stacking when changing frame or liquid animations; changes to a loader must not alter the site's existing frame behavior.
+- Use the [liquid-pill-entrance skill](.agents/skills/liquid-pill-entrance/SKILL.md) when maintaining the Experience pill animation or adding another pill that emerges through the viewport frame.
 - Reuse the existing Motion easing and spring settings for consistent movement. Avoid competing CSS transitions or hand-written animation timers for the same properties.
 - Use CSS for static styling and prepared states. Introduce a different animation system or custom timing loop only when Motion cannot reasonably provide the required behavior, and explain that choice in a nearby comment.
 - Respect reduced-motion preferences and wait for the site loader to finish before starting header and hero entrance animations.

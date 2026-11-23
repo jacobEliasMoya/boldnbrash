@@ -640,7 +640,7 @@ export function LiquidBoundary({
         <defs>
           <mask id={maskId} maskUnits="userSpaceOnUse" x="-2" y="-2" width="101%" height="101%">
             <rect x="-2" y="-2" width="101%" height="101%" fill="white" />
-            <path ref={dockCut} fill="black" />
+            <path ref={dockCut} className="liquid-experience-cut" fill="black" />
             <path ref={dockRecoil} className="liquid-experience-recoil" fill="black" />
           </mask>
         </defs>

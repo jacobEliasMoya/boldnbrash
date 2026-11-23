@@ -57,7 +57,7 @@ test('Experience docks the entering role to the viewport and reverses cleanly', 
   await expect(third).toHaveAttribute('data-docked', '')
   await expect(about.locator('.experience-role')).toHaveCount(4)
 
-  async function expectDockPixels(frame: number[]) {
+  async function expectDockPixels(surface: number[]) {
     const { data, info } = await sharp(await page.screenshot({ scale: 'css' }))
       .removeAlpha()
       .raw()
@@ -70,33 +70,39 @@ test('Experience docks the entering role to the viewport and reverses cleanly', 
 
     // Sample the last row of pixels to catch seams and check the pill's fixed width.
     for (const x of [info.width * 0.5, info.width * 0.6, info.width * 0.7])
-      expect(pixel(Math.round(x))).toEqual([164, 137, 182])
+      expect(pixel(Math.round(x))).toEqual(surface)
 
     const entering = (await third.boundingBox())!
 
+    // The shared surface must paint through the masked join without a halo in either theme.
+    const edgeY = Math.floor(entering.y)
+
+    for (const y of [edgeY - 1, edgeY, edgeY + 1])
+      expect(pixel(Math.round(info.width / 2), y)).toEqual(surface)
+
     // The rising frame wraps over the pill as well as around its sides.
-    expect(pixel(Math.round(info.width / 2), Math.floor(entering.y - 8))).toEqual(frame)
+    expect(pixel(Math.round(info.width / 2), Math.floor(entering.y - 8))).toEqual(surface)
 
     // Both shoulders rise above the flat frame outside the pill's outline.
-    expect(pixel(Math.floor(entering.x - 12), info.height - 18)).toEqual(frame)
-    expect(pixel(Math.ceil(entering.x + entering.width + 12), info.height - 18)).toEqual(frame)
+    expect(pixel(Math.floor(entering.x - 12), info.height - 18)).toEqual(surface)
+    expect(pixel(Math.ceil(entering.x + entering.width + 12), info.height - 18)).toEqual(surface)
 
     for (const x of [4, Math.floor(entering.x - 4), Math.ceil(entering.x + entering.width + 4)]) {
       const outside = pixel(x)
 
-      for (const [index, channel] of frame.entries())
+      for (const [index, channel] of surface.entries())
         expect(Math.abs(outside[index] - channel)).toBeLessThanOrEqual(2)
     }
   }
 
   await expect(canvas).toHaveCSS('background-color', 'rgb(255, 255, 255)')
   await expect(canvas).toHaveCSS('color', 'rgb(8, 8, 9)')
-  await expectDockPixels([0, 0, 0])
+  await expectDockPixels([8, 8, 9])
 
   await nightMode.click()
   await expect(canvas).toHaveCSS('background-color', 'rgb(16, 16, 20)')
   await expect(canvas).toHaveCSS('color', 'rgb(239, 235, 225)')
-  await expectDockPixels([255, 248, 235])
+  await expectDockPixels([255, 255, 255])
 
   await moveToBoundary(page, thirdStart + experiencePillTravel * 0.71)
   const lifting = (await third.boundingBox())!
@@ -119,7 +125,7 @@ test('Experience docks the entering role to the viewport and reverses cleanly', 
     .removeAlpha()
     .raw()
     .toBuffer()
-  expect(Array.from(pillPixel)).toEqual([164, 137, 182])
+  expect(Array.from(pillPixel)).toEqual([255, 255, 255])
 
   const inwardDip = thirdStart + experiencePillTravel * 0.86
   // Leave a strong pointer pull on the floor while the pill's liquid recoils.
@@ -133,7 +139,7 @@ test('Experience docks the entering role to the viewport and reverses cleanly', 
   await expect(recoil).toHaveAttribute('d', / Q/)
   await expect(swell).toHaveAttribute('d', '')
 
-  // The dip cuts into the painted frame while the viewport floor stays cream.
+  // The dip cuts into the painted frame while the viewport floor stays white.
   const { data, info } = await sharp(await page.screenshot({ scale: 'css' }))
     .removeAlpha()
     .raw()
@@ -147,7 +153,7 @@ test('Experience docks the entering role to the viewport and reverses cleanly', 
   const canvasPixel = framePixel(info.height - 14)
   expect(framePixel(info.height - 13)).toEqual(canvasPixel)
   expect(framePixel(info.height - 12)).toEqual(canvasPixel)
-  expect(framePixel(info.height - 1)).toEqual([255, 248, 235])
+  expect(framePixel(info.height - 1)).toEqual([255, 255, 255])
   // Both the canvas and the JM watermark are dark across the former floating bump.
   for (let y = info.height - 60; y < info.height - 13; y++)
     expect(framePixel(y, 860)[0]).toBeLessThan(50)

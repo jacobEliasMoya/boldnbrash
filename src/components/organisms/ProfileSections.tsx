@@ -63,22 +63,27 @@ function AboutIntroduction() {
 
 function ExperienceRole({
   record,
+  number,
   last,
 }: {
   record: (typeof experienceRoles)[number]
+  number: number
   last: boolean
 }) {
   return (
     <li
       className="experience-role"
       data-role={record.id}
-      data-tone={record.tone}
       data-portal={last ? 'contact' : undefined}
     >
-      <h3>{record.employer}</h3>
-      <div className="experience-meta">
-        <span>{record.role}</span>
-        <span>{record.dates}</span>
+      <span className="experience-number" aria-hidden="true">
+        {String(number).padStart(2, '0')}
+      </span>
+      <div className="experience-copy">
+        <p className="experience-meta">
+          {record.employer} <span className="experience-dates">{record.dates}</span>
+        </p>
+        <h3>{record.role}</h3>
       </div>
     </li>
   )
@@ -216,6 +221,7 @@ export function ProfileSections() {
                 <ExperienceRole
                   key={record.id}
                   record={record}
+                  number={index + 1}
                   last={index === experienceRoles.length - 1}
                 />
               ))}

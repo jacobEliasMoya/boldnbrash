@@ -12,28 +12,24 @@ export const experienceRoles = [
     employer: 'Inenvi',
     role: 'Software Engineer',
     dates: '2025–Present',
-    tone: 'plum',
   },
   {
     id: 'biziq-developer-ii',
     employer: 'BIZIQ',
     role: 'Web Developer II',
     dates: '2022–2025',
-    tone: 'lavender',
   },
   {
     id: 'biziq-developer-i',
     employer: 'BIZIQ',
     role: 'Web Developer I',
     dates: '2021–2022',
-    tone: 'mauve',
   },
   {
     id: 'varep-developer',
     employer: 'VAREP National',
     role: 'Junior Web Developer',
     dates: '2019–2021',
-    tone: 'lavender',
   },
 ] as const
 
