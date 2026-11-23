@@ -859,6 +859,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       if (next === requested && stopPlayback && !immediate && !snapping) return
 
       requested = next
+      const velocity = playbackClock.getVelocity()
       stopPlayback?.()
       stopPlayback = undefined
 
@@ -877,6 +878,9 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       const targetTime = toPlaybackTime(requested)
       const difference = Math.abs(targetTime - currentTime)
       const heroPlayback = Math.min(displayed, requested) < heroWalkOutEnd
+      const experiencePlayback =
+        Math.max(displayed, requested) >= experienceStart &&
+        Math.min(displayed, requested) <= experienceEnd
       const introPlayback =
         (current === 1 && Math.min(displayed, requested) < skillParagraphEnd) ||
         (current === 2 && Math.min(displayed, requested) < aboutIntroEnd)
@@ -889,34 +893,28 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         return
       }
 
-      // Keep velocity when a new gesture target arrives. Use the same spring for
-      // wheel and touch through the walk and text fill so a wheel notch cannot restart an ease-out.
+      // Experience uses the same spring for touch and wheel, carrying velocity between inputs.
+      const spring = experiencePlayback
+        ? { stiffness: 190, damping: 27, mass: 1, velocity }
+        : introPlayback
+          ? { stiffness: 230, damping: 30, mass: 0.9 }
+          : gesturePlayback || heroPlayback
+            ? { stiffness: 420, damping: 42, mass: 0.9 }
+            : null
+
       const control = animate(playbackClock, targetTime, {
-        ...(introPlayback
+        ...(spring
           ? {
+              ...spring,
               type: 'spring' as const,
-              stiffness: 230,
-              damping: 30,
-              mass: 0.9,
               restDelta: 0.0005,
               restSpeed: 0.005,
             }
-          : gesturePlayback || heroPlayback
-            ? {
-                type: 'spring' as const,
-                stiffness: 420,
-                damping: 42,
-                mass: 0.9,
-                restDelta: 0.0005,
-                restSpeed: 0.005,
-              }
-            : current === 1
-              ? { type: 'tween' as const, duration: 0.24, ease: [0.22, 1, 0.36, 1] as const }
-              : {
-                  type: 'tween' as const,
-                  duration: Math.min(difference, 0.3),
-                  ease: [0.22, 1, 0.36, 1] as const,
-                }),
+          : {
+              type: 'tween' as const,
+              duration: current === 1 ? 0.24 : Math.min(difference, 0.3),
+              ease: [0.22, 1, 0.36, 1] as const,
+            }),
         onUpdate: (time) => {
           displayed = fromPlaybackTime(time)
           renderScene(displayed)
@@ -1166,21 +1164,31 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           )
 
           if (options && intro) {
-            options.inert = opening < 1
-            intro.inert = opening >= 1
-            panel.dataset.aboutStage =
-              opening === 0 ? 'intro' : opening >= 1 ? 'profile' : 'opening'
+            const stage = opening === 0 ? 'intro' : opening === 1 ? 'profile' : 'opening'
 
-            const period = intro.querySelector('.about-next .skills-title-period')
+            if (stage !== panel.dataset.aboutStage) {
+              options.inert = stage !== 'profile'
+              intro.inert = stage === 'profile'
+              panel.dataset.aboutStage = stage
+            }
 
-            if (period) {
-              const { x, y, dot, radius } = getIntroPeriodGeometry(
-                options.getBoundingClientRect(),
-                period.getBoundingClientRect(),
-              )
-              const aperture = opening > 0 ? getPeriodOpening(opening, dot, radius).innerRadius : 0
+            if (stage === 'opening') {
+              const period = intro.querySelector('.about-next .skills-title-period')
 
-              options.style.clipPath = `circle(${aperture}px at ${x}px ${y}px)`
+              if (period) {
+                const { x, y, dot, radius } = getIntroPeriodGeometry(
+                  options.getBoundingClientRect(),
+                  period.getBoundingClientRect(),
+                )
+                const aperture = getPeriodOpening(opening, dot, radius).innerRadius
+
+                options.style.clipPath = `circle(${aperture}px at ${x}px ${y}px)`
+              }
+            } else {
+              // The finished reveal needs no layout measurement or moving clip while the pills animate.
+              const clip = stage === 'profile' ? 'none' : 'circle(0px)'
+
+              if (options.style.clipPath !== clip) options.style.clipPath = clip
             }
           }
         }

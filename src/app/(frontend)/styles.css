@@ -4549,7 +4549,8 @@ ul {
   }
 
   .experience-role {
-    min-height: clamp(96px, 15dvh, 140px);
+    min-height: clamp(90px, 14dvh, 130px);
+    padding-block: clamp(12px, 1.6dvh, 22px);
     padding-inline: clamp(21px, 7vw, 44px);
   }
 }
