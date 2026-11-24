@@ -2938,7 +2938,7 @@ ul {
   }
 }
 
-.portfolio[data-experience-active] {
+.portfolio:is([data-experience-active], [data-work-projects]) {
   --experience-frame: var(--experience-pill-surface);
 }
 
@@ -2946,6 +2946,10 @@ ul {
 .liquid-experience-cut {
   stroke: white;
   stroke-width: 2px;
+}
+
+.portfolio[data-work-projects] .liquid-experience-cut {
+  stroke-width: 4px;
 }
 
 .portfolio[data-experience-active] .site-scrollbar-thumb {
@@ -3166,12 +3170,6 @@ ul {
 }
 .skills-duet[data-playing] .skills-heading {
   grid-area: auto;
-  margin: 0;
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: calc(100% - 2 * var(--gutter));
-  translate: -50% -50%;
   opacity: 1;
   pointer-events: none;
 }
@@ -3239,7 +3237,7 @@ ul {
   grid-row: 1;
   position: relative;
   min-width: 0;
-  /* Match the resting active pill's 0.94 Motion scale. */
+  /* Match the centered category pill's 94% width. */
   width: 94%;
   justify-self: center;
   height: min(100%, 610px);
@@ -3615,6 +3613,45 @@ ul {
 .skills-reveal .skills-category-pill {
   color: var(--paper);
 }
+
+.portfolio[data-enhanced] .skills-reveal[data-revealed] {
+  clip-path: none;
+}
+
+.portfolio[data-enhanced]
+  .skills-reveal
+  .skills-browser:not([data-work-ready])
+  .skills-category-pill {
+  visibility: hidden !important;
+}
+
+.portfolio[data-enhanced] .skills-reveal .skills-category-pill {
+  background: var(--experience-pill-surface);
+}
+
+:root[data-theme='dark'] .portfolio[data-enhanced] .skills-reveal .skills-category-pill {
+  color: #080809;
+}
+
+:root[data-theme='dark']
+  .portfolio[data-enhanced]
+  .skills-reveal
+  .skills-category-pill
+  :is(.skills-category-number, .skills-technologies, .skills-category-note) {
+  color: #805000;
+}
+
+/* The live pill needs to extend below the wheel while it is attached to the frame. */
+.portfolio[data-enhanced] .skills-duet .skills-browser[data-liquid-entry] {
+  mask-image: none;
+}
+
+.skills-reveal .skills-category-pill[data-work-entering] {
+  transform: translateY(var(--work-entry-y)) scale(var(--work-pill-scale)) !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
 .skills-reveal .skills-project-caption {
   color: var(--ink);
 }
@@ -4526,7 +4563,11 @@ ul {
 }
 
 .portfolio[data-enhanced] .experience-roles {
+  position: absolute;
+  inset: 0;
   margin: 0;
+  perspective: 1100px;
+  perspective-origin: center var(--experience-wheel-center, 50%);
 }
 
 .portfolio[data-enhanced] .experience-role {
@@ -4536,8 +4577,20 @@ ul {
   translate: -50% var(--experience-y, 100dvh);
 }
 
+.portfolio[data-enhanced] .experience-role[data-receding] {
+  transform: translateZ(var(--experience-depth)) rotateX(var(--experience-tilt));
+  opacity: var(--experience-opacity);
+  backface-visibility: hidden;
+}
+
 .portfolio[data-enhanced] .experience-role:not([data-visible='true']) {
   visibility: hidden;
+}
+
+@media (max-width: 900px) {
+  .portfolio[data-enhanced] .experience-roles {
+    perspective: 480px;
+  }
 }
 
 @media (max-width: 760px), (pointer: coarse) and (max-height: 560px) {
@@ -4596,10 +4649,27 @@ ul {
   margin-bottom: 0;
 }
 
-.portfolio[data-enhanced] .about-introduction {
+/* Center the heading on its own, then make room using the paragraph's wrapped height. */
+.portfolio[data-enhanced] :is(.skills-duet[data-playing] .skills-heading, .about-introduction) {
+  display: grid;
+  grid-template-rows: auto var(--intro-paragraph-row, 0fr);
   position: absolute;
-  inset: 0;
+  inset: 50% auto auto 50%;
   width: calc(100% - 2 * var(--gutter));
+  margin: 0;
+  translate: -50% -50%;
+}
+
+.portfolio[data-enhanced] .skills-heading h2 {
+  margin-block: 0;
+}
+
+.portfolio[data-enhanced] .skills-intro-slot {
+  min-height: 0;
+}
+
+.portfolio[data-enhanced] .skills-intro-slot .skills-intro {
+  padding-block-start: clamp(16px, 3dvh, 30px);
 }
 
 [data-intro-drop],

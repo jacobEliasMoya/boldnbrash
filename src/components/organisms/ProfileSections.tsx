@@ -3,7 +3,12 @@
 import { useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { IntroDropText } from '@/components/atoms/IntroDropText'
 import { WordEmphasis } from '@/components/atoms/WordEmphasis'
-import { clamp, skillParagraphEndPortion, skillTitleFillPortion } from './skillsTimeline'
+import {
+  clamp,
+  getIntroParagraphProgress,
+  skillParagraphEndPortion,
+  skillTitleFillPortion,
+} from './skillsTimeline'
 import { ExperienceMotion } from './ExperienceMotion'
 import {
   experienceRoles,
@@ -12,7 +17,7 @@ import {
   type ExperienceDock,
 } from './experienceTimeline'
 
-function AboutIntroduction() {
+function AboutIntroduction({ enhanced }: { enhanced: boolean }) {
   const [progress, setProgress] = useState(0)
 
   useEffect(() => {
@@ -23,15 +28,13 @@ function AboutIntroduction() {
     return () => window.removeEventListener('portfolio:about-intro', update)
   }, [])
 
-  // Match Work: fill the two title lines first, then pass emphasis through the paragraph.
+  // Fill both title lines before scroll starts revealing the paragraph.
   const intro = progress * skillParagraphEndPortion
   const fill = (line: number) =>
     ({
       '--title-fill': `${clamp(intro / (skillTitleFillPortion / 2) - line) * 100}%`,
     }) as CSSProperties
-  const paragraph = clamp(
-    (intro - skillTitleFillPortion) / (skillParagraphEndPortion - skillTitleFillPortion),
-  )
+  const paragraph = getIntroParagraphProgress(intro)
 
   return (
     <div className="about-introduction skills-heading">
@@ -50,13 +53,16 @@ function AboutIntroduction() {
           </a>
         </span>
       </h2>
-      <p className="skills-intro">
-        <WordEmphasis
-          text="Hey, I’m Jacob, a software engineer in Southern California. I’m curious about how things work, and I like making things fun to use."
-          progress={paragraph}
-          dropIn
-        />
-      </p>
+      <div className="skills-intro-slot">
+        <p className="skills-intro">
+          <WordEmphasis
+            text="Hey, I’m Jacob, a software engineer in Southern California. I’m curious about how things work, and I like making things fun to use."
+            progress={paragraph}
+            enabled={enhanced}
+            scrollReveal
+          />
+        </p>
+      </div>
     </div>
   )
 }
@@ -114,6 +120,7 @@ export function ProfileSections() {
     let inset = 0
     let gap = 0
     let boxes: { width: number; height: number; radius: number }[] = []
+    let painted: ReturnType<typeof getExperiencePositions> = []
 
     const paint = () => {
       const position = progress.get()
@@ -124,11 +131,13 @@ export function ProfileSections() {
         floor,
         gap,
         inset,
+        viewportWidth <= 900,
       )
       let shape: ExperienceDock | null = null
 
       for (const [index, role] of roles.entries()) {
         const pose = poses[index]
+        const previous = painted[index]
         const box = boxes[index]
         const outline = pose.entering
           ? getExperienceDock(
@@ -140,14 +149,31 @@ export function ProfileSections() {
             )
           : null
 
-        role.style.setProperty('--experience-y', `${pose.y}px`)
-        role.dataset.visible = String(pose.visible)
-        role.inert = !pose.visible || pose.entering
+        if (pose.y !== previous?.y) role.style.setProperty('--experience-y', `${pose.y}px`)
+
+        if (pose.tilt !== previous?.tilt) {
+          role.style.setProperty('--experience-tilt', `${pose.tilt}deg`)
+          role.toggleAttribute('data-receding', pose.tilt !== 0)
+        }
+
+        if (pose.depth !== previous?.depth)
+          role.style.setProperty('--experience-depth', `${pose.depth}px`)
+        if (pose.opacity !== previous?.opacity)
+          role.style.setProperty('--experience-opacity', String(pose.opacity))
+        if (pose.visible !== previous?.visible) role.dataset.visible = String(pose.visible)
+
+        role.inert = !pose.visible || (pose.entering && !pose.featured)
         role.toggleAttribute('data-docked', outline?.touching ?? false)
+
+        if (pose.featured !== previous?.featured) {
+          if (pose.featured) role.setAttribute('aria-current', 'true')
+          else role.removeAttribute('aria-current')
+        }
 
         if (outline) shape = { ...outline, x, y }
       }
 
+      painted = poses
       // Move the frame opening in the same update as the CSS pill.
       dock.set(shape)
       element.toggleAttribute('data-experience-started', position > 0)
@@ -165,18 +191,20 @@ export function ProfileSections() {
       inset = parseFloat(styles.getPropertyValue('--frame-inset')) || 12
       gap = parseFloat(getComputedStyle(list).rowGap) || 20
       top = title.getBoundingClientRect().bottom - y + gap
+
+      // Measure the layout box so the previous pose's tilt cannot distort the mask.
       boxes = roles.map((role) => {
-        const bounds = role.getBoundingClientRect()
         const pillStyles = getComputedStyle(role)
 
         return {
-          width: bounds.width,
-          height: bounds.height,
+          width: parseFloat(pillStyles.width),
+          height: parseFloat(pillStyles.height),
           radius: parseFloat(pillStyles.borderTopLeftRadius),
         }
       })
 
       element.style.setProperty('--experience-list-top', `${top}px`)
+      element.style.setProperty('--experience-wheel-center', `${(top + floor - inset) / 2}px`)
       paint()
     }
 
@@ -202,13 +230,15 @@ export function ProfileSections() {
         role.inert = false
         role.removeAttribute('data-visible')
         role.removeAttribute('data-docked')
+        role.removeAttribute('data-receding')
+        role.removeAttribute('aria-current')
       }
     }
   }, [enhanced, progress, dock])
 
   return (
     <div className="about-pages">
-      <AboutIntroduction />
+      <AboutIntroduction enhanced={enhanced} />
       <div className="about-reveal intro-period-reveal">
         <div ref={root} id="about-profile" className="experience" tabIndex={-1}>
           <h2 ref={heading} className="experience-heading">

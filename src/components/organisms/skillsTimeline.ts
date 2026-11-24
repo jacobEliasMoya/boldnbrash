@@ -206,6 +206,10 @@ export const skillParagraphEndPortion = (skillParagraphEnd - skillIntroStart) / 
 
 export const clamp = (value: number, min = 0, max = 1) => Math.max(min, Math.min(max, value))
 
+export function getIntroParagraphProgress(intro: number) {
+  return clamp((intro - skillTitleFillPortion) / (skillParagraphEndPortion - skillTitleFillPortion))
+}
+
 export function getSkillPosition(progress: number) {
   const position = clamp(progress) * skillTravel
   let index = skillSegments.findIndex((segment) => position < segment.start + segment.duration)
@@ -242,10 +246,19 @@ export function getSkillFrame(progress: number) {
   const projectPosition = previous + fraction
   const active = projectStops[Math.round(projectPosition)]
 
+  // Each category enters in the interval leading to its first project stop.
+  const entrance =
+    next === 0
+      ? { index: 0, phase: clamp(position / to.position) }
+      : from.skillIndex !== to.skillIndex
+        ? { index: to.skillIndex, phase: fraction }
+        : null
+
   return {
     index: active.skillIndex,
     projectIndex: active.projectIndex,
     projectPosition,
     ringPosition: from.skillIndex + (to.skillIndex - from.skillIndex) * fraction,
+    entrance,
   }
 }

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import {
+  aboutIntroEnd,
   sceneStops,
   skillParagraphEnd,
   skillStart,
@@ -12,8 +13,8 @@ const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000'
 
 async function scrollToPhase(page: Page, position: number) {
   await page.evaluate(
-    ({ value, segments, start }) => {
-      if (value >= start) {
+    ({ value, segments, start, end }) => {
+      if (value >= start && value < end) {
         const relative = value - start
         const index = segments.reduce(
           (selected, segment, i) => (segment.start <= relative ? i : selected),
@@ -42,7 +43,7 @@ async function scrollToPhase(page: Page, position: number) {
           ((track.offsetHeight - stage.clientHeight) * value) / Number(track.dataset.duration),
       )
     },
-    { value: position, segments: skillSegments, start: skillStart },
+    { value: position, segments: skillSegments, start: skillStart, end: sceneStops[2] - 1 },
   )
   await expect
     .poll(
@@ -62,49 +63,97 @@ for (const viewport of [
 ]) {
   test.describe(`paired scroll ${viewport.width}`, () => {
     test.use({ viewport })
-    test('paragraph words lift in sequence after the heading fills', async ({ page }) => {
-      await page.addInitScript(() => sessionStorage.setItem('portfolio:intro-seen', '1'))
-      await page.goto(`${baseURL}/#skills`)
-      await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 15000 })
+    for (const { id, start, end } of [
+      { id: 'skills', start: sceneStops[1], end: skillParagraphEnd },
+      { id: 'about', start: sceneStops[2], end: aboutIntroEnd },
+    ]) {
+      test(`${id} paragraph drops in word by word as the visitor scrolls`, async ({ page }) => {
+        await page.addInitScript(() => sessionStorage.setItem('portfolio:intro-seen', '1'))
+        await page.goto(`${baseURL}/#${id}`)
+        await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 15000 })
 
-      const paragraph = page.locator('#skills .skills-intro')
-      const words = paragraph.locator('.word-emphasis')
+        const panel = page.locator(`#${id}`)
+        const paragraph = panel.locator('p.skills-intro')
+        const words = paragraph.locator('.word-emphasis')
+        const heading = panel.locator('.skills-heading h2')
+        await expect(panel).toHaveAttribute('data-intro-drop-complete', '')
+        await expect(heading).toBeInViewport()
 
-      await expect(words.first()).toBeVisible()
+        const titleEnd = start + (skillStart - sceneStops[1]) * skillTitleFillPortion
+        const wordTravel = (end - titleEnd) / ((await words.count()) + 3)
+        const visibleWords = () =>
+          words.evaluateAll((elements) =>
+            elements.flatMap((element, index) =>
+              Number(getComputedStyle(element).opacity) > 0 ? [index] : [],
+            ),
+          )
 
-      const count = await words.count()
-      const titleEnd = sceneStops[1] + (skillStart - sceneStops[1]) * skillTitleFillPortion
-      const activeWords = () =>
-        words.evaluateAll((elements) =>
-          elements.flatMap((element, index) =>
-            getComputedStyle(element).transform === 'none' ? [] : [index],
-          ),
-        )
+        const scene = (await panel.boundingBox())!
+        const centered = (await heading.boundingBox())!
+        const centerX = scene.x + scene.width / 2
+        const centerY = scene.y + scene.height / 2
 
-      await expect
-        .poll(() => paragraph.textContent())
-        .toBe(
-          'See what I’ve built across client websites, design systems, and developer tools, plus a few experiments in 3D and AI.',
-        )
-      await scrollToPhase(page, titleEnd + ((skillParagraphEnd - titleEnd) * 2.5) / count)
-      await expect.poll(activeWords).toEqual([2])
-      await expect(page.locator('#skills .skills-title-fill').last()).toHaveCSS(
-        '--title-fill',
-        '100%',
-      )
+        // The heading fills at the center, then lifts to make room for the paragraph.
+        expect(Math.abs(centered.x + centered.width / 2 - centerX)).toBeLessThan(1)
+        expect(Math.abs(centered.y + centered.height / 2 - centerY)).toBeLessThan(1)
+        await expect.poll(visibleWords).toEqual([])
 
-      const playback = () =>
-        page.locator('.scene-track').getAttribute('data-playback-progress').then(Number)
-      const beforeWheel = await playback()
+        await scrollToPhase(page, titleEnd - 0.1)
+        expect((await heading.boundingBox())!.y).toBeCloseTo(centered.y, 0)
 
-      await page
-        .locator('.scene-track')
-        .dispatchEvent('wheel', { deltaY: 1800, bubbles: true, cancelable: true })
-      await expect.poll(playback).toBeGreaterThan(beforeWheel + 0.02)
-      expect(await playback()).toBeLessThan(beforeWheel + 0.13)
-      await scrollToPhase(page, titleEnd - 0.1)
-      await expect.poll(activeWords).toEqual([])
-    })
+        await scrollToPhase(page, titleEnd + wordTravel * 1.65)
+        await expect.poll(visibleWords).toEqual([0, 1])
+        await expect(words.first()).not.toHaveCSS('transform', 'none')
+        await expect(words.first()).toHaveCSS('--word-emphasis', '0%')
+        await expect(panel.locator('.skills-title-fill').last()).toHaveCSS('--title-fill', '100%')
+        const lifting = (await heading.boundingBox())!
+        expect(lifting.y).toBeLessThan(centered.y - 2)
+
+        await scrollToPhase(page, titleEnd + wordTravel * 3.55)
+        await expect(words.first()).not.toHaveCSS('--word-emphasis', '0%')
+        await expect(words.last()).toHaveCSS('opacity', '0')
+
+        const playback = () =>
+          page.locator('.scene-track').getAttribute('data-playback-progress').then(Number)
+        const beforeWheel = await playback()
+
+        await page
+          .locator('.scene-track')
+          .dispatchEvent('wheel', { deltaY: 1800, bubbles: true, cancelable: true })
+        await expect.poll(playback).toBeGreaterThan(beforeWheel + 0.02)
+        expect(await playback()).toBeLessThan(beforeWheel + 0.13)
+
+        await scrollToPhase(page, end + 0.03)
+        await expect(words.last()).toHaveCSS('opacity', '1')
+        await expect(words.last()).toHaveCSS('transform', 'none')
+        const settled = (await heading.boundingBox())!
+        const copy = (await paragraph.boundingBox())!
+        expect(settled.y).toBeLessThan(lifting.y - 2)
+        expect(Math.abs((settled.y + copy.y + copy.height) / 2 - centerY)).toBeLessThan(1)
+
+        // The circle still opens from the period after the heading has moved.
+        const clipOffset = () =>
+          panel.evaluate((section) => {
+            const canvas = section.querySelector('.intro-period-reveal')!
+            const period = section.querySelector('.skills-title-period')!.getBoundingClientRect()
+            const bounds = canvas.getBoundingClientRect()
+            const clip = getComputedStyle(canvas).clipPath.match(/at ([\d.]+)px ([\d.]+)px/)
+
+            if (!clip) return Infinity
+
+            return Math.hypot(
+              Number(clip[1]) - (period.left + period.width / 2 - bounds.left),
+              Number(clip[2]) - (period.top + period.height / 2 - bounds.top),
+            )
+          })
+
+        await expect.poll(clipOffset).toBeLessThan(1)
+
+        await scrollToPhase(page, titleEnd - 0.1)
+        await expect.poll(visibleWords).toEqual([])
+        expect((await heading.boundingBox())!.y).toBeCloseTo(centered.y, 0)
+      })
+    }
 
     test('period expands into the canvas behind synchronized skill and project wheels', async ({
       page,
@@ -114,12 +163,14 @@ for (const viewport of [
       await page.goto(`${baseURL}/#skills`)
       await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 15000 })
 
-      const intro = page.locator('.skills-heading')
+      const work = page.locator('#skills')
+      const intro = work.locator('.skills-heading')
 
+      await expect(work).toHaveAttribute('data-intro-drop-complete', '')
       await expect(intro).toHaveCSS('opacity', '1')
 
       const bounds = (await intro.boundingBox())!
-      const sceneBounds = (await page.locator('#skills').boundingBox())!
+      const sceneBounds = (await work.boundingBox())!
 
       expect(
         Math.abs(bounds.x + bounds.width / 2 - (sceneBounds.x + sceneBounds.width / 2)),
@@ -168,6 +219,8 @@ for (const viewport of [
         'false',
       )
       await expect(page.locator('.skills-performance')).not.toHaveCSS('opacity', '0')
+      await scrollToPhase(page, skillStart - 0.1)
+      await expect(page.locator('.skills-category-pill').first()).toHaveCSS('visibility', 'hidden')
       await scrollToPhase(page, skillStart + 1.1)
       await expect(intro).toHaveAttribute('aria-hidden', 'true')
 
@@ -190,6 +243,14 @@ for (const viewport of [
       else expect(left.y).toBeGreaterThan(right.y + right.height)
 
       await page.screenshot({ path: `test-results/duet-project-${viewport.width}.png` })
+
+      // Hold a gesture while checking the project wipe between native snap points.
+      await page.locator('.skills-performance').evaluate((target) => {
+        const event = new Event('touchstart', { bubbles: true })
+
+        Object.defineProperty(event, 'touches', { value: [{ clientX: 180, clientY: 480 }] })
+        target.dispatchEvent(event)
+      })
       await scrollToPhase(page, skillStart + 1.45)
 
       const incomingCard = page.locator('.skill-project-card[aria-label="This Portfolio"]')
@@ -223,6 +284,19 @@ for (const viewport of [
         )
         .toBeLessThan(1)
       await page.screenshot({ path: `test-results/card-circle-${viewport.width}.png` })
+
+      // The top card stays fully uncovered across its stop, including on reversal.
+      for (const position of [1.94, 1.96, 1.94]) {
+        await scrollToPhase(page, skillStart + position)
+        await expect(incomingCard).toHaveCSS('visibility', 'visible')
+        await expect
+          .poll(() =>
+            incomingCard.evaluate((card) => parseFloat(getComputedStyle(card).clipPath.slice(7))),
+          )
+          .toBeGreaterThan(145)
+      }
+
+      await page.locator('.skills-performance').dispatchEvent('touchend')
       await scrollToPhase(page, skillStart + 2.1)
       await expect(currentSkill).toContainText('Frontend Development')
 

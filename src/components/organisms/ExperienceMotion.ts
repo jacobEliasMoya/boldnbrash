@@ -2,8 +2,11 @@ import { createContext } from 'react'
 import type { MotionValue } from 'motion/react'
 import type { ExperienceDock } from './experienceTimeline'
 
-export const ExperienceMotion = createContext<{
+type PillEntranceMotion = {
   enhanced: boolean
   progress: MotionValue<number>
   dock: MotionValue<ExperienceDock | null>
-} | null>(null)
+}
+
+export const ExperienceMotion = createContext<PillEntranceMotion | null>(null)
+export const WorkPillMotion = createContext<PillEntranceMotion | null>(null)

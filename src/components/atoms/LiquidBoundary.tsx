@@ -19,12 +19,14 @@ export function LiquidBoundary({
   scrollProgress,
   scrollRecess,
   experienceDock,
+  workDock,
 }: {
   headerY: MotionValue<number>
   wordmarkY: MotionValue<number>
   scrollProgress: MotionValue<number>
   scrollRecess: MotionValue<number>
   experienceDock: MotionValue<ExperienceDock | null>
+  workDock: MotionValue<ExperienceDock | null>
 }) {
   const root = useRef<SVGSVGElement>(null)
   const surround = useRef<SVGSVGElement>(null)
@@ -76,6 +78,8 @@ export function LiquidBoundary({
     let surroundLeft = 0
     let surroundTop = 0
     let experienceOwnsFloor = false
+    let experienceMasked: boolean | undefined
+    let experienceTransform: string | undefined
     let pointerFloorPresence = 1
 
     function paintExperience(shape: ExperienceDock | null) {
@@ -91,20 +95,31 @@ export function LiquidBoundary({
         schedule()
       }
 
-      const masked = shape?.cut || shape?.recoil
+      const transform = shape ? `translate(${shape.x - surroundLeft} ${shape.y - surroundTop})` : ''
 
-      for (const group of [boundaryPaint.current, surroundPaint.current]) {
-        if (masked) group?.setAttribute('mask', `url(#${maskId})`)
-        else group?.removeAttribute('mask')
+      if (transform !== experienceTransform) {
+        for (const path of [dockCut.current, dockShoulders.current, dockRecoil.current]) {
+          path?.setAttribute('transform', transform)
+        }
+
+        experienceTransform = transform
       }
 
-      const transform = shape ? `translate(${shape.x - surroundLeft} ${shape.y - surroundTop})` : ''
-      dockCut.current?.setAttribute('transform', transform)
       dockCut.current?.setAttribute('d', shape?.cut ?? '')
-      dockShoulders.current?.setAttribute('transform', transform)
       dockShoulders.current?.setAttribute('d', shape?.shoulders ?? '')
-      dockRecoil.current?.setAttribute('transform', transform)
       dockRecoil.current?.setAttribute('d', shape?.recoil ?? '')
+
+      // Keep the mask attached across frames and update only its geometry during the pull.
+      const masked = Boolean(shape?.cut || shape?.recoil)
+
+      if (masked !== experienceMasked) {
+        for (const group of [boundaryPaint.current, surroundPaint.current]) {
+          if (masked) group?.setAttribute('mask', `url(#${maskId})`)
+          else group?.removeAttribute('mask')
+        }
+
+        experienceMasked = masked
+      }
     }
 
     svg.dataset.mode = media.matches ? 'static' : 'pointer'
@@ -415,7 +430,7 @@ export function LiquidBoundary({
       )
       position = wrap(position)
       targetPosition = wrap(targetPosition)
-      paintExperience(experienceDock.get())
+      paintDock()
       schedule()
     }
 
@@ -590,7 +605,12 @@ export function LiquidBoundary({
     const stopFollowing = [headerY, wordmarkY, scrollProgress, scrollRecess].map((value) =>
       value.on('change', schedule),
     )
-    const stopExperience = experienceDock.on('change', paintExperience)
+    function paintDock() {
+      paintExperience(workDock.get() ?? experienceDock.get())
+    }
+
+    const stopExperience = experienceDock.on('change', paintDock)
+    const stopWork = workDock.on('change', paintDock)
 
     measure()
     armIdle()
@@ -610,6 +630,7 @@ export function LiquidBoundary({
       cancelAnimationFrame(frame)
       stopFollowing.forEach((unsubscribe) => unsubscribe())
       stopExperience()
+      stopWork()
       document.querySelectorAll<HTMLElement>('[data-liquid-covered]').forEach((control) => {
         delete control.dataset.liquidCovered
       })
@@ -627,7 +648,7 @@ export function LiquidBoundary({
       document.removeEventListener('focusout', unfocus)
       media.removeEventListener('change', preferenceChanged)
     }
-  }, [headerY, wordmarkY, scrollProgress, scrollRecess, experienceDock, maskId])
+  }, [headerY, wordmarkY, scrollProgress, scrollRecess, experienceDock, workDock, maskId])
 
   return (
     <>

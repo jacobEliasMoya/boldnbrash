@@ -3,6 +3,9 @@
 import { Children, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   animate,
+  cancelFrame,
+  easeOut,
+  frame as motionFrame,
   motionValue,
   stagger,
   motion,
@@ -22,6 +25,9 @@ import {
   experienceStart,
   experienceEnd,
   sectionScrollRanges,
+  clamp,
+  getIntroParagraphProgress,
+  skillParagraphEndPortion,
   getScrollSection,
   skillSegments,
   skillStart,
@@ -50,7 +56,7 @@ import {
   toShowcaseTime,
   fromShowcaseTime,
 } from './scrollPlayback'
-import { ExperienceMotion } from './ExperienceMotion'
+import { ExperienceMotion, WorkPillMotion } from './ExperienceMotion'
 import type { ExperienceDock } from './experienceTimeline'
 import { useIntroReady } from '@/hooks/useIntroReady'
 import { useClientReady } from '@/hooks/useClientReady'
@@ -83,6 +89,18 @@ const origins = [
   [82, 72],
 ]
 
+function positionIntroCopy(copy: HTMLElement | null | undefined, intro: number) {
+  if (!copy) return
+
+  // Make room as the first few words arrive. Use the same scroll clock as the word reveal.
+  const paragraph = getIntroParagraphProgress(intro)
+  const row = `${easeOut(clamp(paragraph / 0.25))}fr`
+
+  if (copy.style.getPropertyValue('--intro-paragraph-row') !== row) {
+    copy.style.setProperty('--intro-paragraph-row', row)
+  }
+}
+
 export function SceneSequence({ children }: { children: ReactNode }) {
   const reduceMotion = useReducedMotion()
   const introReady = useIntroReady()
@@ -93,6 +111,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
   const timeline = useMotionValue(0)
   const experienceProgress = useMotionValue(0)
   const experienceDock = useMotionValue<ExperienceDock | null>(null)
+  const workProgress = useMotionValue(-1)
+  const workDock = useMotionValue<ExperienceDock | null>(null)
   const scrollProgress = useMotionValue(0)
   const scrollRecess = useSpring(1, { stiffness: 340, damping: 34, mass: 0.85 })
   const [scrollSection, setScrollSection] = useState(0)
@@ -104,6 +124,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
   const [active, setActive] = useState(0)
   const activeScene = scenes[active].id
   const experienceActive = activeScene === 'about' && scrollRange.label === 'Experience'
+  const workProjectsActive = activeScene === 'skills' && scrollRange.label === 'Work projects'
   const headerTone = activeScene === 'contact' ? 'dark' : 'paper'
   const [menuOpen, setMenuOpen] = useState(false)
   const toggleShowcase = useRef<(() => void) | null>(null)
@@ -124,18 +145,16 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     if (!panel) return
 
     const letters = Array.from(panel.querySelectorAll<HTMLElement>('[data-intro-drop="letter"]'))
-    const words = Array.from(panel.querySelectorAll<HTMLElement>('[data-intro-drop="word"]'))
-    const tokens = [...letters, ...words]
     const secondLine = letters.filter((letter) => letter.closest('.skills-title-line:nth-child(2)'))
     const firstLine = letters.slice(0, letters.length - secondLine.length)
     const letterGap = 0.036
     const spring = { type: 'spring', duration: 0.45, bounce: 0.1 } as const
     const appear = { type: 'tween' as const, duration: spring.duration, times: [0, 0.001, 1] }
 
-    // Prepare every token before making the heading visible to the scene reveal.
-    for (const token of tokens) token.style.opacity = '0'
+    // Prepare the letters before making the heading visible to the scene reveal.
+    for (const letter of letters) letter.style.opacity = '0'
 
-    // Compress the loader's stagger for the longer headings, then hand off to the words.
+    // Compress the loader's stagger for the longer headings. Scroll drives the paragraph.
     const entrance = animate([
       [
         firstLine,
@@ -149,16 +168,6 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           ...spring,
           at: firstLine.length * letterGap,
           delay: stagger(letterGap),
-          opacity: appear,
-        },
-      ],
-      [
-        words,
-        { y: ['-0.8em', '0em'], opacity: [0, 1, 1] },
-        {
-          ...spring,
-          at: (letters.length - 1) * letterGap + 0.24,
-          delay: stagger(0.042),
           opacity: appear,
         },
       ],
@@ -182,9 +191,9 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       panel.removeAttribute('data-intro-drop-complete')
       entrance.stop()
 
-      for (const token of tokens) {
-        token.style.removeProperty('opacity')
-        token.style.removeProperty('transform')
+      for (const letter of letters) {
+        letter.style.removeProperty('opacity')
+        letter.style.removeProperty('transform')
       }
     }
   }, [active, activeScene, enhanced, introReady, reduceMotion])
@@ -337,6 +346,9 @@ export function SceneSequence({ children }: { children: ReactNode }) {
   useEffect(() => {
     const previousScrollRestoration = history.scrollRestoration
     const media = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const compact = window.matchMedia('(max-width: 760px), (pointer: coarse)')
+    const workHeading = panels.current[1]?.querySelector<HTMLElement>('.skills-heading')
+    const aboutHeading = panels.current[2]?.querySelector<HTMLElement>('.about-introduction')
 
     let frame = 0
     let current = 0
@@ -351,6 +363,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     let gesturePlayback = false
     let gestureTargetClock = 0
     const playbackClock = motionValue(0)
+    let experienceInput: { clock: number; start: number; distance: number } | null = null
+    let experienceScrollY: number | undefined
     let snapTimer = 0
     let stopSnap: (() => void) | undefined
     let snapping = false
@@ -379,6 +393,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     let lastHeroFill = -1
     let stopShowcasePlayback: (() => void) | undefined
     let showcaseExpectedY = 0
+    let showcaseHoldingScroll = false
 
     function cancelSceneTransition() {
       sceneTransition?.stop?.()
@@ -562,6 +577,30 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       }, 420)
     }
 
+    function clearExperienceInput() {
+      if (experienceInput) cancelFrame(applyExperienceInput)
+
+      experienceInput = null
+      experienceScrollY = undefined
+    }
+
+    function applyExperienceInput() {
+      if (!experienceInput) return
+
+      const { clock, start, distance } = experienceInput
+      const progress = fromPlaybackTime(clock)
+      experienceInput = null
+
+      if (frame) cancelAnimationFrame(frame)
+
+      frame = 0
+      // Commit one scroll write per frame and use the exact input before the browser rounds scrollY.
+      window.scrollTo({ top: start + (distance * progress) / sceneDuration, behavior: 'instant' })
+      experienceScrollY = scrollY
+      hasScrolled = true
+      timeline.set(progress)
+    }
+
     // Route wheel and touch input through the same scene and project boundaries.
     function introTextReady(index: number) {
       return media.matches || panels.current[index]?.hasAttribute('data-intro-drop-complete')
@@ -606,8 +645,9 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         target = target.parentElement
       }
 
-      const start = window.scrollY + node.getBoundingClientRect().top
+      const start = experienceInput?.start ?? window.scrollY + node.getBoundingClientRect().top
       const distance =
+        experienceInput?.distance ??
         node.offsetHeight - (node.firstElementChild?.clientHeight ?? window.innerHeight)
 
       if (distance <= 0) return false
@@ -707,18 +747,20 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         Math.min(sceneDuration, ((window.scrollY - start) / distance) * sceneDuration),
       )
       const currentClock = toPlaybackTime(displayed)
+      const inExperience =
+        current === 2 && displayed >= experienceStart && requested <= experienceEnd
+      const reversing = inputDirection !== 0 && inputDirection !== direction
 
-      if (inputDirection && inputDirection !== direction) {
+      if (reversing) {
         // Reverse immediately rather than inheriting forward spring momentum.
         playbackClock.jump(currentClock)
       }
 
-      const base =
-        inputDirection && inputDirection !== direction
-          ? currentClock
-          : touchInput
-            ? gestureTargetClock
-            : toPlaybackTime(nativeProgress)
+      const hasExactPosition = inExperience && experienceScrollY === scrollY
+      const inputClock = touchInput
+        ? gestureTargetClock
+        : toPlaybackTime(hasExactPosition ? requested : nativeProgress)
+      const base = reversing ? currentClock : (experienceInput?.clock ?? inputClock)
 
       inputDirection = direction
 
@@ -731,15 +773,26 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           ? heroWalkOutEnd
           : sceneDuration
       const bounded = Math.max(0, Math.min(toPlaybackTime(limit), desired))
+      const proposed = fromPlaybackTime(bounded)
 
-      if (triggerSceneTransition(pixels, fromPlaybackTime(bounded), start, distance, touchInput))
+      if (triggerSceneTransition(pixels, proposed, start, distance, touchInput)) {
+        clearExperienceInput()
         return true
+      }
 
       // Accumulate fractional gesture travel before the browser rounds scrollY.
       if (touchInput) gestureTargetClock = bounded
 
+      if (inExperience && proposed >= experienceStart && proposed <= experienceEnd) {
+        experienceInput = { clock: bounded, start, distance }
+        motionFrame.update(applyExperienceInput)
+
+        return true
+      }
+
+      clearExperienceInput()
       window.scrollTo({
-        top: start + (distance * fromPlaybackTime(bounded)) / sceneDuration,
+        top: start + (distance * proposed) / sceneDuration,
         behavior: 'instant',
       })
       update()
@@ -854,6 +907,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     function render(value: number, immediate = false) {
       if ((sceneTransition || stopShowcasePlayback) && !immediate) return
 
+      if (immediate) clearExperienceInput()
+
       const next = Math.max(0, Math.min(sceneDuration, value))
 
       if (next === requested && stopPlayback && !immediate && !snapping) return
@@ -895,7 +950,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
 
       // Experience uses the same spring for touch and wheel, carrying velocity between inputs.
       const spring = experiencePlayback
-        ? { stiffness: 190, damping: 27, mass: 1, velocity }
+        ? { stiffness: 145, damping: 24.5, mass: 1, velocity }
         : introPlayback
           ? { stiffness: 230, damping: 30, mass: 0.9 }
           : gesturePlayback || heroPlayback
@@ -1066,6 +1121,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       }
 
       const skillProgress = Math.max(0, Math.min(1, (progress - skillStart) / skillTravel))
+
       const skillIntro = Math.max(
         0,
         Math.min(1, (progress - sceneStops[1]) / (skillStart - sceneStops[1])),
@@ -1077,6 +1133,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         skillIntro !== lastSkillIntro ||
         skillTextIntro !== lastSkillTextIntro
       ) {
+        if (skillTextIntro !== lastSkillTextIntro) positionIntroCopy(workHeading, skillTextIntro)
+
         lastSkillProgress = skillProgress
         lastSkillIntro = skillIntro
         lastSkillTextIntro = skillTextIntro
@@ -1092,6 +1150,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         : 0
 
       if (aboutIntro !== lastAboutIntro) {
+        // Update the layout before measuring the period for the circular reveal below.
+        positionIntroCopy(aboutHeading, aboutIntro * skillParagraphEndPortion)
         lastAboutIntro = aboutIntro
         window.dispatchEvent(new CustomEvent('portfolio:about-intro', { detail: aboutIntro }))
       }
@@ -1102,6 +1162,17 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       panels.current.forEach((panel, index) => {
         if (!panel) return
 
+        // Stop compositing earlier scenes once the opaque project or Experience stage covers them.
+        if (index < 2) {
+          const covered =
+            compact.matches && progress >= (index === 0 ? skillStart : experienceStart)
+          const display = covered ? 'none' : ''
+
+          if (panel.style.display !== display) panel.style.display = display
+
+          if (covered) return
+        }
+
         const reveal =
           index === 0
             ? 1
@@ -1110,11 +1181,11 @@ export function SceneSequence({ children }: { children: ReactNode }) {
               : Math.max(0, Math.min(1, progress - sceneStops[index] + 1))
 
         if (index > 0 && (reveal === 0 || reveal === 1)) {
-          panel.style.clipPath = reveal === 1 ? 'none' : 'circle(0px)'
-
+          const clip = reveal === 1 ? 'none' : 'circle(0px)'
           const ring = sceneOpenings.current[index]
 
-          if (ring) ring.style.visibility = 'hidden'
+          if (panel.style.clipPath !== clip) panel.style.clipPath = clip
+          if (ring && ring.style.visibility !== 'hidden') ring.style.visibility = 'hidden'
         } else if (index > 0) {
           const portal = panels.current[index - 1]?.querySelector(
             `[data-portal="${scenes[index].id}"]`,
@@ -1153,11 +1224,13 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           }
         }
 
-        panel.style.visibility = index === 0 || reveal > 0 ? 'visible' : 'hidden'
+        const visibility = index === 0 || reveal > 0 ? 'visible' : 'hidden'
+
+        if (panel.style.visibility !== visibility) panel.style.visibility = visibility
 
         if (scenes[index].id === 'about') {
           const options = panel.querySelector<HTMLElement>('.about-reveal')
-          const intro = panel.querySelector<HTMLElement>('.about-introduction')
+          const intro = aboutHeading
           const opening = Math.max(
             0,
             Math.min(1, (progress - aboutIntroEnd) / (experienceStart - aboutIntroEnd)),
@@ -1219,6 +1292,9 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           panel.setAttribute('aria-hidden', String(hidden))
         }
       })
+
+      // Restore a covered Work stage before measuring the category pill on reverse navigation.
+      workProgress.set(progress >= skillStart ? skillProgress : -1)
     }
 
     // Defer focus until navigation finishes so focus does not interrupt scrolling.
@@ -1237,11 +1313,15 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       }
     }
 
-    function schedule() {
+    function schedule(event?: Event) {
+      if (event?.type === 'scroll' && experienceScrollY === scrollY) return
+
+      if (event?.type === 'scroll') clearExperienceInput()
+
       if (stopShowcasePlayback) {
         if (Math.abs(scrollY - showcaseExpectedY) <= 1) return
 
-        pauseShowcase()
+        pauseShowcase(event)
       }
 
       if (sceneTransition) {
@@ -1258,6 +1338,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     }
 
     function resizeScene() {
+      clearExperienceInput()
       const node = track.current
 
       if (node && current === 2 && !media.matches && !sceneTransition && !stopShowcasePlayback) {
@@ -1276,6 +1357,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     }
 
     function setup() {
+      clearExperienceInput()
       pauseShowcase()
       cancelSceneTransition()
       cancelSnap()
@@ -1295,6 +1377,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         panels.current.forEach((panel) => {
           if (!panel) return
 
+          panel.style.display = ''
           panel.style.clipPath = ''
           panel.style.visibility = ''
           panel.inert = false
@@ -1475,11 +1558,30 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       if (index >= 0 && !media.matches) goTo(index, true, position)
     }
 
-    function pauseShowcase() {
+    function pauseShowcase(event?: Event) {
       if (!stopShowcasePlayback) return
 
       stopShowcasePlayback()
       stopShowcasePlayback = undefined
+
+      if (showcaseHoldingScroll) {
+        showcaseHoldingScroll = false
+        const node = track.current
+
+        // Manual input after pausing should start at the pill that was on screen.
+        if (node && event?.type !== 'scroll') {
+          const start = scrollY + node.getBoundingClientRect().top
+          const distance = node.offsetHeight - (node.firstElementChild?.clientHeight ?? innerHeight)
+
+          window.scrollTo({
+            top: start + (distance * displayed) / sceneDuration,
+            behavior: 'instant',
+          })
+          experienceScrollY = scrollY
+          gestureTargetClock = toPlaybackTime(displayed)
+        }
+      }
+
       setShowcasePlaying(false)
     }
 
@@ -1510,6 +1612,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
 
       if (!node || media.matches) return
 
+      clearExperienceInput()
       cancelSceneTransition()
       cancelSnap()
       stopPlayback?.()
@@ -1532,8 +1635,19 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       const playFrame = (time: number) => {
         const position = Math.min(sceneDuration, fromShowcaseTime(time))
 
-        window.scrollTo({ top: start + (distance * position) / sceneDuration, behavior: 'instant' })
-        showcaseExpectedY = scrollY
+        // The stage is already pinned. Avoid forcing mobile Safari to scroll and lay it out on every frame.
+        const inWork = position >= skillStart && position < sceneStops[2] - 1
+        const inExperience = position >= experienceStart && position < sceneStops[3] - 1
+        showcaseHoldingScroll = compact.matches && (inWork || inExperience)
+
+        if (!showcaseHoldingScroll) {
+          window.scrollTo({
+            top: start + (distance * position) / sceneDuration,
+            behavior: 'instant',
+          })
+          showcaseExpectedY = scrollY
+        }
+
         timeline.jump(position)
         render(position, true)
       }
@@ -1562,7 +1676,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           playSegment(first, end, finishShowcase)
         }
 
-        // Keep the reading clock at the scene entrance until the drop finishes.
+        // Keep the reading clock at the scene entrance until the heading lands.
         if (introTextReady(2)) resume()
         else resumeShowcaseAfterAboutDrop.current = resume
       }
@@ -1627,6 +1741,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       document.removeEventListener('scroll', interruptNestedScroll, true)
       document.removeEventListener('visibilitychange', pauseShowcase)
       history.scrollRestoration = previousScrollRestoration
+      clearExperienceInput()
       cancelSceneTransition()
       stopRendering()
       timeline.stop()
@@ -1653,7 +1768,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       window.removeEventListener('hashchange', restoreHash)
       media.removeEventListener('change', setup)
     }
-  }, [timeline, scrollProgress, scrollRecess, experienceProgress])
+  }, [timeline, scrollProgress, scrollRecess, experienceProgress, workProgress])
 
   // Switching from document flow to a sticky stage changes the track geometry.
   useEffect(() => {
@@ -1670,6 +1785,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         data-enhanced={enhanced ? '' : undefined}
         data-menu-open={menuOpen ? '' : undefined}
         data-experience-active={experienceActive ? '' : undefined}
+        data-work-projects={workProjectsActive ? '' : undefined}
       >
         <LiquidBoundary
           headerY={headerEntranceY}
@@ -1677,6 +1793,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           scrollProgress={scrollProgress}
           scrollRecess={scrollRecess}
           experienceDock={experienceDock}
+          workDock={workDock}
         />
         {enhanced && introReady && !menuOpen && (
           <ScrollPill
@@ -1895,6 +2012,12 @@ export function SceneSequence({ children }: { children: ReactNode }) {
                   >
                     {child}
                   </ExperienceMotion.Provider>
+                ) : scenes[index].id === 'skills' ? (
+                  <WorkPillMotion.Provider
+                    value={{ enhanced, progress: workProgress, dock: workDock }}
+                  >
+                    {child}
+                  </WorkPillMotion.Provider>
                 ) : (
                   child
                 )}

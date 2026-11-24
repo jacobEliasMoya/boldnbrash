@@ -10,6 +10,7 @@ import {
   sceneDuration,
   sceneStops,
   skillStart,
+  projectStops,
   experienceStart,
 } from '../../src/components/organisms/skillsTimeline'
 
@@ -37,6 +38,76 @@ test.beforeEach(async ({ page }) => {
   await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 15000 })
 })
 
+test('Work categories dock with the liquid and return to their project slot', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto(`${baseURL}/#${projectStops[0].id}`)
+  await expect(page.locator('.portfolio[data-work-projects]')).toBeVisible()
+
+  // Keep the project snap from moving a paused inspection point.
+  await page.locator('.skills-performance').evaluate((target) => {
+    const event = new Event('touchstart', { bubbles: true })
+
+    Object.defineProperty(event, 'touches', { value: [{ clientX: 900, clientY: 480 }] })
+    target.dispatchEvent(event)
+  })
+
+  const nextProject = projectStops.findIndex((stop) => stop.skillIndex === 1)
+  const from = projectStops[nextProject - 1].position
+  const to = projectStops[nextProject].position
+  const midEntry = skillStart + from + (to - from) * 0.43
+  const second = page.locator('.skills-category-pill').nth(1)
+  const first = page.locator('.skills-category-pill').first()
+
+  // Measure scale independently of the wheel's tilt and perspective.
+  const readScale = () =>
+    second.evaluate((pill) => {
+      const pose = new DOMMatrixReadOnly(getComputedStyle(pill).transform)
+
+      return { x: pose.m11, y: Math.hypot(pose.m22, pose.m23) }
+    })
+
+  await moveToBoundary(page, skillStart - 0.1)
+  await expect(first).toHaveCSS('visibility', 'hidden')
+  await expect(page.locator('.skills-reveal')).toHaveAttribute('inert', '')
+
+  await moveToBoundary(page, skillStart + projectStops[0].position * 0.43)
+  await expect(first).toHaveAttribute('data-work-docked', '')
+  await expect(first).toHaveCSS('visibility', 'visible')
+
+  await moveToBoundary(page, midEntry)
+  await expect(second).toHaveAttribute('data-work-docked', '')
+  const outgoingTilt = () =>
+    first.evaluate((pill) => new DOMMatrixReadOnly(getComputedStyle(pill).transform).m23)
+
+  await expect.poll(outgoingTilt).toBeCloseTo(0, 3)
+  const attached = (await second.boundingBox())!
+  const attachedScale = await readScale()
+  expect(attached.y + attached.height).toBeGreaterThan(900)
+
+  const edge = await sharp(await page.screenshot({ scale: 'css' }))
+    .extract({ left: Math.floor(attached.x + attached.width / 2), top: 899, width: 1, height: 1 })
+    .removeAlpha()
+    .raw()
+    .toBuffer()
+
+  expect(Array.from(edge)).toEqual([8, 8, 9])
+
+  await moveToBoundary(page, skillStart + to + 0.035)
+  await expect(second).toHaveAttribute('data-active', '')
+  await expect(second).not.toHaveAttribute('data-work-entering')
+  await expect.poll(outgoingTilt).toBeGreaterThan(0.3)
+  const settledScale = await readScale()
+  expect(settledScale.x).toBeCloseTo(attachedScale.x, 3)
+  expect(settledScale.y).toBeCloseTo(attachedScale.y, 3)
+  await expect(page.locator(`#${projectStops[nextProject].id}`)).not.toHaveAttribute('inert')
+
+  await moveToBoundary(page, midEntry)
+  await expect(second).toHaveAttribute('data-work-docked', '')
+
+  await moveToBoundary(page, skillStart - 0.1)
+  await expect(first).toHaveCSS('visibility', 'hidden')
+})
+
 test('Experience docks the entering role to the viewport and reverses cleanly', async ({
   page,
 }) => {
@@ -49,13 +120,24 @@ test('Experience docks the entering role to the viewport and reverses cleanly', 
   const about = page.locator('#about')
   const canvas = about.locator('.about-reveal')
   const nightMode = page.getByRole('button', { name: 'Night mode' })
-  const third = about.locator('[data-role="biziq-developer-i"]')
+  const second = about.locator('[data-role="biziq-developer-i"]')
+  const third = about.locator('[data-role="biziq-developer-ii"]')
   const thirdStart = experienceStart + experienceEntryTravel * 2
   const midEntry = thirdStart + experiencePillTravel * 0.43
 
   await moveToBoundary(page, midEntry)
   await expect(third).toHaveAttribute('data-docked', '')
-  await expect(about.locator('.experience-role')).toHaveCount(4)
+  await expect(second).toHaveAttribute('aria-current', 'true')
+  await expect(second).toHaveCSS('transform', 'none')
+  await expect(third).toHaveCSS('transform', 'none')
+  const docked = (await third.boundingBox())!
+  const focused = (await second.boundingBox())!
+  await expect(about.locator('.experience-role h3')).toHaveText([
+    'Junior Web Developer',
+    'Web Developer I',
+    'Web Developer II',
+    'Software Engineer',
+  ])
 
   async function expectDockPixels(surface: number[]) {
     const { data, info } = await sharp(await page.screenshot({ scale: 'css' }))
@@ -104,12 +186,20 @@ test('Experience docks the entering role to the viewport and reverses cleanly', 
   await expect(canvas).toHaveCSS('color', 'rgb(239, 235, 225)')
   await expectDockPixels([255, 255, 255])
 
+  await moveToBoundary(page, thirdStart + experiencePillTravel * 0.68)
+  const swell = page.locator('.liquid-experience-shoulders')
+  const raised = (await swell.boundingBox())!
+  const fullyDocked = (await third.boundingBox())!
+  const crestClearance = fullyDocked.y - raised.y
+  expect(crestClearance).toBeGreaterThan(16)
+  expect(crestClearance).toBeLessThan(27)
+
   await moveToBoundary(page, thirdStart + experiencePillTravel * 0.71)
   const lifting = (await third.boundingBox())!
-  const swell = page.locator('.liquid-experience-shoulders')
   expect(lifting.y + lifting.height).toBeLessThan(900)
   expect(lifting.y + lifting.height).toBeGreaterThan(888)
   await expect(third).toHaveAttribute('data-docked', '')
+  await expect(second).toHaveCSS('transform', 'none')
   await expect(swell).toHaveAttribute('d', / Q/)
 
   await moveToBoundary(page, thirdStart + experiencePillTravel * 0.76)
@@ -118,6 +208,8 @@ test('Experience docks the entering role to the viewport and reverses cleanly', 
   expect(cleared.y + cleared.height).toBeLessThan(888)
   await expect(third).not.toHaveAttribute('data-docked')
   await expect(swell).toHaveAttribute('d', / Q/)
+  await expect(second).toHaveCSS('transform', /^matrix3d\(/)
+  await expect(third).toHaveCSS('transform', 'none')
 
   // The spring can still overlap the pill after it clears the flat frame.
   const pillPixel = await sharp(await page.screenshot({ scale: 'css' }))
@@ -167,16 +259,38 @@ test('Experience docks the entering role to the viewport and reverses cleanly', 
   await expect(third).not.toHaveAttribute('data-docked')
   await expect(recoil).toHaveAttribute('d', '')
   await expect(swell).toHaveAttribute('d', '')
+  await expect(third).toHaveCSS('scale', 'none')
   const settled = (await third.boundingBox())!
+  expect(settled.width).toBeCloseTo(docked.width, 1)
+  expect(settled.height).toBeCloseTo(docked.height, 1)
   expect(settled.y + settled.height).toBeLessThan(900)
+  expect(settled.y + settled.height / 2).toBeCloseTo(focused.y + focused.height / 2, 0)
+  await expect(third).toHaveAttribute('aria-current', 'true')
+  await expect(second).toHaveCSS('opacity', '0.35')
+
+  const outgoing = await second.evaluate((element) => {
+    const pose = new DOMMatrixReadOnly(getComputedStyle(element).transform)
+
+    return { tilt: pose.m23, depth: pose.m43 }
+  })
+
+  // The departing pill rolls in Work's direction while moving back into depth.
+  expect(outgoing.tilt).toBeGreaterThan(0)
+  expect(outgoing.depth).toBeLessThan(0)
 
   await moveToBoundary(page, inwardDip)
   await expect(recoil).toHaveAttribute('d', / Q/)
 
   await moveToBoundary(page, midEntry)
   await expect(third).toHaveAttribute('data-docked', '')
+  await expect(second).toHaveAttribute('aria-current', 'true')
+  await expect(second).toHaveCSS('transform', 'none')
 
   await moveToBoundary(page, sceneStops[3] - 1 - 0.01)
+  const currentRole = about.locator('[data-role="inenvi-engineer"]')
+  await expect(currentRole).toHaveAttribute('aria-current', 'true')
+  await expect(currentRole).toHaveAttribute('data-portal', 'contact')
+
   await page.mouse.move(10, 400)
   await page.mouse.wheel(0, 120)
   await expect(page.locator('#contact')).toHaveAttribute('aria-hidden', 'false')

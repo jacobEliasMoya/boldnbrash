@@ -9,17 +9,26 @@ import {
   motion,
   useMotionValue,
   useReducedMotion,
-  useSpring,
   useTransform,
   type MotionValue,
+  type MotionStyle,
 } from 'motion/react'
 import { ProjectCover } from '@/components/atoms/ProjectCover'
 import { ProjectCTA } from '@/components/atoms/ProjectCTA'
 import { WordEmphasis } from '@/components/atoms/WordEmphasis'
 import { ProjectDialog } from './ProjectDialog'
+import {
+  pillWheelDepth,
+  pillWheelOpacity,
+  pillWheelRotation,
+  pillWheelVertical,
+  workPillScale,
+} from './pillWheel'
 import { getIntroPeriodGeometry, getPeriodOpening } from '@/components/atoms/periodOpening'
+import { useWorkPillEntrance } from '@/hooks/useWorkPillEntrance'
 import {
   clamp,
+  getIntroParagraphProgress,
   getSkillFrame,
   projectStops,
   skills,
@@ -54,45 +63,17 @@ function SkillCategoryPill({
 }) {
   const skill = skills[index]
   // A perspective ring brings the active skill forward while its neighbours tilt away.
-  const distance = useTransform(ringPosition, (position) => {
-    return (
-      ((((index - position + skills.length / 2) % skills.length) + skills.length) % skills.length) -
-      skills.length / 2
-    )
+  const distance = useTransform(ringPosition, (position) => index - position)
+  const rotation = useTransform(distance, (value) => pillWheelRotation(value, compact))
+  const vertical = useTransform(distance, (value) => pillWheelVertical(value, radius))
+  const depth = useTransform(distance, (value) => pillWheelDepth(value, radius, compact))
+  const opacity = useTransform(distance, (value) => {
+    // Finish fading the outgoing pill before removing it from the wheel.
+    return pillWheelOpacity(value) * clamp((value + 1.75) / 0.45)
   })
-  const rotation = useTransform(distance, (value) => clamp(-value * (compact ? 62 : 38), -81, 81))
-  const vertical = useTransform(distance, (value) => Math.sin((value * Math.PI) / 4) * radius)
-  const depth = useTransform(
-    distance,
-    (value) => (Math.cos((value * Math.PI) / 4) - 1) * radius * (compact ? 3.5 : 1),
-  )
-  const opacity = useTransform(distance, (value) => 1 - clamp(Math.abs(value)) * 0.65)
   const visibility = useTransform(distance, (value) =>
-    Math.abs(value) < 1.75 ? 'visible' : 'hidden',
+    value <= 0 && value > -1.75 ? 'visible' : 'hidden',
   )
-  const scaleX = useSpring(0.82, { stiffness: 340, damping: 17, mass: 0.8 })
-  const scaleY = useSpring(0.82, { stiffness: 260, damping: 14, mass: 0.8 })
-
-  useEffect(() => {
-    if (!animated) return
-
-    let focused: boolean | undefined
-    const update = (value: number) => {
-      // Pop only as the item reaches the centre, rather than halfway through a turn.
-      const next = active && Math.abs(value) < 0.12
-
-      if (next === focused) return
-
-      focused = next
-      scaleX.set(next ? 0.94 : 0.82)
-      scaleY.set(next ? 0.94 : 0.82)
-    }
-
-    update(distance.get())
-
-    return distance.on('change', update)
-  }, [active, animated, distance, scaleX, scaleY])
-
   const order = useTransform(distance, (value) => 20 - Math.round(Math.abs(value) * 4))
 
   return (
@@ -100,16 +81,18 @@ function SkillCategoryPill({
       role={animated ? 'listitem' : undefined}
       className="skills-category-pill"
       data-active={active ? '' : undefined}
-      style={{
-        rotateX: animated ? rotation : 0,
-        y: animated ? vertical : 0,
-        z: animated ? depth : 0,
-        opacity: animated ? opacity : 1,
-        scaleX: animated ? scaleX : 1,
-        scaleY: animated ? scaleY : 1,
-        visibility: animated ? visibility : 'visible',
-        zIndex: animated ? order : 1,
-      }}
+      style={
+        {
+          rotateX: animated ? rotation : 0,
+          y: animated ? vertical : 0,
+          z: animated ? depth : 0,
+          opacity: animated ? opacity : 1,
+          scale: animated ? workPillScale : 1,
+          visibility: animated ? visibility : 'visible',
+          zIndex: animated ? order : 1,
+          '--work-pill-scale': workPillScale,
+        } as MotionStyle
+      }
     >
       <div className="skills-category-current" data-skill={skill.name}>
         <span className="skills-category-number" aria-hidden="true">
@@ -165,7 +148,6 @@ function SkillProjects({
   const projectIndex = Math.round(clamp(localPosition, 0, skill.projects.length - 1))
   const outgoing = Math.floor(projectPosition)
   const incoming = Math.ceil(projectPosition)
-  const reveal = projectPosition - outgoing
   const visible = !animated || (first <= incoming && first + skill.projects.length - 1 >= outgoing)
 
   return (
@@ -205,7 +187,10 @@ function SkillProjects({
             inert={animated && (!active || position !== projectIndex)}
             style={
               {
-                '--card-reveal': `${first + position === incoming && incoming !== outgoing ? reveal * 150 : 150}%`,
+                '--card-reveal':
+                  first + position === incoming && incoming !== outgoing
+                    ? `${(projectPosition - outgoing) * 150}%`
+                    : '150%',
                 '--information-reveal': 1,
                 zIndex: 100 + position,
               } as CSSProperties
@@ -241,6 +226,7 @@ export function SkillsScene() {
   const [radius, setRadius] = useState(340)
   const [compactWheel, setCompactWheel] = useState(false)
   const ringPosition = useMotionValue(0)
+  useWorkPillEntrance(wheel, animated, ringPosition, radius, compactWheel)
 
   useLayoutEffect(() => {
     const element = wheel.current
@@ -249,11 +235,13 @@ export function SkillsScene() {
 
     const measure = () => {
       const compact = window.matchMedia('(max-width: 900px)').matches
+      const pills = Array.from(element.querySelectorAll<HTMLElement>('.skills-category-pill'))
+      const tallest = Math.max(0, ...pills.map((pill) => pill.offsetHeight * workPillScale))
 
       setCompactWheel(compact)
       setRadius(
         compact
-          ? Math.max(80, element.clientHeight * 0.6)
+          ? Math.max(80, element.clientHeight * 0.6, (tallest + 12) * Math.SQRT2)
           : Math.max(130, element.clientHeight * 0.46),
       )
     }
@@ -263,6 +251,7 @@ export function SkillsScene() {
     const observer = new ResizeObserver(measure)
 
     observer.observe(element)
+    element.querySelectorAll('.skills-category-pill').forEach((pill) => observer.observe(pill))
 
     return () => observer.disconnect()
   }, [animated])
@@ -272,9 +261,7 @@ export function SkillsScene() {
   const [portal, setPortal] = useState({ x: 0, y: 0, radius: 0, dot: 0, borderWidth: 12 })
   const revealStart = skillParagraphEndPortion
   const fillDuration = skillTitleFillPortion / 2
-  const paragraphProgress = clamp(
-    (selection.textIntro - skillTitleFillPortion) / (revealStart - skillTitleFillPortion),
-  )
+  const paragraphProgress = getIntroParagraphProgress(selection.textIntro)
   const expansion = animated ? clamp((selection.intro - revealStart) / (1 - revealStart)) : 1
   const titleFill = (line: number) =>
     animated ? clamp(selection.textIntro / fillDuration - line) * 100 : 0
@@ -322,8 +309,6 @@ export function SkillsScene() {
     }
   }, [animated])
   useLayoutEffect(() => {
-    ringPosition.set(selection.ringPosition)
-
     if (pendingCategoryFocus.current === selection.index) {
       const focusCategory = () => {
         pendingCategoryFocus.current = null
@@ -336,15 +321,25 @@ export function SkillsScene() {
 
       return () => cancelFrame(focusCategory)
     }
-  }, [selection.index, selection.ringPosition, ringPosition])
+  }, [selection.index])
   useEffect(() => {
     function update(event: Event) {
       const { progress, intro, textIntro } = (
         event as CustomEvent<{ progress: number; intro: number; textIntro: number }>
       ).detail
 
+      const next = getSkillFrame(progress)
+
+      // Commit the wipe and card visibility together when crossing a project stop.
       setPinned(true)
-      setSelection({ ...getSkillFrame(progress), intro, textIntro })
+      setSelection((previous) => {
+        const unchanged =
+          previous.projectPosition === next.projectPosition &&
+          previous.intro === intro &&
+          previous.textIntro === textIntro
+
+        return unchanged ? previous : { ...next, intro, textIntro }
+      })
     }
 
     window.addEventListener('portfolio:skills-progress', update)
@@ -409,13 +404,21 @@ export function SkillsScene() {
             </span>
           </h2>
         </div>
-        <p className="skills-intro">
-          <WordEmphasis text={introText} progress={paragraphProgress} enabled={animated} dropIn />
-        </p>
+        <div className="skills-intro-slot">
+          <p className="skills-intro">
+            <WordEmphasis
+              text={introText}
+              progress={paragraphProgress}
+              enabled={animated}
+              scrollReveal
+            />
+          </p>
+        </div>
       </div>
       {animated ? (
         <div
           className="skills-reveal intro-period-reveal"
+          data-revealed={expansion === 1 ? '' : undefined}
           inert={expansion < 1}
           aria-hidden={expansion < 1}
         >

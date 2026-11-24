@@ -61,7 +61,7 @@ test('the mobile liquid matches the pill corner radius throughout its entrance',
   await expect(page.locator('#about')).toHaveAttribute('data-about-stage', 'profile')
 
   const track = page.locator('.scene-track')
-  const pill = page.locator('[data-role="biziq-developer-i"]')
+  const pill = page.locator('[data-role="biziq-developer-ii"]')
   const start = experienceStart + 2 * experienceEntryTravel
 
   for (const phase of [0.43, 0.61, 0.43]) {
@@ -112,6 +112,66 @@ test('the mobile liquid matches the pill corner radius throughout its entrance',
     expect(Math.min(...widths)).toBeGreaterThan(4)
     expect(Math.max(...widths) - Math.min(...widths)).toBeLessThan(1)
   }
+})
+
+test('mobile Work showcase keeps the stage pinned until playback pauses', async ({ page }) => {
+  await page.goto(`${baseURL}/#${projectStops[0].id}`)
+  await expect(page.locator('.portfolio[data-work-projects]')).toBeVisible()
+
+  const track = page.locator('.scene-track')
+  const progress = () => track.getAttribute('data-playback-progress').then(Number)
+  const initialY = await page.evaluate(() => scrollY)
+
+  await page.getByRole('button', { name: 'Play showcase' }).click()
+  await expect.poll(progress).toBeGreaterThan(skillStart + projectStops[1].position - 0.2)
+  expect(await page.evaluate(() => scrollY)).toBe(initialY)
+  await expect(page.locator('#top')).toHaveCSS('display', 'none')
+  await expect(page.locator(`#${projectStops[1].id}`)).not.toHaveAttribute('inert')
+
+  await page.getByRole('button', { name: 'Pause showcase' }).click()
+  const paused = await progress()
+  const native = await track.evaluate((element, duration) => {
+    const travel = element.clientHeight - element.firstElementChild!.clientHeight
+
+    return (-element.getBoundingClientRect().top * duration) / travel
+  }, sceneDuration)
+
+  expect(native).toBeCloseTo(paused, 2)
+})
+
+test('mobile Experience showcase pauses at the visible pill without scrolling each frame', async ({
+  page,
+}) => {
+  await page.goto(`${baseURL}/#about-profile`)
+  await expect(page.locator('#about')).toHaveAttribute('data-about-stage', 'profile')
+
+  const track = page.locator('.scene-track')
+  const progress = () => track.getAttribute('data-playback-progress').then(Number)
+  const initialY = await page.evaluate(() => scrollY)
+
+  await page.getByRole('button', { name: 'Play showcase' }).click()
+  await expect.poll(progress).toBeGreaterThan(experienceStart + 0.4)
+  expect(await page.evaluate(() => scrollY)).toBe(initialY)
+  await expect(page.locator('#top')).toHaveCSS('display', 'none')
+  await expect(page.locator('#skills')).toHaveCSS('display', 'none')
+
+  await page.getByRole('button', { name: 'Pause showcase' }).click()
+  const paused = await progress()
+  const native = await track.evaluate((element, duration) => {
+    const travel = element.clientHeight - element.firstElementChild!.clientHeight
+
+    return (-element.getBoundingClientRect().top * duration) / travel
+  }, sceneDuration)
+
+  expect(native).toBeCloseTo(paused, 2)
+
+  await swipe(page, '#about-profile', 580, 510)
+  await expect.poll(progress).toBeGreaterThan(paused + 0.04)
+
+  await page.evaluate(() => {
+    location.hash = '#skills'
+  })
+  await expect(page.locator('#skills')).toBeVisible()
 })
 
 test('vertical touch input advances and reverses the scene clock', async ({ page }) => {
@@ -280,9 +340,13 @@ test('skills introduction fill responds to mobile wheel input and vertical swipe
     window.dispatchEvent(new CustomEvent('portfolio:select-scene', { detail: 1 })),
   )
 
-  const first = page.locator('.skills-title-fill').first()
+  const work = page.locator('#skills')
+  const first = work.locator('.skills-title-fill').first()
+  const firstWord = work.locator('.skills-intro .word-emphasis').first()
 
+  await expect(work).toHaveAttribute('data-intro-drop-complete', '')
   await expect(first).toHaveCSS('--title-fill', '0%')
+  await expect(firstWord).toHaveCSS('opacity', '0')
   await first.dispatchEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true })
   await expect
     .poll(async () =>
@@ -296,13 +360,16 @@ test('skills introduction fill responds to mobile wheel input and vertical swipe
 
   expect(consumed.every(Boolean)).toBe(true)
   await expect(first).toHaveCSS('--title-fill', '100%')
-  await swipe(page, '.skills-title-fill', 320, 620)
+
+  await swipe(page, '.skills-title-fill', 620, 160)
+  await expect(firstWord).toHaveCSS('opacity', '1')
+  await swipe(page, '.skills-title-fill', 160, 720)
   // Returning from the project reveal finishes at the full title before the
   // next gesture scrubs its fill backward.
   await expect(page.locator('.skills-reveal')).toHaveAttribute('aria-hidden', 'true')
   await swipe(page, '.skills-title-fill', 320, 620)
 
-  const second = page.locator('.skills-title-fill').nth(1)
+  const second = work.locator('.skills-title-fill').nth(1)
 
   await expect
     .poll(async () =>
@@ -311,6 +378,7 @@ test('skills introduction fill responds to mobile wheel input and vertical swipe
       ),
     )
     .toBeLessThan(100)
+  await expect(firstWord).toHaveCSS('opacity', '0')
 })
 
 test('long and short swipes advance one project and reverse across category gaps', async ({
