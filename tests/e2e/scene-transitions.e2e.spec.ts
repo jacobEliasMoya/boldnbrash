@@ -108,6 +108,33 @@ test('Work categories dock with the liquid and return to their project slot', as
   await expect(first).toHaveCSS('visibility', 'hidden')
 })
 
+test('Experience keeps its pill spacing when the entrance reverses on a small screen', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 568 })
+  await page.goto(`${baseURL}/#about-profile`)
+  await expect(page.locator('#about')).toHaveAttribute('data-about-stage', 'profile')
+  await page.evaluate(() => document.fonts.ready)
+
+  const incoming = page.locator('[data-role="biziq-developer-ii"]')
+  const start = experienceStart + 2 * experienceEntryTravel
+  const clearance = await incoming.evaluate((pill) =>
+    parseFloat(getComputedStyle(pill.parentElement!).rowGap),
+  )
+
+  for (const phase of [0.68, 0.86, 1, 1.12, 0.86, 0.68]) {
+    await moveToBoundary(page, start + phase * experiencePillTravel)
+
+    const gap = await incoming.evaluate(
+      (pill) =>
+        pill.getBoundingClientRect().top -
+        pill.previousElementSibling!.getBoundingClientRect().bottom,
+    )
+
+    expect(gap).toBeGreaterThanOrEqual(clearance - 0.5)
+  }
+})
+
 test('Experience docks the entering role to the viewport and reverses cleanly', async ({
   page,
 }) => {

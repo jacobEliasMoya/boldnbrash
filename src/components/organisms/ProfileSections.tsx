@@ -120,6 +120,7 @@ export function ProfileSections() {
     let top = 0
     let inset = 0
     let gap = 0
+    let perspective = 0
     let boxes: { width: number; height: number; radius: number }[] = []
     let painted: ReturnType<typeof getExperiencePositions> = []
 
@@ -133,6 +134,7 @@ export function ProfileSections() {
         gap,
         inset,
         viewportWidth <= 900,
+        perspective,
       )
       let shape: ExperienceDock | null = null
 
@@ -185,6 +187,7 @@ export function ProfileSections() {
     const measure = () => {
       const bounds = element.getBoundingClientRect()
       const styles = getComputedStyle(element)
+      const wheelStyles = getComputedStyle(list)
       x = bounds.left
       y = bounds.top
       viewportWidth = bounds.width
@@ -192,7 +195,8 @@ export function ProfileSections() {
       floor =
         (viewport && viewport.scale === 1 ? viewport.offsetTop + viewport.height : innerHeight) - y
       inset = parseFloat(styles.getPropertyValue('--frame-inset')) || 12
-      gap = parseFloat(getComputedStyle(list).rowGap) || 20
+      gap = parseFloat(wheelStyles.rowGap) || 20
+      perspective = parseFloat(wheelStyles.perspective) || Infinity
       top = title.getBoundingClientRect().bottom - y + gap
 
       // Measure the layout box so the previous pose's tilt cannot distort the mask.

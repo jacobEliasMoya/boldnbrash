@@ -3138,6 +3138,7 @@ ul {
 }
 /* The title period opens a canvas for the skills and projects. */
 .skills-duet.skills-index {
+  --work-pill-title-size: clamp(1.875rem, 3.4vw, 3.125rem);
   display: block;
 }
 :is(.skills-duet, .about-pages) .skills-heading {
@@ -3209,13 +3210,28 @@ ul {
   left: 0;
   width: 100%;
 }
-.skills-duet .skills-category-current h3,
 .experience-role h3 {
   font-size: clamp(30px, 3.4vw, 50px);
 }
+.skills-duet .skills-category-copy {
+  container-type: inline-size;
+}
 .skills-duet .skills-category-current h3 {
+  /* Keep the full title on one line even in the narrowest text column. */
+  font-size: min(var(--work-pill-title-size), var(--work-pill-title-fit, 9.7cqi));
+  white-space: nowrap;
   max-width: none;
   transform: none;
+}
+.skills-duet
+  .skills-category-current:is(
+    [data-skill='Frontend Development'],
+    [data-skill='AI & Agent Development']
+  ) {
+  --work-pill-title-fit: 8.4cqi;
+}
+.skills-duet .skills-category-current[data-skill='Design Systems & Accessibility'] {
+  --work-pill-title-fit: 6.7cqi;
 }
 .skills-duet .skills-technologies {
   margin-top: 0;
@@ -3321,9 +3337,14 @@ ul {
     perspective: 480px;
   }
   .skills-duet .skills-category-pill {
-    padding: 16px 22px;
+    padding: 16px clamp(10px, 20vw - 54px, 22px);
   }
-  .skills-duet .skills-category-current h3,
+  .skills-duet .skills-category-current {
+    gap: clamp(10px, 10vw - 22px, 16px);
+  }
+  .skills-duet.skills-index {
+    --work-pill-title-size: clamp(1.625rem, 6vw, 2.375rem);
+  }
   .experience-role h3 {
     font-size: clamp(26px, 6vw, 38px);
   }
@@ -3426,7 +3447,9 @@ ul {
   .skills-duet .skill-project-card h4 {
     font-size: 22px;
   }
-  .skills-duet .skills-category-current h3,
+  .skills-duet.skills-index {
+    --work-pill-title-size: 1.5rem;
+  }
   .experience-role h3 {
     font-size: 24px;
   }

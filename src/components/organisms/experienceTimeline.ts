@@ -179,6 +179,7 @@ export function getExperiencePositions(
   gap: number,
   inset: number,
   compact: boolean,
+  perspective: number,
 ) {
   const clock = clamp(progress) * heights.length
   const current = Math.min(heights.length - 1, Math.floor(clock))
@@ -196,7 +197,7 @@ export function getExperiencePositions(
   const turn = pillWheelTurn(release)
   const featured = current - (turn < 0.5 ? 1 : 0)
 
-  return heights.map((height, index) => {
+  const poses = heights.map((height, index) => {
     const rest = center(height)
     const recede = index < current ? current - index - 1 + turn : 0
     // Use the outgoing half of Work's wheel, sized to fit between the heading and the focused pill.
@@ -223,4 +224,32 @@ export function getExperiencePositions(
       entering: index === current && travel < experienceEntryTravel,
     }
   })
+
+  const origin = (top + floor - inset) / 2
+  let nextTop = incomingY
+
+  // Reserve the layout gap between the projected edges, starting with the flat incoming pill.
+  for (let index = current - 1; index >= 0 && poses[index].visible; index--) {
+    const pose = poses[index]
+    const halfHeight = heights[index] / 2
+    const angle = (pose.tilt * Math.PI) / 180
+    const edgeY = halfHeight * Math.cos(angle)
+    const edgeZ = halfHeight * Math.sin(angle)
+    const topScale = 1 / (1 - (pose.depth - edgeZ) / perspective)
+    const bottomScale = 1 / (1 - (pose.depth + edgeZ) / perspective)
+    const limit = nextTop - gap - origin
+
+    // Invert the projection for each edge to find how far down this pill can sit.
+    const maxY =
+      origin - halfHeight + Math.min(limit / topScale + edgeY, limit / bottomScale - edgeY)
+    const easeRoom = Math.max(0, gap / 2 - Math.abs(pose.y - maxY))
+
+    // Ease into the constraint so the wheel keeps moving smoothly in either scroll direction.
+    pose.y = Math.min(pose.y, maxY) - easeRoom ** 2 / (2 * gap)
+
+    const centerY = pose.y + halfHeight - origin
+    nextTop = origin + Math.min((centerY - edgeY) * topScale, (centerY + edgeY) * bottomScale)
+  }
+
+  return poses
 }
