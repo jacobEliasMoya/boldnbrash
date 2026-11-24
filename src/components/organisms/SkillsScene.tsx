@@ -22,6 +22,10 @@ import {
   pillWheelOpacity,
   pillWheelRotation,
   pillWheelVertical,
+  compactPillBottom,
+  workCompactDepth,
+  workCompactPitch,
+  workPillClearance,
   workPillScale,
 } from './pillWheel'
 import { getIntroPeriodGeometry, getPeriodOpening } from '@/components/atoms/periodOpening'
@@ -64,9 +68,13 @@ function SkillCategoryPill({
   const skill = skills[index]
   // A perspective ring brings the active skill forward while its neighbours tilt away.
   const distance = useTransform(ringPosition, (position) => index - position)
-  const rotation = useTransform(distance, (value) => pillWheelRotation(value, compact))
+  const rotation = useTransform(distance, (value) =>
+    pillWheelRotation(value, compact, workCompactPitch),
+  )
   const vertical = useTransform(distance, (value) => pillWheelVertical(value, radius))
-  const depth = useTransform(distance, (value) => pillWheelDepth(value, radius, compact))
+  const depth = useTransform(distance, (value) =>
+    pillWheelDepth(value, radius, compact, workCompactDepth),
+  )
   const opacity = useTransform(distance, (value) => {
     // Finish fading the outgoing pill before removing it from the wheel.
     return pillWheelOpacity(value) * clamp((value + 1.75) / 0.45)
@@ -237,13 +245,20 @@ export function SkillsScene() {
       const compact = window.matchMedia('(max-width: 900px)').matches
       const pills = Array.from(element.querySelectorAll<HTMLElement>('.skills-category-pill'))
       const tallest = Math.max(0, ...pills.map((pill) => pill.offsetHeight * workPillScale))
+      let compactRadius = Math.max(80, element.clientHeight * 0.6)
+      const maximumRadius = (tallest + workPillClearance) * Math.SQRT2
+
+      // Keep the orbit tight and expand it only as far as the tilted edges require.
+      while (
+        compact &&
+        compactRadius < maximumRadius &&
+        compactPillBottom(1, tallest, compactRadius) > -tallest / 2 - workPillClearance
+      ) {
+        compactRadius += 4
+      }
 
       setCompactWheel(compact)
-      setRadius(
-        compact
-          ? Math.max(80, element.clientHeight * 0.6, (tallest + 12) * Math.SQRT2)
-          : Math.max(130, element.clientHeight * 0.46),
-      )
+      setRadius(compact ? compactRadius : Math.max(130, element.clientHeight * 0.46))
     }
 
     measure()

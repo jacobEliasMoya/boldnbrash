@@ -56,7 +56,7 @@ function AboutIntroduction({ enhanced }: { enhanced: boolean }) {
       <div className="skills-intro-slot">
         <p className="skills-intro">
           <WordEmphasis
-            text="Hey, I’m Jacob, a software engineer in Southern California. I’m curious about how things work, and I like making things fun to use."
+            text="Hey, I’m Jacob. I’m a software engineer in Southern California. I like taking things apart to see how they work, then putting my own spin on them. I want the things I make to be useful and a little fun to figure out."
             progress={paragraph}
             enabled={enhanced}
             scrollReveal
@@ -90,6 +90,7 @@ function ExperienceRole({
           {record.employer} <span className="experience-dates">{record.dates}</span>
         </p>
         <h3>{record.role}</h3>
+        <p className="experience-detail">{record.detail}</p>
       </div>
     </li>
   )
@@ -160,6 +161,8 @@ export function ProfileSections() {
           role.style.setProperty('--experience-depth', `${pose.depth}px`)
         if (pose.opacity !== previous?.opacity)
           role.style.setProperty('--experience-opacity', String(pose.opacity))
+        if (pose.detail !== previous?.detail)
+          role.style.setProperty('--experience-detail', String(pose.detail))
         if (pose.visible !== previous?.visible) role.dataset.visible = String(pose.visible)
 
         role.inert = !pose.visible || (pose.entering && !pose.featured)

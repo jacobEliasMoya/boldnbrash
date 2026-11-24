@@ -127,6 +127,7 @@ test('Experience docks the entering role to the viewport and reverses cleanly', 
 
   await moveToBoundary(page, midEntry)
   await expect(third).toHaveAttribute('data-docked', '')
+  await expect(third.locator('.experience-detail')).toHaveCSS('opacity', '0')
   await expect(second).toHaveAttribute('aria-current', 'true')
   await expect(second).toHaveCSS('transform', 'none')
   await expect(third).toHaveCSS('transform', 'none')
@@ -199,7 +200,11 @@ test('Experience docks the entering role to the viewport and reverses cleanly', 
   expect(lifting.y + lifting.height).toBeLessThan(900)
   expect(lifting.y + lifting.height).toBeGreaterThan(888)
   await expect(third).toHaveAttribute('data-docked', '')
-  await expect(second).toHaveCSS('transform', 'none')
+  const liftOffTilt = await second.evaluate(
+    (role) => new DOMMatrixReadOnly(getComputedStyle(role).transform).m23,
+  )
+  expect(liftOffTilt).toBeGreaterThan(0)
+  expect(liftOffTilt).toBeLessThan(0.08)
   await expect(swell).toHaveAttribute('d', / Q/)
 
   await moveToBoundary(page, thirdStart + experiencePillTravel * 0.76)
@@ -266,7 +271,15 @@ test('Experience docks the entering role to the viewport and reverses cleanly', 
   expect(settled.y + settled.height).toBeLessThan(900)
   expect(settled.y + settled.height / 2).toBeCloseTo(focused.y + focused.height / 2, 0)
   await expect(third).toHaveAttribute('aria-current', 'true')
-  await expect(second).toHaveCSS('opacity', '0.35')
+  await expect
+    .poll(() =>
+      third
+        .locator('.experience-detail')
+        .evaluate((detail) => Number(getComputedStyle(detail).opacity)),
+    )
+    .toBeGreaterThan(0.95)
+  const outgoingOpacity = await second.evaluate((role) => Number(getComputedStyle(role).opacity))
+  expect(outgoingOpacity).toBeCloseTo(0.35, 2)
 
   const outgoing = await second.evaluate((element) => {
     const pose = new DOMMatrixReadOnly(getComputedStyle(element).transform)

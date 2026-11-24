@@ -1,15 +1,20 @@
 'use client'
 
 import { useContext, useLayoutEffect, type RefObject } from 'react'
-import { easeInOut, type MotionValue } from 'motion/react'
+import type { MotionValue } from 'motion/react'
 import { WorkPillMotion } from '@/components/organisms/ExperienceMotion'
 import {
   experienceEntryTravel,
   getExperienceDock,
   getPillLift,
 } from '@/components/organisms/experienceTimeline'
-import { workPillScale } from '@/components/organisms/pillWheel'
-import { clamp, getSkillFrame } from '@/components/organisms/skillsTimeline'
+import {
+  compactPillBottom,
+  pillWheelTurn,
+  workPillClearance,
+  workPillScale,
+} from '@/components/organisms/pillWheel'
+import { getSkillFrame } from '@/components/organisms/skillsTimeline'
 
 export function useWorkPillEntrance(
   wheel: RefObject<HTMLDivElement | null>,
@@ -88,13 +93,27 @@ export function useWorkPillEntrance(
 
       // Start turning the wheel at lift-off, using the same clock as the liquid release.
       const previous = boxes[entry.index - 1]
-      const clearance = compact && previous ? centerY + previous.height / 2 + 12 - y : 0
+      let turn = pillWheelTurn(release)
 
-      // Advance along the same arc if the rising pill would reach the outgoing pill.
-      const clearTurn = (Math.asin(clamp(clearance / radius, 0, Math.SQRT1_2)) * 4) / Math.PI
-      ringPosition.set(
-        entry.index === 0 ? 0 : entry.index - 1 + Math.max(easeInOut(release), clearTurn),
-      )
+      // Advance along the same arc only when the projected edges need more space.
+      if (compact && previous) {
+        const limit = y - centerY - workPillClearance
+
+        if (compactPillBottom(turn, previous.height, radius) > limit) {
+          let end = 1
+
+          for (let iteration = 0; iteration < 12; iteration += 1) {
+            const middle = (turn + end) / 2
+
+            if (compactPillBottom(middle, previous.height, radius) > limit) turn = middle
+            else end = middle
+          }
+
+          turn = end
+        }
+      }
+
+      ringPosition.set(entry.index === 0 ? 0 : entry.index - 1 + turn)
       dock.set(shape ? { ...shape, x: bounds.left, y: bounds.top } : null)
       // Reveal the wheel only after the incoming pill has been placed at the floor.
       browser.toggleAttribute('data-work-ready', true)

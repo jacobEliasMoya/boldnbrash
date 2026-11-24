@@ -4527,6 +4527,17 @@ ul {
   gap: 6px;
 }
 
+.experience-detail {
+  font-size: clamp(12px, 1.15vw, 16px);
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.portfolio[data-enhanced] .experience-detail {
+  opacity: var(--experience-detail, 0);
+  translate: 0 calc(6px * (1 - var(--experience-detail, 0)));
+}
+
 .experience-dates {
   display: inline-block;
   margin-inline-start: 0.25em;

@@ -656,7 +656,7 @@ test('about navigation and history work by keyboard', async ({ page }) => {
   await expect(page.locator('#about')).toHaveAttribute('aria-hidden', 'false')
   await expect(page.locator('#about')).toHaveAttribute('data-intro-drop-complete', '')
   await expect(page.locator('.about-introduction .skills-intro')).toHaveText(
-    'Hey, I’m Jacob, a software engineer in Southern California. I’m curious about how things work, and I like making things fun to use.',
+    'Hey, I’m Jacob. I’m a software engineer in Southern California. I like taking things apart to see how they work, then putting my own spin on them. I want the things I make to be useful and a little fun to figure out.',
   )
   await page.getByRole('link', { name: 'Read more about Jacob' }).press('Enter')
   await expect(page.locator('#about')).toHaveAttribute('data-about-stage', 'profile')

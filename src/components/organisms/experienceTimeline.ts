@@ -5,7 +5,13 @@ import {
   wordmarkPullPower,
   wordmarkPullRadius,
 } from '../atoms/liquidContour'
-import { pillWheelDepth, pillWheelOpacity, pillWheelRotation, pillWheelVertical } from './pillWheel'
+import {
+  pillWheelDepth,
+  pillWheelOpacity,
+  pillWheelRotation,
+  pillWheelTurn,
+  pillWheelVertical,
+} from './pillWheel'
 
 export const experienceRoles = [
   {
@@ -13,24 +19,28 @@ export const experienceRoles = [
     employer: 'VAREP National',
     role: 'Junior Web Developer',
     dates: '2019–2021',
+    detail: 'Helped rebuild a veterans nonprofit’s site from Joomla to WordPress.',
   },
   {
     id: 'biziq-developer-i',
     employer: 'BIZIQ',
     role: 'Web Developer I',
     dates: '2021–2022',
+    detail: 'Built and launched responsive client sites in WordPress and Shopify.',
   },
   {
     id: 'biziq-developer-ii',
     employer: 'BIZIQ',
     role: 'Web Developer II',
     dates: '2022–2025',
+    detail: 'Built reusable WordPress features, including a custom reviews template.',
   },
   {
     id: 'inenvi-engineer',
     employer: 'Inenvi',
     role: 'Software Engineer',
     dates: '2025–Present',
+    detail: 'Helped modernize a legacy web platform with Next.js and Strapi.',
   },
 ] as const
 
@@ -158,7 +168,7 @@ export function getPillLift(travel: number, height: number, rest: number, floor:
   const lifted =
     liftDistance * ease(lifting) + joinSpeed * liftTravel * lifting * (1 - lifting) ** 2
 
-  return { y: floor - exposed - lifted, release, lifted, liftDistance, lifting }
+  return { y: floor - exposed - lifted, release }
 }
 
 export function getExperiencePositions(
@@ -175,18 +185,15 @@ export function getExperiencePositions(
   const travel = (clock - current) * experienceEntryTravel
   const center = (height: number) => top + Math.max(0, (floor - inset - top - height) / 2)
   const incomingHeight = heights[current]
-  const {
-    y: incomingY,
-    release,
-    lifted,
-    liftDistance,
-    lifting,
-  } = getPillLift(travel, incomingHeight, center(incomingHeight), floor)
-
-  // Only turn the previous roles once the new pill clears the frame.
-  const turn = ease(
-    liftDistance > inset ? clamp((lifted - inset) / (liftDistance - inset)) : lifting,
+  const { y: incomingY, release } = getPillLift(
+    travel,
+    incomingHeight,
+    center(incomingHeight),
+    floor,
   )
+
+  // Use Work's lift-off timing while keeping the entering pill flat.
+  const turn = pillWheelTurn(release)
   const featured = current - (turn < 0.5 ? 1 : 0)
 
   return heights.map((height, index) => {
@@ -208,6 +215,9 @@ export function getExperiencePositions(
       tilt: pillWheelRotation(distance, compact),
       depth: pillWheelDepth(distance, radius, compact),
       opacity: pillWheelOpacity(distance) * (1 - clamp((recede - 1) / 0.6)),
+      // Reveal the detail at the end of the lift and fade it as the pill turns away.
+      detail:
+        index === current ? ease(clamp((release - 0.85) / 0.12)) : 1 - ease(clamp(recede * 2)),
       featured: index === featured,
       visible: y < floor && recede < 1.6,
       entering: index === current && travel < experienceEntryTravel,
