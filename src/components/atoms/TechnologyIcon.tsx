@@ -38,17 +38,29 @@ function TechnologyIcon({ icon }: { icon: TechnologyIconMatch }) {
 export function TechnologyIcons({
   technologies,
   className,
+  label,
 }: {
   technologies: readonly string[]
   className?: string
+  label?: string
 }) {
   const icons = resolveTechnologyIcons(technologies)
 
   return (
     <p className={className}>
-      {icons.map((icon, index) => (
-        <TechnologyIcon key={`${icon.label}-${index}`} icon={icon} />
-      ))}
+      {label && <strong>{label}</strong>}
+      {icons.map((icon, index) => {
+        const key = `${icon.label}-${index}`
+
+        return label ? (
+          <span className="technology-labeled-badge" key={key}>
+            <TechnologyIcon icon={icon} />
+            <span aria-hidden="true">{icon.label}</span>
+          </span>
+        ) : (
+          <TechnologyIcon key={key} icon={icon} />
+        )
+      })}
     </p>
   )
 }

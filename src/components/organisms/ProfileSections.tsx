@@ -88,12 +88,36 @@ function ExperienceRole({
       </div>
       <div className="experience-body">
         <p className="experience-detail">{record.detail}</p>
+        {record.stats && (
+          <dl className="experience-stats">
+            {record.stats.map(({ value, label }) => (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd>{value}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
         {record.highlight && (
           <p className="experience-highlight">
             <strong>{record.highlight.value}</strong> {record.highlight.label}
           </p>
         )}
-        <TechnologyIcons className="experience-technologies" technologies={record.technologies} />
+        <TechnologyIcons
+          className="experience-technologies"
+          technologies={record.technologies}
+          label={record.keyWork ? 'Tech:' : undefined}
+        />
+        {record.keyWork && (
+          <div className="experience-key-work">
+            <strong>Key Work:</strong>
+            <ul role="list">
+              {record.keyWork.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </li>
   )

@@ -399,6 +399,11 @@ test('Experience keeps its pill spacing when the entrance reverses on a small sc
 
     expect(gap).toBeGreaterThanOrEqual(clearance - 0.5)
   }
+
+  await moveToBoundary(page, start + experienceEntryTravel * 0.99)
+  await expect(incoming.getByText('Performance & UX', { exact: true })).toBeInViewport()
+  await expect(incoming.getByText('REST APIs', { exact: true })).toBeInViewport()
+  await expect(incoming).toBeInViewport({ ratio: 1 })
 })
 
 test('Experience docks the entering role to the viewport and reverses cleanly', async ({
@@ -571,9 +576,23 @@ test('Experience docks the entering role to the viewport and reverses cleanly', 
         .evaluate((detail) => Number(getComputedStyle(detail).opacity)),
     )
     .toBeGreaterThan(0.95)
-  for (const name of ['WordPress', 'PHP', 'WCAG']) {
+  await expect(third.locator('.experience-detail')).toHaveText(
+    'Built reusable WordPress features, including a custom reviews template.',
+  )
+  await expect(third.locator('.experience-stats dd')).toHaveText(['200+', '12K+', '50+'])
+  await expect(third.locator('.experience-stats dt')).toHaveText([
+    'Sites Built',
+    'Tasks Delivered',
+    'Custom Features',
+  ])
+  for (const name of ['WordPress', 'PHP', 'JavaScript', 'React', 'REST APIs']) {
     await expect(third.getByRole('img', { name, exact: true })).toBeVisible()
+    await expect(third.getByText(name, { exact: true })).toBeVisible()
   }
+  await expect(third.locator('.experience-key-work li')).toHaveText([
+    'Multi-site builds',
+    'Performance & UX',
+  ])
   await expect(second.locator('.experience-technologies')).toBeHidden()
 
   const outgoingOpacity = await second.evaluate((role) => Number(getComputedStyle(role).opacity))

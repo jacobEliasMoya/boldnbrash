@@ -15,6 +15,8 @@ import {
   pillWheelVertical,
 } from './pillWheel'
 
+type ExperienceStat = { value: string; label: string }
+
 type ExperienceRoleRecord = {
   id: string
   employer: string
@@ -22,7 +24,9 @@ type ExperienceRoleRecord = {
   dates: string
   detail: string
   technologies: readonly string[]
-  highlight?: { value: string; label: string }
+  highlight?: ExperienceStat
+  stats?: readonly ExperienceStat[]
+  keyWork?: readonly string[]
 }
 
 export const experienceRoles: readonly ExperienceRoleRecord[] = [
@@ -48,8 +52,14 @@ export const experienceRoles: readonly ExperienceRoleRecord[] = [
     employer: 'BIZIQ',
     role: 'Web Developer II',
     dates: '2022–2025',
-    detail: 'Built a reusable PHP reviews template and improved site accessibility.',
-    technologies: ['WordPress', 'PHP', 'WCAG'],
+    detail: 'Built reusable WordPress features, including a custom reviews template.',
+    stats: [
+      { value: '200+', label: 'Sites Built' },
+      { value: '12K+', label: 'Tasks Delivered' },
+      { value: '50+', label: 'Custom Features' },
+    ],
+    technologies: ['WordPress', 'PHP', 'JavaScript', 'React', 'REST APIs'],
+    keyWork: ['Multi-site builds', 'Performance & UX'],
   },
   {
     id: 'inenvi-engineer',
@@ -156,14 +166,14 @@ export function getExperienceDock(
   const emergence = clamp(exposed / Math.max(1, pill.height - inset))
   const mobileRise = Math.min(8, pill.height * 0.09) * ease(clamp((emergence - 0.97) / 0.03))
 
-  // Let the wide crest follow the pill with a shallower overhang.
+  // Keep the crest close to the frame when a pill has more résumé details.
   const projectRim = Math.min(inset * 0.64, 8) * ease(clamp(visible / 24))
   const lift =
     profile === 'project'
       ? visible + projectRim
       : narrow
         ? visible + rim + mobileRise
-        : exposed * 1.14
+        : exposed + Math.min(exposed * 0.14, inset * 2)
   const depth = getReleaseDepth(lift, inset, release, profile === 'project')
 
   // The spring can overlap the pill after it clears the flat frame.

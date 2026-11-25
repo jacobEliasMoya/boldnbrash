@@ -19,6 +19,7 @@ const technologies: readonly TechnologyDefinition[] = [
   { name: 'React', asset: 'react.svg', aliases: ['React.js', 'ReactJS'] },
   { name: 'Next.js', asset: 'nextdotjs.svg', aliases: ['Next', 'NextJS'] },
   { name: 'TypeScript', asset: 'typescript.svg', aliases: ['TS'] },
+  { name: 'JavaScript', asset: 'javascript.svg', aliases: ['JS'] },
   { name: 'Astro', asset: 'astro.svg' },
   { name: 'Strapi', asset: 'strapi.svg' },
   { name: 'GraphQL', asset: 'graphql.svg' },
