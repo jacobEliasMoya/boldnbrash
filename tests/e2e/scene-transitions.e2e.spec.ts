@@ -262,9 +262,28 @@ test('mobile Work project enters from the left and reverses', async ({ page }) =
     target.dispatchEvent(event)
   })
 
-  const entry = skillStart + getWorkOpeningTiming(true).projectStart + workProjectTravel * 0.25
+  const { copyStart, copyEnd, projectStart } = getWorkOpeningTiming(true)
+  const copyPhase = (phase: number) => skillStart + copyStart + (copyEnd - copyStart) * phase
+  const intro = page.locator('.skills-browser [data-wheel-static]')
+  const letters = intro.locator('.intro-title-glyph')
+  const words = intro.locator('.word-emphasis')
+
+  await moveToBoundary(page, copyPhase(0.23))
+  await expect(letters.first()).toHaveCSS('opacity', '1')
+  await expect(letters.last()).toHaveCSS('opacity', '0')
+  await expect(words.first()).toHaveCSS('opacity', '0')
+  await expect(card).toBeHidden()
+
+  await moveToBoundary(page, copyPhase(0.72))
+  await expect(letters.last()).toHaveCSS('transform', 'none')
+  await expect(words.first()).toHaveCSS('opacity', '1')
+  await expect(words.last()).toHaveCSS('opacity', '0')
+  await expect(card).toBeHidden()
+
+  const entry = skillStart + projectStart + workProjectTravel * 0.25
   await moveToBoundary(page, entry)
-  await expect(page.locator('.skills-browser [data-wheel-static]')).toHaveCSS('opacity', '1')
+  await expect(intro).toHaveCSS('opacity', '1')
+  await expect(words.last()).toHaveCSS('opacity', '1')
   await expect(page.locator('.skills-browser .skills-category-pill').first()).toBeHidden()
   const entering = (await card.boundingBox())!
   expect(entering.x).toBeLessThan(0)
@@ -289,6 +308,11 @@ test('mobile Work project enters from the left and reverses', async ({ page }) =
 
   await moveToBoundary(page, entry)
   await expect.poll(async () => (await card.boundingBox())!.x).toBeCloseTo(entering.x, 0)
+
+  await moveToBoundary(page, copyPhase(0.23))
+  await expect(letters.last()).toHaveCSS('opacity', '0')
+  await expect(words.first()).toHaveCSS('opacity', '0')
+  await expect(card).toBeHidden()
 })
 
 test('project details reuse the scroll pill with their own measured range', async ({ page }) => {

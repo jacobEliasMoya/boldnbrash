@@ -167,19 +167,23 @@ export const skills = skillCatalog.map((skill) => ({
   projects: [skill.projects[0]],
 }))
 
-// Each project gets one reading interval; selection and the final pause get 0.8.
-export const skillSegments = skills.map((skill, index) => ({
-  start: skills.slice(0, index).reduce((sum, item) => sum + item.projects.length + 1.6, 0),
-  duration: skill.projects.length + 1.6,
-}))
-export const skillTravel = skillSegments.reduce((sum, segment) => sum + segment.duration, 0)
-
 export const workCategoryTravel = 0.95
 export const workProjectTravel = 0.8
+const workCategorySettle = workCategoryTravel + workProjectTravel
 
-const workIntroCopyTravel = 0.25
+const workIntroCopyTravel = 1.05
 export const workIntroPillStart = workProjectTravel + workIntroCopyTravel
-export const workIntroSettle = workCategoryTravel + workProjectTravel
+export const workIntroSettle = workIntroPillStart + 0.7
+
+// Reserve time for the opening copy while keeping later project intervals intact.
+const workOpeningExtraTravel = workIntroSettle - workCategorySettle
+export const skillSegments = skills.map((skill, index) => ({
+  start:
+    skills.slice(0, index).reduce((sum, item) => sum + item.projects.length + 1.6, 0) +
+    (index === 0 ? 0 : workOpeningExtraTravel),
+  duration: skill.projects.length + 1.6 + (index === 0 ? workOpeningExtraTravel : 0),
+}))
+export const skillTravel = skillSegments.reduce((sum, segment) => sum + segment.duration, 0)
 
 export function getWorkOpeningTiming(compact: boolean) {
   // In the compact layout, the heading leads into the project beneath it.
@@ -254,7 +258,10 @@ export const projectStops = skills.flatMap((skill, skillIndex) =>
     id: workProjectId(project.title),
     skillIndex,
     projectIndex,
-    position: skillSegments[skillIndex].start + projectIndex + workIntroSettle,
+    position:
+      skillSegments[skillIndex].start +
+      projectIndex +
+      (skillIndex === 0 ? workIntroSettle : workCategorySettle),
   })),
 )
 
@@ -280,7 +287,10 @@ export function getSkillFrame(progress: number) {
           phase: clamp((position - workIntroPillStart) / (to.position - workIntroPillStart)),
         }
       : from.skillIndex !== to.skillIndex
-        ? { index: to.skillIndex, phase: clamp((fraction * workIntroSettle) / workCategoryTravel) }
+        ? {
+            index: to.skillIndex,
+            phase: clamp((fraction * workCategorySettle) / workCategoryTravel),
+          }
         : null
 
   return {

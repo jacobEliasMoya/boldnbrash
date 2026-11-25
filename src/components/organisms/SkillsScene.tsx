@@ -1,6 +1,7 @@
 'use client'
 
-import { IntroDropText } from '@/components/atoms/IntroDropText'
+import { IntroDropText, ScrollIntroDropText } from '@/components/atoms/IntroDropText'
+import { WordEmphasis } from '@/components/atoms/WordEmphasis'
 
 import { useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import {
@@ -211,11 +212,32 @@ function SkillProject({
   )
 }
 
-function SkillsWheelIntroCopy() {
+const workProjectsHeading = 'A Few Things I\u2019ve Made.'
+
+function SkillsWheelIntroCopy({ progress }: { progress?: number }) {
+  if (progress === undefined) {
+    return (
+      <>
+        <h3>{workProjectsHeading}</h3>
+        <p>{workProjectsCopy}</p>
+      </>
+    )
+  }
+
   return (
     <>
-      <h3>A Few Things I&rsquo;ve Made.</h3>
-      <p>{workProjectsCopy}</p>
+      <h3 aria-label={workProjectsHeading}>
+        <span aria-hidden="true">
+          <ScrollIntroDropText text={workProjectsHeading} progress={clamp(progress / 0.62)} />
+        </span>
+      </h3>
+      <p>
+        <WordEmphasis
+          text={workProjectsCopy}
+          progress={clamp((progress - 0.42) / 0.58)}
+          scrollReveal
+        />
+      </p>
     </>
   )
 }
@@ -224,17 +246,20 @@ function SkillsWheelIntro({ compact }: { compact: boolean }) {
   const progress = useContext(WorkPillMotion)?.progress
   const { copyStart, copyEnd } = getWorkOpeningTiming(compact)
 
-  // Follow the scene opening while staying independent of the category wheel.
-  const opacity = useTransform(() => {
+  // The type and the liquid entrances share one scroll clock in both directions.
+  const copy = useTransform(() => {
     const travel = (progress?.get() ?? 0) * skillTravel
 
-    return easeOut(clamp((travel - copyStart) / (copyEnd - copyStart)))
+    return clamp((travel - copyStart) / (copyEnd - copyStart))
   })
-  const visibility = useTransform(opacity, (value) => (value > 0 ? 'visible' : 'hidden'))
+  const [copyProgress, setCopyProgress] = useState(() => copy.get())
+  useMotionValueEvent(copy, 'change', setCopyProgress)
+  const opacity = useTransform(copy, (value) => (value > 0 ? 1 : 0))
+  const visibility = useTransform(copy, (value) => (value > 0 ? 'visible' : 'hidden'))
 
   return (
     <motion.li className="skills-wheel-intro" data-wheel-static style={{ opacity, visibility }}>
-      <SkillsWheelIntroCopy />
+      <SkillsWheelIntroCopy progress={copyProgress} />
     </motion.li>
   )
 }

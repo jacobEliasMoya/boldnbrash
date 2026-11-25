@@ -38,6 +38,7 @@ import {
 import { BlendedLogo } from '@/components/atoms/BlendedLogo'
 import { BlendedNav } from '@/components/atoms/BlendedNav'
 import { LiquidBoundary } from '@/components/atoms/LiquidBoundary'
+import { introDropSpring } from '@/components/atoms/IntroDropText'
 import { DotIcon } from '@/components/atoms/dot-icons/DotIcon'
 import { ScrollPill } from '@/components/atoms/ScrollPill'
 import { ThemeToggle } from '@/components/atoms/ThemeToggle'
@@ -97,7 +98,7 @@ const scrollLimits = {
 } as const
 
 const heroRevealTravel = sceneStops[1] - heroWalkOutEnd
-const workOpeningItemsDuration = 1.4
+const workOpeningSecondsPerUnit = 0.8
 const wordmarkDropStart = -100
 
 const origins = [
@@ -165,8 +166,11 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     const secondLine = letters.filter((letter) => letter.closest('.skills-title-line:nth-child(2)'))
     const firstLine = letters.slice(0, letters.length - secondLine.length)
     const letterGap = 0.036
-    const spring = { type: 'spring', duration: 0.45, bounce: 0.1 } as const
-    const appear = { type: 'tween' as const, duration: spring.duration, times: [0, 0.001, 1] }
+    const appear = {
+      type: 'tween' as const,
+      duration: introDropSpring.duration,
+      times: [0, 0.001, 1],
+    }
 
     // Prepare the letters before making the heading visible to the scene reveal.
     for (const letter of letters) letter.style.opacity = '0'
@@ -176,13 +180,13 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       [
         firstLine,
         { y: ['-0.85em', '0em'], opacity: [0, 1, 1] },
-        { ...spring, delay: stagger(letterGap), opacity: appear },
+        { ...introDropSpring, delay: stagger(letterGap), opacity: appear },
       ],
       [
         secondLine,
         { y: ['-0.18em', '0em'], opacity: [0, 1, 1] },
         {
-          ...spring,
+          ...introDropSpring,
           at: firstLine.length * letterGap,
           delay: stagger(letterGap),
           opacity: appear,
@@ -508,7 +512,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         // Keep the circle's original pace. The items follow their own eased shapes
         // at a steady timeline rate, in either direction.
         const secondsPerUnit = workItems
-          ? workOpeningItemsDuration / workIntroSettle
+          ? workOpeningSecondsPerUnit
           : openingWork
             ? introPeriodRevealDuration / (skillStart - skillTitleEnd)
             : (range.end === experienceStart
