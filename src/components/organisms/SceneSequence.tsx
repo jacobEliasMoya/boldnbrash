@@ -57,7 +57,7 @@ import {
   toShowcaseTime,
   fromShowcaseTime,
 } from './scrollPlayback'
-import { ExperienceMotion, WorkPillMotion } from './ExperienceMotion'
+import { ExperienceMotion, WorkPillMotion, type WorkDock } from './ExperienceMotion'
 import type { ExperienceDock } from './experienceTimeline'
 import { useIntroReady } from '@/hooks/useIntroReady'
 import { useClientReady } from '@/hooks/useClientReady'
@@ -91,6 +91,9 @@ const scrollLimits = {
   touchClockLead: 2.5,
   wheelClockLead: 0.5,
   workLead: 0.45,
+  desktopWorkLead: 1,
+  desktopWorkProjectPixels: 360,
+  desktopWorkCommitPortion: 0.18,
   springVelocity: 8,
 } as const
 
@@ -127,7 +130,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
   const experienceProgress = useMotionValue(0)
   const experienceDock = useMotionValue<ExperienceDock | null>(null)
   const workProgress = useMotionValue(-1)
-  const workDock = useMotionValue<ExperienceDock | null>(null)
+  const workDock = useMotionValue<WorkDock | null>(null)
   const scrollProgress = useMotionValue(0)
   const scrollRecess = useSpring(1, { stiffness: 340, damping: 34, mass: 0.85 })
   const [scrollSection, setScrollSection] = useState(0)
@@ -384,6 +387,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     let stopSnap: (() => void) | undefined
     let snapping = false
     let snapExpectedY = 0
+    let lastWorkWheelAt = -Infinity
 
     const workOpeningRange = { start: skillParagraphEnd, end: skillStart + workIntroSettle }
     const transitionRanges = [
@@ -577,7 +581,11 @@ export function SceneSequence({ children }: { children: ReactNode }) {
 
         // The reveal's final scroll position can round up by a fraction of a pixel.
         // Leave the first card at the reveal boundary until the visitor scrolls again.
-        if (requested <= skillStart + 0.01 || displayed > skillStart + skillTravel) return
+        if (
+          requested <= skillStart + 0.01 ||
+          requested > skillStart + projectStops[projectStops.length - 1].position + 0.01
+        )
+          return
 
         const nearest = projectStops.reduce((best, stop) =>
           Math.abs(skillStart + stop.position - requested) <
@@ -585,25 +593,65 @@ export function SceneSequence({ children }: { children: ReactNode }) {
             ? stop
             : best,
         )
-        const target = skillStart + nearest.position
+        let target = skillStart + nearest.position
+
+        // Commit early in the visitor's direction instead of repeatedly pulling
+        // short desktop gestures back across the halfway point.
+        if (!compact.matches && performance.now() - lastWorkWheelAt < 1200) {
+          const position = requested - skillStart
+          const upperIndex = projectStops.findIndex((stop) => stop.position > position + 0.003)
+          const lower = projectStops[Math.max(0, upperIndex - 1)]
+          const upper = projectStops[upperIndex]
+
+          if (upper && position > lower.position + 0.003) {
+            const fraction = (position - lower.position) / (upper.position - lower.position)
+            const commit = scrollLimits.desktopWorkCommitPortion
+            target =
+              skillStart +
+              (inputDirection > 0
+                ? fraction >= commit
+                  ? upper.position
+                  : lower.position
+                : fraction <= 1 - commit
+                  ? lower.position
+                  : upper.position)
+          }
+        }
 
         // Every pause lands on a complete project, including between skill categories.
         if (Math.abs(target - displayed) < 0.003) return
 
-        const start = scrollY
         const trackTop = scrollY + node.getBoundingClientRect().top
         const distance = node.offsetHeight - (node.firstElementChild?.clientHeight ?? innerHeight)
-        const destination = trackTop + (distance * target) / sceneDuration
-        const duration = 480 + Math.min(1, Math.abs(target - displayed)) * 260
+        const startTime = toPlaybackTime(displayed)
+        const targetTime = toPlaybackTime(target)
+        const velocity = clamp(
+          playbackClock.getVelocity(),
+          -scrollLimits.springVelocity,
+          scrollLimits.springVelocity,
+        )
 
+        // Continue the visible pose and velocity on the shared clock. Animating
+        // the document from its queued target caused a second acceleration/jump.
+        stopPlayback?.()
+        stopPlayback = undefined
         snapping = true
         node.dataset.snapping = 'true'
 
-        const control = animate(start, destination, {
-          duration: duration / 1000,
-          ease: [0.65, 0, 0.35, 1],
-          onUpdate: (top) => {
-            window.scrollTo({ top, behavior: 'instant' })
+        const control = animate(startTime, targetTime, {
+          type: 'spring',
+          stiffness: 145,
+          damping: 24.5,
+          mass: 1,
+          velocity,
+          restDelta: 0.0005,
+          restSpeed: 0.005,
+          onUpdate: (time) => {
+            const position = fromPlaybackTime(time)
+            window.scrollTo({
+              top: trackTop + (distance * position) / sceneDuration,
+              behavior: 'instant',
+            })
             snapExpectedY = window.scrollY
             update()
           },
@@ -789,13 +837,35 @@ export function SceneSequence({ children }: { children: ReactNode }) {
 
             travel = direction * Math.min(Math.abs(pixels) * touch.projectSwipe.gain, remaining)
 
-            if (!travel) return true
+            // Let the same drag leave Work after its final project has settled.
+            const last = skillStart + projectStops[projectStops.length - 1].position
+            if (!travel && direction > 0 && requested >= last - 0.01) {
+              touch.projectSwipe = null
+              travel = pixels * 1.25
+            } else if (!travel) return true
           }
         }
 
+        const desktopWork =
+          !touchInput &&
+          !compact.matches &&
+          !readingIntro &&
+          displayed >= skillStart &&
+          requested <= skillStart + projectStops[projectStops.length - 1].position
+
+        if (desktopWork) {
+          lastWorkWheelAt = performance.now()
+
+          // Map a short wheel gesture to one project interval, independently of
+          // viewport height and the much longer document-wide scroll track.
+          const interval = projectStops[1].position - projectStops[0].position
+          travel *= (interval * distance) / (sceneDuration * scrollLimits.desktopWorkProjectPixels)
+        }
+
         if (!touchInput && !readingIntro && !sceneTransition) {
-          // Bound trackpad momentum in Work as well as the reading introductions.
-          const lead = Math.max(0, scrollLimits.workLead - direction * (requested - displayed))
+          // Limit queued movement even with the more responsive desktop mapping.
+          const maximumLead = desktopWork ? scrollLimits.desktopWorkLead : scrollLimits.workLead
+          const lead = Math.max(0, maximumLead - direction * (requested - displayed))
           travel = direction * Math.min(Math.abs(travel), (lead * distance) / sceneDuration)
           if (!travel) return true
         }
@@ -1037,6 +1107,9 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       const targetTime = toPlaybackTime(requested)
       const difference = Math.abs(targetTime - currentTime)
       const heroPlayback = Math.min(displayed, requested) < heroWalkOutEnd
+      const workPlayback =
+        Math.max(displayed, requested) >= skillStart &&
+        Math.min(displayed, requested) <= skillStart + skillTravel
       const experiencePlayback =
         Math.max(displayed, requested) >= experienceStart &&
         Math.min(displayed, requested) <= experienceEnd
@@ -1052,14 +1125,16 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         return
       }
 
-      // Experience uses the same spring for touch and wheel, carrying velocity between inputs.
-      const spring = experiencePlayback
-        ? { stiffness: 145, damping: 24.5, mass: 1, velocity }
-        : introPlayback
-          ? { stiffness: 230, damping: 30, mass: 0.9 }
-          : gesturePlayback || heroPlayback
-            ? { stiffness: 420, damping: 42, mass: 0.9 }
-            : null
+      // Keep one shared clock for the project, pill, and liquid frame. Carry velocity
+      // across wheel/touch updates so each event continues the motion already in flight.
+      const spring =
+        experiencePlayback || workPlayback
+          ? { stiffness: 145, damping: 24.5, mass: 1, velocity }
+          : introPlayback
+            ? { stiffness: 230, damping: 30, mass: 0.9 }
+            : gesturePlayback || heroPlayback
+              ? { stiffness: 420, damping: 42, mass: 0.9 }
+              : null
 
       const control = animate(playbackClock, targetTime, {
         ...(spring

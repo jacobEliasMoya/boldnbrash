@@ -188,16 +188,23 @@ function roundedLiquidSwell(pull: BottomLiquidPull, pill: RoundedPill) {
 
 // Project cards need their own shoulders: a broad, flat crest follows the image
 // frame, then tangent-matched cubics ease back into the viewport edge.
+export type ProjectShoulderBounds = { start: number; end: number }
+
 export function projectLiquidContour(
   pull: BottomLiquidPull,
   card: { width: number; corner: number; rim: number },
+  bounds?: ProjectShoulderBounds,
 ) {
   const { width, floor, inset, center, depth } = pull
   const edge = floor - inset - liquidFrameOverlap
   const half = Math.min(card.width / 2 + card.rim, width / 2 - inset)
   const reach = Math.min(96, Math.max(24, card.corner * 2.4))
-  const left = Math.max(inset + liquidFrameCorner, center - half - reach)
-  const right = Math.min(width - inset - liquidFrameCorner, center + half + reach)
+  const left = Math.max(bounds?.start ?? 0, inset + liquidFrameCorner, center - half - reach)
+  const right = Math.min(
+    bounds?.end ?? width,
+    width - inset - liquidFrameCorner,
+    center + half + reach,
+  )
 
   if (depth < 0) {
     // Keep the returning dip local to the card rather than pulling the whole edge.

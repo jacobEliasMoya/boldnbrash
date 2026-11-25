@@ -5,6 +5,7 @@ import {
   liquidFrameOverlap,
   wordmarkPullPower,
   wordmarkPullRadius,
+  type ProjectShoulderBounds,
 } from '../atoms/liquidContour'
 import {
   pillWheelDepth,
@@ -119,6 +120,7 @@ export function getExperienceDock(
   width: number,
   release: number,
   profile: 'pill' | 'project' = 'pill',
+  projectShoulderBounds?: ProjectShoulderBounds,
 ) {
   if (pill.top >= floor) return null
 
@@ -176,11 +178,11 @@ export function getExperienceDock(
   }
   const contour =
     profile === 'project'
-      ? projectLiquidContour(pullShape, {
-          width: pill.width,
-          corner,
-          rim: projectRim,
-        })
+      ? projectLiquidContour(
+          pullShape,
+          { width: pill.width, corner, rim: projectRim },
+          projectShoulderBounds,
+        )
       : bottomLiquidContour(pullShape)
 
   return { cut, touching, shoulders: depth > 0 ? contour : '', recoil: depth < 0 ? contour : '' }

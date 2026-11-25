@@ -5,9 +5,9 @@ export function Correspondence() {
     <div className="contact-scene scene-content">
       <p className="eyebrow">04 — Contact</p>
       <h2>
-        Have something
+        Have Something
         <br />
-        in mind?
+        In Mind?
       </h2>
       <a className="email-link" href="mailto:jemoya1994@gmail.com">
         Get in touch{' '}

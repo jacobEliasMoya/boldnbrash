@@ -60,9 +60,19 @@ test('Work categories dock with the liquid and return to their project slot', as
   const to = projectStops[nextProject].position
   const midEntry = skillStart + from + (to - from) * (0.95 / 1.75) * 0.43
   const earlyTurn = skillStart + from + (to - from) * 0.35
+  const lateTurn = skillStart + from + (to - from) * 0.46
   const second = page.locator('.skills-category-pill').nth(1)
   const first = page.locator('.skills-category-pill').first()
   const intro = page.locator('ul.skills-browser > li[data-wheel-static]:first-child')
+  const outgoingCard = page.locator(`#${projectStops[0].id}`)
+  const incomingCard = page.locator(`#${projectStops[nextProject].id}`)
+  const readSlide = (card = outgoingCard) =>
+    card.evaluate((element) => {
+      const style = getComputedStyle(element)
+      const pose = new DOMMatrixReadOnly(style.transform)
+
+      return { x: pose.m41, z: pose.m43, opacity: Number(style.opacity) }
+    })
 
   // Rotation about the X axis leaves the X scale readable throughout the turn.
   const readScale = (pill = second) =>
@@ -108,12 +118,32 @@ test('Work categories dock with the liquid and return to their project slot', as
   await moveToBoundary(page, earlyTurn)
   await expect.poll(outgoingTilt).toBeGreaterThan(0.01)
   await expect.poll(outgoingScale).toBeLessThan(attachedScale.x - 0.01)
+  await expect(outgoingCard).toHaveAttribute('data-project-exiting', '')
+  await expect.poll(async () => (await readSlide()).z).toBeLessThan(0)
   const earlyScale = await outgoingScale()
+  const earlySlide = await readSlide()
+  expect(earlySlide.x).toBeCloseTo(0)
+  expect(earlySlide.opacity).toBeLessThan(1)
 
-  // The category must stay visible after settling while its project is still entering.
+  await moveToBoundary(page, lateTurn)
+  await expect(incomingCard).toHaveAttribute('data-project-entering', '')
+  await expect.poll(async () => (await readSlide(incomingCard)).x).toBeLessThan(0)
+  await expect.poll(async () => (await readSlide()).opacity).toBeLessThan(earlySlide.opacity)
+  await expect(page.locator('.liquid-experience-shoulders')).toHaveAttribute(
+    'transform',
+    /^translate\([^)]*\)\s*$/,
+  )
+  await expect(page.locator('.liquid-work-project-shoulders')).toHaveAttribute(
+    'transform',
+    /matrix\(0 1 -1 0/,
+  )
+  await page.screenshot({ path: test.info().outputPath('work-project-and-pill-liquid.png') })
+
+  // Both sides settle before the reading interval begins.
   await moveToBoundary(page, skillStart + skillSegments[1].start + 0.7)
   await expect(second).toHaveCSS('visibility', 'visible')
   await expect(second).not.toHaveAttribute('data-work-entering')
+  await expect(incomingCard).toHaveCSS('transform', 'none')
 
   await moveToBoundary(page, skillStart + to + 0.035)
   await expect(second).toHaveAttribute('data-active', '')
@@ -122,6 +152,7 @@ test('Work categories dock with the liquid and return to their project slot', as
   await expect(intro).toHaveCSS('transform', 'none')
   await expect(intro).toHaveCSS('opacity', '1')
   expect(await intro.boundingBox()).toEqual(introBounds)
+  expect((await second.boundingBox())!.x).toBeCloseTo(introBounds!.x, 1)
   const settledScale = await readScale()
   expect(settledScale.x).toBeCloseTo(attachedScale.x, 3)
   expect(settledScale.y).toBeCloseTo(attachedScale.y, 3)
@@ -129,6 +160,7 @@ test('Work categories dock with the liquid and return to their project slot', as
 
   await moveToBoundary(page, earlyTurn)
   await expect.poll(outgoingScale).toBeCloseTo(earlyScale, 2)
+  await expect.poll(async () => Math.abs((await readSlide()).z - earlySlide.z)).toBeLessThan(1)
 
   await moveToBoundary(page, midEntry)
   await expect(second).toHaveAttribute('data-work-docked', '')
@@ -154,11 +186,13 @@ test('a page-mode wheel burst cannot queue multiple Work categories', async ({ p
         }),
       )
   })
-  // A release must settle locally rather than continue through several categories.
-  await page.waitForTimeout(700)
-  const position = Number(await page.locator('.scene-track').getAttribute('data-playback-progress'))
-  expect(position).toBeGreaterThan(initial)
-  expect(position).toBeLessThan(initial + 0.5)
+  // A release commits to one adjacent project even for an oversized wheel burst.
+  const track = page.locator('.scene-track')
+  await expect
+    .poll(() => track.getAttribute('data-playback-progress').then(Number))
+    .toBeCloseTo(skillStart + projectStops[1].position, 2)
+  await expect(track).not.toHaveAttribute('data-snapping')
+  await expect(page.locator(`#${projectStops[1].id}`)).not.toHaveAttribute('inert')
 })
 
 test('desktop Work project enters from the left and reverses', async ({ page }) => {
@@ -674,6 +708,7 @@ test('a short mobile drag reveals the project, intro, and pill in order and reve
   const wheel = page.locator('ul.skills-browser')
   const intro = wheel.locator(':scope > li[data-wheel-static]:first-child')
   await expect(wheel.locator(':scope > :not(li)')).toHaveCount(0)
+  await expect(page.locator('.skills-project-caption')).toHaveCount(0)
   await expect(intro).toHaveCSS('opacity', '1')
   await expect(intro).toHaveCSS('transform', 'none')
   const first = wheel.locator('.skills-category-pill').first()
@@ -684,6 +719,7 @@ test('a short mobile drag reveals the project, intro, and pill in order and reve
   expect(introBounds.y - (headerBounds.y + headerBounds.height)).toBeGreaterThanOrEqual(24)
   expect(projectBounds.y - (introBounds.y + introBounds.height)).toBeGreaterThanOrEqual(12)
   expect(pillBounds.y - (projectBounds.y + projectBounds.height)).toBeGreaterThanOrEqual(12)
+  expect(introBounds.x).toBeCloseTo(pillBounds.x, 1)
   await page.screenshot({ path: test.info().outputPath('work-opening-mobile.png') })
   await page.locator(`#${projectStops[0].id}`).getByRole('button').click({ trial: true })
   await drag(-1)

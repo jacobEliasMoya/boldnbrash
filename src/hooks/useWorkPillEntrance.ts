@@ -7,6 +7,7 @@ import {
   experienceEntryTravel,
   getExperienceDock,
   getPillLift,
+  type ExperienceDock,
 } from '@/components/organisms/experienceTimeline'
 import {
   compactPillBottom,
@@ -17,9 +18,7 @@ import {
 import {
   clamp,
   getSkillFrame,
-  skillSegments,
   skillTravel,
-  workCategoryTravel,
   workProjectTravel,
 } from '@/components/organisms/skillsTimeline'
 
@@ -37,8 +36,9 @@ export function useWorkPillEntrance(
   useLayoutEffect(() => {
     const browser = wheel.current
     const stage = browser?.closest<HTMLElement>('.skills-reveal')
+    const projectSlot = stage?.querySelector<HTMLElement>('.skills-projects')
 
-    if (!animated || !browser || !stage || !progress || !dock) return
+    if (!animated || !browser || !stage || !projectSlot || !progress || !dock) return
 
     const pills = Array.from(browser.querySelectorAll<HTMLElement>('.skills-category-pill'))
     const intro = browser.querySelector<HTMLElement>('[data-wheel-static]')
@@ -47,88 +47,145 @@ export function useWorkPillEntrance(
     let inset = 0
     let boxes: { width: number; height: number; radius: number }[] = []
 
-    const projects = Array.from(stage.querySelectorAll<HTMLElement>('.skill-project-card'))
-    const captions = Array.from(stage.querySelectorAll<HTMLElement>('.skills-project-caption'))
+    const projects = Array.from(
+      projectSlot.querySelectorAll<HTMLElement>('.skills-project-deck'),
+      (deck) => ({
+        deck,
+        card: deck.querySelector<HTMLElement>('.skill-project-card')!,
+      }),
+    )
+    let activeProject: (typeof projects)[number] | undefined
+    let projectPhase: number | undefined
 
-    const projectOffsets = new Map<HTMLElement, number>()
+    const clearProject = () => {
+      if (!activeProject) return
 
-    // Give the card and category separate turns with the shared liquid renderer.
-    const paintProjects = (position: number) => {
-      const travel = position * skillTravel
-      let projectDock = null
+      const { deck, card } = activeProject
+      deck.removeAttribute('data-project-visible')
+      card.removeAttribute('data-project-entering')
+      card.removeAttribute('data-project-exiting')
+      card.removeAttribute('inert')
+      card.style.removeProperty('transform')
+      card.style.removeProperty('opacity')
+    }
 
-      const stageBounds = stage.getBoundingClientRect()
+    const paintProject = (position: number, wheelPosition: number, measuredStage?: DOMRect) => {
+      const index = Math.ceil(wheelPosition)
+      const distance = wheelPosition - index
+      // Overlap the receding card and the left entrance throughout the turn.
+      const phase =
+        wheelPosition === 0
+          ? clamp((position * skillTravel) / workProjectTravel)
+          : clamp(1 + distance)
+      const project = phase > 0 ? projects[index] : undefined
 
-      projects.forEach((project, index) => {
-        const start = index === 0 ? 0 : skillSegments[index].start + workCategoryTravel
-        const phase = clamp((travel - start) / workProjectTravel)
-        const entering = phase > 0 && phase < 1
-        project.toggleAttribute('data-project-entering', entering)
-        project.style.clipPath = 'none'
-        project.style.opacity = phase > 0 ? '1' : '0'
-        project.style.pointerEvents = phase === 1 ? '' : 'none'
-        if (captions[index]) {
-          // Let the deck's accessibility state hide captions after a category change.
-          if (phase < 1) captions[index].style.opacity = String(clamp((phase - 0.8) / 0.2))
-          else captions[index].style.removeProperty('opacity')
-        }
+      if (project !== activeProject) {
+        clearProject()
+        activeProject = project
+        projectPhase = undefined
+        project?.deck.setAttribute('data-project-visible', '')
+      }
 
-        if (!entering) {
-          project.style.transform = 'translateX(0px)'
-          projectOffsets.set(project, 0)
-          return
-        }
+      projects.forEach(({ deck, card }, projectIndex) => {
+        if (projectIndex === index) return
 
-        // Read the current pose without clearing transforms and forcing another layout.
-        // Only the entering card needs a measurement; hidden and settled cards do not.
-        const bounds = project.getBoundingClientRect()
-        const previousOffset = projectOffsets.get(project) ?? 0
-        const rest = stageBounds.width - (bounds.right - previousOffset - stageBounds.left)
-        const entryFloor = stageBounds.width + stageBounds.left
-        const { y, release } = getPillLift(
-          phase * experienceEntryTravel,
-          bounds.width,
-          rest,
-          entryFloor,
-        )
-
-        const offset = rest - y
-        projectOffsets.set(project, offset)
-        project.style.transform = `translateX(${offset}px)`
-
-        if (phase > 0 && phase < 1) {
-          const shape = getExperienceDock(
-            {
-              width: bounds.height,
-              height: bounds.width,
-              radius: parseFloat(getComputedStyle(project).borderTopLeftRadius) || 0,
-              x: bounds.top + bounds.height / 2 - stageBounds.top,
-              top: y,
-            },
-            entryFloor,
-            inset,
-            stageBounds.height,
-            release,
-            'project',
-          )
-
-          if (shape) {
-            projectDock = {
-              ...shape,
-              x: stageBounds.left,
-              y: stageBounds.top,
-              transform: `matrix(0 1 -1 0 ${stageBounds.width} 0)`,
-            }
-          }
-        }
+        const outgoing = projectIndex === index - 1 && phase > 0 && phase < 1
+        deck.toggleAttribute('data-project-visible', outgoing)
+        card.toggleAttribute('data-project-exiting', outgoing)
+        card.toggleAttribute('inert', outgoing)
+        card.style.opacity = outgoing ? `${1 - phase}` : ''
+        card.style.transform = outgoing
+          ? `translateZ(${-80 * phase}px) scale(${1 - 0.04 * phase})`
+          : ''
       })
 
-      return projectDock
+      if (!project) return null
+
+      const moving = phase < 1
+      if (!moving && phase === projectPhase) return null
+
+      projectPhase = phase
+      const { card } = project
+      card.toggleAttribute('data-project-entering', moving && distance <= 0)
+      card.toggleAttribute('data-project-exiting', moving && distance > 0)
+      card.toggleAttribute('inert', moving)
+
+      card.style.opacity = '1'
+
+      if (!moving) {
+        card.style.removeProperty('transform')
+        return null
+      }
+
+      // Measure the stationary slot instead of the card's translated box.
+      const stageBounds = measuredStage ?? stage.getBoundingClientRect()
+      const slot = projectSlot.getBoundingClientRect()
+      const heading = compact ? intro?.getBoundingClientRect() : undefined
+      const rest = stageBounds.right - slot.right
+      const entryFloor = stageBounds.width + stageBounds.left
+      const { y, release } = getPillLift(
+        phase * experienceEntryTravel,
+        slot.width,
+        rest,
+        entryFloor,
+      )
+
+      card.style.transform = `translateX(${rest - y}px)`
+
+      // Keep the side pull inside the project gutters when the heading sits above it.
+      const stacked =
+        heading &&
+        heading.bottom <= slot.top &&
+        heading.left < slot.right &&
+        heading.right > slot.left
+      const shoulderBounds = stacked
+        ? {
+            start: Math.max(heading.bottom + 4, slot.top - 12) - stageBounds.top,
+            end: slot.bottom + 12 - stageBounds.top,
+          }
+        : undefined
+
+      const shape = getExperienceDock(
+        {
+          width: slot.height,
+          height: slot.width,
+          radius: parseFloat(getComputedStyle(card).borderTopLeftRadius) || 0,
+          x: slot.top + slot.height / 2 - stageBounds.top,
+          top: y,
+        },
+        entryFloor,
+        inset,
+        stageBounds.height,
+        release,
+        'project',
+        shoulderBounds,
+      )
+
+      return shape
+        ? {
+            ...shape,
+            x: stageBounds.left,
+            y: stageBounds.top,
+            transform: `matrix(0 1 -1 0 ${stageBounds.width} 0)`,
+          }
+        : null
+    }
+
+    const paintTurn = (
+      position: number,
+      wheelPosition: number,
+      pill: ExperienceDock | null = null,
+      stageBounds?: DOMRect,
+    ) => {
+      ringPosition.set(wheelPosition)
+
+      const project = paintProject(position, wheelPosition, stageBounds)
+
+      dock.set(pill || project ? { pill, project } : null)
     }
 
     const paint = () => {
       const position = progress.get()
-      const projectDock = paintProjects(position)
       const frame = getSkillFrame(position)
       const entry = position < 0 ? null : frame.entrance
       const pill =
@@ -149,10 +206,8 @@ export function useWorkPillEntrance(
       }
 
       if (!pill || !entry) {
-        // The category settles before its project enters. Hold the completed turn
-        // instead of dropping back onto the slower project interpolation mid-gesture.
-        ringPosition.set(entry?.index ?? frame.ringPosition)
-        dock.set(projectDock)
+        // Hold the completed turn through the reading interval.
+        paintTurn(position, entry?.index ?? frame.ringPosition)
         browser.toggleAttribute('data-work-ready', position >= 0 && (!entry || entry.phase === 1))
         return
       }
@@ -210,8 +265,9 @@ export function useWorkPillEntrance(
         }
       }
 
-      ringPosition.set(Math.max(0, entry.index - 1 + turn))
-      dock.set(shape ? { ...shape, x: bounds.left, y: bounds.top } : null)
+      const pillDock = shape ? { ...shape, x: bounds.left, y: bounds.top } : null
+
+      paintTurn(position, Math.max(0, entry.index - 1 + turn), pillDock, bounds)
       // Reveal the wheel only after the incoming pill has been placed at the floor.
       browser.toggleAttribute('data-work-ready', true)
     }
@@ -235,6 +291,7 @@ export function useWorkPillEntrance(
     const observer = new ResizeObserver(measure)
     observer.observe(stage)
     observer.observe(browser)
+    observer.observe(projectSlot)
     if (intro) observer.observe(intro)
     pills.forEach((pill) => observer.observe(pill))
     // Measure and update the shared clock before Motion renders its transforms.
@@ -256,13 +313,14 @@ export function useWorkPillEntrance(
       active?.removeAttribute('data-work-entering')
       active?.removeAttribute('data-work-docked')
       active?.style.removeProperty('--work-entry-y')
-      projects.forEach((project) => {
-        project.removeAttribute('data-project-entering')
-        for (const property of ['transform', 'clip-path', 'opacity', 'pointer-events']) {
-          project.style.removeProperty(property)
-        }
+      clearProject()
+      projects.forEach(({ deck, card }) => {
+        deck.removeAttribute('data-project-visible')
+        card.removeAttribute('data-project-exiting')
+        card.removeAttribute('inert')
+        card.style.removeProperty('transform')
+        card.style.removeProperty('opacity')
       })
-      captions.forEach((caption) => caption.style.removeProperty('opacity'))
       dock.set(null)
     }
   }, [animated, compact, dock, progress, radius, ringPosition, wheel])

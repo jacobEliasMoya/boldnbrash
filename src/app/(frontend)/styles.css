@@ -1932,17 +1932,6 @@ ul {
 .skills-project-stage[aria-hidden='true'] {
   visibility: hidden;
 }
-.skills-project-caption {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  flex-shrink: 0;
-  margin-bottom: 12px;
-  font:
-    10px/1.4 'JetBrains Mono',
-    monospace;
-  text-transform: uppercase;
-}
 .skills-project-window {
   position: relative;
   flex: 1;
@@ -2053,9 +2042,6 @@ ul {
   pointer-events: none;
 }
 .portfolio[data-enhanced] .skill-project-card {
-  transform: perspective(900px) translateY(var(--card-offset)) rotateX(var(--card-rotation, 0deg))
-    translateZ(var(--card-depth, 0px));
-  opacity: var(--card-opacity, 1);
   transform-origin: center;
   backface-visibility: hidden;
 }
@@ -2948,12 +2934,12 @@ ul {
 }
 
 /* Overlap the same-colored edges so antialiasing cannot expose the canvas through the cut. */
-.liquid-experience-cut {
+:is(.liquid-experience-cut, .liquid-work-project-cut) {
   stroke: white;
   stroke-width: 2px;
 }
 
-.portfolio[data-work-projects] .liquid-experience-cut {
+.portfolio[data-work-projects] :is(.liquid-experience-cut, .liquid-work-project-cut) {
   stroke-width: 4px;
 }
 
@@ -3182,6 +3168,8 @@ ul {
 .skills-browser > [data-wheel-static] {
   grid-row: 1;
   min-width: 0;
+  width: 94%;
+  justify-self: center;
 }
 .skills-wheel-intro h3 {
   margin: 0;
@@ -3248,7 +3236,36 @@ ul {
   --work-pill-title-fit: 6.7cqi;
 }
 .skills-duet .skills-technologies {
-  margin-top: 0;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  max-width: 100%;
+}
+.skills-technology {
+  --technology-amber: #ffc857;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--technology-amber);
+  border-radius: 50%;
+  background: #000;
+}
+.technology-brand-mark {
+  width: 20px;
+  height: 20px;
+  background: var(--technology-amber);
+  mask: var(--technology-icon) center / var(--technology-icon-size, contain) no-repeat;
+}
+.technology-brand-mark[data-format='image'] {
+  /* The raster marks use brightness to keep their internal details in amber. */
+  mask-mode: luminance;
 }
 .skills-duet .skills-technologies,
 .experience-meta {
@@ -3263,6 +3280,7 @@ ul {
   box-shadow: none;
 }
 .skills-projects {
+  perspective: 1100px;
   grid-column: 1;
   grid-row: 1;
   position: relative;
@@ -3277,24 +3295,19 @@ ul {
   position: absolute;
   inset: 0;
   overflow: visible;
+  visibility: hidden;
 }
-.skills-duet .skills-project-caption {
-  align-items: center;
-  min-height: 28px;
-  margin-bottom: 14px;
-  color: var(--paper);
+.skills-projects .skills-project-deck[data-project-visible] {
+  visibility: visible;
 }
 .skills-duet .skills-project-window {
   overflow: visible;
 }
 .portfolio[data-enhanced] .skills-duet .skill-project-card {
-  transform: translateY(var(--card-offset)) rotate(var(--card-rotation));
-  transform-origin: 130% 50%;
   border-radius: 34px;
   padding: clamp(22px, 2.5vw, 38px);
 }
 .skills-duet .skill-project-card[aria-hidden='true'] {
-  visibility: hidden;
   pointer-events: none;
 }
 .skills-duet .skill-project-card .artwork-frame {
@@ -3369,6 +3382,18 @@ ul {
   .skills-duet.skills-index {
     --work-pill-title-size: clamp(1.625rem, 6vw, 2.375rem);
   }
+  .skills-duet .skills-category-current h3 {
+    /* Wrap long names instead of shrinking them into unreadable single lines. */
+    font-size: clamp(18px, 9.7cqi, 26px);
+    line-height: 1.15;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-wrap: balance;
+  }
+  .skills-duet .skills-category-copy {
+    gap: 8px;
+  }
+
   .experience-role h3 {
     font-size: clamp(26px, 6vw, 38px);
   }
@@ -3386,10 +3411,6 @@ ul {
     grid-row: 1;
     height: 100%;
     width: 94%;
-  }
-  .skills-duet .skills-project-caption {
-    font-size: 9px;
-    margin-bottom: 8px;
   }
   .portfolio[data-enhanced] .skills-duet .skill-project-card {
     padding: 22px;
@@ -3484,9 +3505,6 @@ ul {
   .experience-role h3 {
     font-size: 24px;
   }
-  .skills-duet .skills-project-caption {
-    font-size: 8px;
-  }
 }
 
 @media (max-height: 280px) and (min-width: 500px) {
@@ -3511,8 +3529,13 @@ ul {
     }
 
     .skills-performance {
-      grid-template-rows: auto minmax(0, 1fr) clamp(128px, 20dvh, 166px);
-      gap: clamp(12px, 2.4dvh, 20px);
+      --work-stack-gap: clamp(12px, 2.4dvh, 20px);
+      /* Shrink the project allocation, then center all three rows as one group. */
+      grid-template-rows:
+        auto minmax(0, var(--work-project-row-height, 1fr))
+        var(--work-pill-row-height, 128px);
+      align-content: center;
+      gap: var(--work-stack-gap);
     }
 
     /* Share the rows so the intro can sit above the project as part of the wheel list. */
@@ -3527,8 +3550,6 @@ ul {
     }
 
     .skills-browser > [data-wheel-static] {
-      width: 94%;
-      justify-self: center;
       pointer-events: auto;
     }
 
@@ -3539,6 +3560,10 @@ ul {
 
     .skills-projects {
       grid-row: 2;
+      align-self: center;
+      height: 85%;
+      /* Balance the subtitle's trailing line space against the solid pill edge. */
+      top: -2px;
     }
   }
 
@@ -3552,6 +3577,11 @@ ul {
       gap: 12px 28px;
     }
 
+    .skills-projects {
+      height: 100%;
+      top: 0;
+    }
+
     .portfolio[data-enhanced] .skills-duet .skills-browser {
       grid-column: 1 / -1;
       grid-template-columns: subgrid;
@@ -3559,17 +3589,11 @@ ul {
     }
 
     .skills-browser > [data-wheel-static] {
-      grid-column: 1 / -1;
-      width: 97%;
+      grid-column: 2 / 3;
     }
 
     .portfolio[data-enhanced] .skills-duet .skills-category-pill {
       grid-area: 2 / 2 / 3 / 3;
-    }
-
-    .skills-duet .skills-project-caption {
-      min-height: 16px;
-      margin-bottom: 6px;
     }
   }
 }
@@ -3580,27 +3604,15 @@ ul {
   }
 }
 
-/* Each incoming project opens from the corner scoop over a stationary card. */
 .portfolio[data-enhanced] .skills-duet .skill-project-card {
   transform: none;
   filter: none;
   opacity: 1;
-  clip-path: circle(var(--card-reveal, 150%) at 100% 0%);
+  clip-path: none;
   transition: none;
-}
-.skills-duet .skills-project-deck[data-visible='true'],
-.skills-duet .skill-project-card[data-visible='true'] {
-  visibility: visible;
-}
-.skills-duet .skills-project-deck:not([data-visible='true']),
-.skills-duet .skill-project-card:not([data-visible='true']) {
-  visibility: hidden;
 }
 .portfolio[data-enhanced] .skills-duet .skill-project-information {
   transition: none;
-}
-.skills-duet .skills-project-deck[aria-hidden='true'] .skills-project-caption {
-  opacity: 0;
 }
 
 :is(.skills-duet, .about-pages) .skills-heading {
@@ -3789,10 +3801,6 @@ ul {
   transform: translateY(var(--work-entry-y)) scale(var(--work-pill-scale)) !important;
   visibility: visible !important;
   opacity: 1 !important;
-}
-
-.skills-reveal .skills-project-caption {
-  color: var(--ink);
 }
 
 /* Carry the hero silhouette through the period reveal. */
@@ -4054,6 +4062,7 @@ ul {
 }
 .skill-project-ribbon {
   position: absolute;
+  z-index: 2;
   inset: auto calc(-1 * var(--ribbon-overhang)) clamp(24px, 4vh, 42px);
   width: calc(100% + 2 * var(--ribbon-overhang));
 }

@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef } from 'react'
 import type { MotionValue } from 'motion/react'
 import { introCompleteEvent } from '@/hooks/useIntroReady'
+import type { WorkDock } from '@/components/organisms/ExperienceMotion'
 import type { ExperienceDock } from '@/components/organisms/experienceTimeline'
 import {
   closedLiquidCurve,
@@ -26,7 +27,7 @@ export function LiquidBoundary({
   scrollProgress: MotionValue<number>
   scrollRecess: MotionValue<number>
   experienceDock: MotionValue<ExperienceDock | null>
-  workDock: MotionValue<ExperienceDock | null>
+  workDock: MotionValue<WorkDock | null>
 }) {
   const root = useRef<SVGSVGElement>(null)
   const surround = useRef<SVGSVGElement>(null)
@@ -37,7 +38,13 @@ export function LiquidBoundary({
   const dockCut = useRef<SVGPathElement>(null)
   const dockShoulders = useRef<SVGPathElement>(null)
   const dockRecoil = useRef<SVGPathElement>(null)
+  const projectBoundaryPaint = useRef<SVGGElement>(null)
+  const projectSurroundPaint = useRef<SVGGElement>(null)
+  const projectCut = useRef<SVGPathElement>(null)
+  const projectShoulders = useRef<SVGPathElement>(null)
+  const projectRecoil = useRef<SVGPathElement>(null)
   const maskId = useId()
+  const projectMaskId = `${maskId}-project`
 
   useEffect(() => {
     const svg = root.current
@@ -77,51 +84,87 @@ export function LiquidBoundary({
     let scrollRadius = 46
     let surroundLeft = 0
     let surroundTop = 0
-    let experienceOwnsFloor = false
-    let experienceMasked: boolean | undefined
-    let experienceTransform: string | undefined
+    let dockOwnsFloor = false
+    let dockOwnsLeft = false
     let pointerFloorPresence = 1
+    let pointerLeftPresence = 1
 
-    function paintExperience(shape: ExperienceDock | null) {
-      const ownsFloor = shape !== null
+    function createDockPainter(
+      id: string,
+      cut: SVGPathElement | null,
+      shoulders: SVGPathElement | null,
+      recoil: SVGPathElement | null,
+      groups: (SVGGElement | null)[],
+    ) {
+      let previousTransform: string | undefined
+      let wasMasked: boolean | undefined
 
-      if (ownsFloor !== experienceOwnsFloor) {
-        experienceOwnsFloor = ownsFloor
+      return (shape: ExperienceDock | null) => {
+        const transform = shape
+          ? `translate(${shape.x - surroundLeft} ${shape.y - surroundTop}) ${shape.transform ?? ''}`
+          : ''
 
-        // Remove the competing pull before the recoil mask can cut it off from the frame.
+        if (transform !== previousTransform) {
+          for (const path of [cut, shoulders, recoil]) {
+            path?.setAttribute('transform', transform)
+          }
+
+          previousTransform = transform
+        }
+
+        cut?.setAttribute('d', shape?.cut ?? '')
+        shoulders?.setAttribute('d', shape?.shoulders ?? '')
+        recoil?.setAttribute('d', shape?.recoil ?? '')
+
+        // Keep the mask attached during the pull and update just its geometry.
+        const masked = Boolean(shape?.cut || shape?.recoil)
+        if (masked !== wasMasked) {
+          for (const group of groups) {
+            if (masked) group?.setAttribute('mask', `url(#${id})`)
+            else group?.removeAttribute('mask')
+          }
+
+          wasMasked = masked
+        }
+      }
+    }
+
+    const paintPrimaryDock = createDockPainter(
+      maskId,
+      dockCut.current,
+      dockShoulders.current,
+      dockRecoil.current,
+      [boundaryPaint.current, surroundPaint.current],
+    )
+    const paintProjectDock = createDockPainter(
+      projectMaskId,
+      projectCut.current,
+      projectShoulders.current,
+      projectRecoil.current,
+      [projectBoundaryPaint.current, projectSurroundPaint.current],
+    )
+
+    function paintDock() {
+      const work = workDock.get()
+      const primary = work?.pill ?? work?.project ?? experienceDock.get()
+      const project = work?.pill ? work.project : null
+      const ownsFloor = primary !== null
+      const ownsLeft = Boolean(work?.project)
+
+      if (ownsFloor !== dockOwnsFloor || ownsLeft !== dockOwnsLeft) {
+        dockOwnsFloor = ownsFloor
+        dockOwnsLeft = ownsLeft
+
+        // Remove competing pulls before dock masks can cut them off from the frame.
         if (ownsFloor) pointerFloorPresence = 0
+        if (ownsLeft) pointerLeftPresence = 0
 
         paintPointerContour()
         schedule()
       }
 
-      const transform = shape
-        ? `translate(${shape.x - surroundLeft} ${shape.y - surroundTop}) ${shape.transform ?? ''}`
-        : ''
-
-      if (transform !== experienceTransform) {
-        for (const path of [dockCut.current, dockShoulders.current, dockRecoil.current]) {
-          path?.setAttribute('transform', transform)
-        }
-
-        experienceTransform = transform
-      }
-
-      dockCut.current?.setAttribute('d', shape?.cut ?? '')
-      dockShoulders.current?.setAttribute('d', shape?.shoulders ?? '')
-      dockRecoil.current?.setAttribute('d', shape?.recoil ?? '')
-
-      // Keep the mask attached across frames and update only its geometry during the pull.
-      const masked = Boolean(shape?.cut || shape?.recoil)
-
-      if (masked !== experienceMasked) {
-        for (const group of [boundaryPaint.current, surroundPaint.current]) {
-          if (masked) group?.setAttribute('mask', `url(#${maskId})`)
-          else group?.removeAttribute('mask')
-        }
-
-        experienceMasked = masked
-      }
+      paintPrimaryDock(primary)
+      paintProjectDock(project)
     }
 
     svg.dataset.mode = media.matches ? 'static' : 'pointer'
@@ -197,10 +240,12 @@ export function LiquidBoundary({
     }
 
     function paintPointerContour() {
-      const distanceFromFloor = height - pointAt(position).y
-      const awayFromFloor = Math.max(0, Math.min(1, (distanceFromFloor - corner) / (2 * corner)))
-      const presence = pointerFloorPresence + (1 - pointerFloorPresence) * awayFromFloor
-      const visibleDepth = depth * presence
+      const point = pointAt(position)
+      const awayFromFloor = Math.max(0, Math.min(1, (height - point.y - corner) / (2 * corner)))
+      const awayFromLeft = Math.max(0, Math.min(1, (point.x - corner) / (2 * corner)))
+      const floorPresence = pointerFloorPresence + (1 - pointerFloorPresence) * awayFromFloor
+      const leftPresence = pointerLeftPresence + (1 - pointerLeftPresence) * awayFromLeft
+      const visibleDepth = depth * Math.min(floorPresence, leftPresence)
       const flat = visibleDepth < 0.01
 
       if (flat && flatPathPainted) return
@@ -230,8 +275,9 @@ export function LiquidBoundary({
       radius += (targetRadius - radius) * ease
       power += (targetPower - power) * ease
 
-      // Use the pointer's existing easing when handing the floor back after Experience.
-      if (!experienceOwnsFloor) pointerFloorPresence += (1 - pointerFloorPresence) * ease
+      // Return each edge to the pointer with the same easing after its dock clears.
+      if (!dockOwnsFloor) pointerFloorPresence += (1 - pointerFloorPresence) * ease
+      if (!dockOwnsLeft) pointerLeftPresence += (1 - pointerLeftPresence) * ease
 
       paintPointerContour()
 
@@ -361,7 +407,8 @@ export function LiquidBoundary({
           Math.abs(depth - targetDepth) +
           Math.abs(radius - targetRadius) +
           Math.abs(power - targetPower) +
-          (experienceOwnsFloor ? 0 : 1 - pointerFloorPresence) <
+          (dockOwnsFloor ? 0 : 1 - pointerFloorPresence) +
+          (dockOwnsLeft ? 0 : 1 - pointerLeftPresence) <
         0.01
 
       frame = settled && !idle ? 0 : requestAnimationFrame(paint)
@@ -607,10 +654,6 @@ export function LiquidBoundary({
     const stopFollowing = [headerY, wordmarkY, scrollProgress, scrollRecess].map((value) =>
       value.on('change', schedule),
     )
-    function paintDock() {
-      paintExperience(workDock.get() ?? experienceDock.get())
-    }
-
     const stopExperience = experienceDock.on('change', paintDock)
     const stopWork = workDock.on('change', paintDock)
 
@@ -650,13 +693,24 @@ export function LiquidBoundary({
       document.removeEventListener('focusout', unfocus)
       media.removeEventListener('change', preferenceChanged)
     }
-  }, [headerY, wordmarkY, scrollProgress, scrollRecess, experienceDock, workDock, maskId])
+  }, [
+    headerY,
+    wordmarkY,
+    scrollProgress,
+    scrollRecess,
+    experienceDock,
+    workDock,
+    maskId,
+    projectMaskId,
+  ])
 
   return (
     <>
       <svg ref={root} className="liquid-boundary" aria-hidden="true" focusable="false">
-        <g ref={boundaryPaint}>
-          <path fillRule="evenodd" />
+        <g ref={projectBoundaryPaint}>
+          <g ref={boundaryPaint}>
+            <path fillRule="evenodd" />
+          </g>
         </g>
       </svg>
       <svg ref={surround} className="liquid-surround" aria-hidden="true" focusable="false">
@@ -666,12 +720,28 @@ export function LiquidBoundary({
             <path ref={dockCut} className="liquid-experience-cut" fill="black" />
             <path ref={dockRecoil} className="liquid-experience-recoil" fill="black" />
           </mask>
+          {/* Compose the masks so a cut's antialiasing stroke cannot reopen the other cut. */}
+          <mask
+            id={projectMaskId}
+            maskUnits="userSpaceOnUse"
+            x="-2"
+            y="-2"
+            width="101%"
+            height="101%"
+          >
+            <rect x="-2" y="-2" width="101%" height="101%" fill="white" />
+            <path ref={projectCut} className="liquid-work-project-cut" fill="black" />
+            <path ref={projectRecoil} className="liquid-work-project-recoil" fill="black" />
+          </mask>
         </defs>
-        <g ref={surroundPaint}>
-          <path fillRule="evenodd" />
-          <path ref={parked} className="liquid-wordmark-parked" fillRule="evenodd" />
-          <path ref={scrollLiquid} className="liquid-scroll-pill" fillRule="evenodd" />
-          <path ref={dockShoulders} className="liquid-experience-shoulders" />
+        <g ref={projectSurroundPaint}>
+          <g ref={surroundPaint}>
+            <path fillRule="evenodd" />
+            <path ref={parked} className="liquid-wordmark-parked" fillRule="evenodd" />
+            <path ref={scrollLiquid} className="liquid-scroll-pill" fillRule="evenodd" />
+            <path ref={dockShoulders} className="liquid-experience-shoulders" />
+            <path ref={projectShoulders} className="liquid-work-project-shoulders" />
+          </g>
         </g>
       </svg>
     </>

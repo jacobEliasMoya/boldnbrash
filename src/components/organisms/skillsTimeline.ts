@@ -234,7 +234,7 @@ export function getSkillPosition(progress: number) {
   return { index, phase: position - skillSegments[index].start }
 }
 
-// Each project is a resting point. Between them, both wheels use the same fractional position.
+// Each project stop anchors scroll snapping and keyboard navigation.
 export const workProjectId = (title: string) =>
   `work-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
 
@@ -261,7 +261,7 @@ export function getSkillFrame(progress: number) {
   const projectPosition = previous + fraction
   const active = projectStops[Math.round(projectPosition)]
 
-  // The first category waits for the intro. Later categories lead their project.
+  // The first category waits for the intro. Later turns use the category's lift window.
   const entrance =
     next === 0
       ? { index: 0, phase: clamp((position - workIntroCopyEnd) / (to.position - workIntroCopyEnd)) }

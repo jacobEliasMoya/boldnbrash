@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import {
   aboutIntroEnd,
+  projectStops,
   sceneStops,
   skillParagraphEnd,
   skillStart,
@@ -155,7 +156,7 @@ for (const viewport of [
       })
     }
 
-    test('period expands into the canvas behind synchronized skill and project wheels', async ({
+    test('period expands into the canvas behind the synchronized pill and project motion', async ({
       page,
     }) => {
       test.setTimeout(60000)
@@ -221,7 +222,9 @@ for (const viewport of [
       await expect(page.locator('.skills-performance')).not.toHaveCSS('opacity', '0')
       await scrollToPhase(page, skillStart - 0.1)
       await expect(page.locator('.skills-category-pill').first()).toHaveCSS('visibility', 'hidden')
-      await scrollToPhase(page, skillStart + 1.1)
+      const firstStop = skillStart + projectStops[0].position
+      const nextStop = skillStart + projectStops[1].position
+      await scrollToPhase(page, firstStop)
       await expect(intro).toHaveAttribute('aria-hidden', 'true')
 
       const currentSkill = page.locator('.skills-category-pill[data-active]')
@@ -240,92 +243,102 @@ for (const viewport of [
       const right = (await firstProject.boundingBox())!
 
       if (viewport.width > 900) expect(left.x).toBeGreaterThan(right.x + right.width)
-      else expect(left.y).toBeGreaterThan(right.y + right.height)
+      else {
+        expect(left.y).toBeGreaterThan(right.y + right.height)
+
+        const heading = (await page.locator('.skills-wheel-intro').first().boundingBox())!
+        const above = right.y - heading.y - heading.height
+        const below = left.y - right.y - right.height
+
+        // The subtitle's trailing line space needs a small optical correction.
+        expect(Math.abs(above + 4 - below)).toBeLessThan(2)
+        expect(Math.min(above, below)).toBeGreaterThan(16)
+
+        const stage = (await page.locator('.skills-performance').boundingBox())!
+        const stackCenter = (heading.y + left.y + left.height) / 2
+
+        expect(Math.abs(stackCenter - stage.y - stage.height / 2)).toBeLessThan(2)
+      }
 
       await page.screenshot({ path: `test-results/duet-project-${viewport.width}.png` })
 
-      // Hold a gesture while checking the project wipe between native snap points.
+      // Hold a gesture while sampling the project and category between snap points.
       await page.locator('.skills-performance').evaluate((target) => {
         const event = new Event('touchstart', { bubbles: true })
 
         Object.defineProperty(event, 'touches', { value: [{ clientX: 180, clientY: 480 }] })
         target.dispatchEvent(event)
       })
-      await scrollToPhase(page, skillStart + 1.45)
+      const turn = firstStop + (nextStop - firstStop) * 0.35
+      const movingCard = page.locator('[data-project-entering]')
+      const outgoingCard = page.locator('[data-project-exiting]')
+      const nextCard = page.locator(`#${projectStops[1].id}`)
+      const readOffset = () =>
+        movingCard.evaluate((card) => new DOMMatrixReadOnly(getComputedStyle(card).transform).m41)
 
-      const incomingCard = page.locator('.skill-project-card[aria-label="This Portfolio"]')
-
-      await expect(incomingCard).toHaveCSS('transform', 'none')
-      await expect(incomingCard).toHaveCSS('opacity', '1')
-      await expect(incomingCard).toHaveCSS('filter', 'none')
-
-      const incomingBounds = (await incomingCard.boundingBox())!
-      const outgoingBounds = (await page
-        .locator('.skill-project-card[aria-label="Astro Platform"]')
-        .boundingBox())!
-
-      for (const key of ['x', 'y', 'width', 'height'] as const) {
-        expect(Math.abs(incomingBounds[key] - outgoingBounds[key])).toBeLessThan(1)
-      }
-
-      const clip = await incomingCard.evaluate((el) => getComputedStyle(el).clipPath)
-
-      expect(clip).toMatch(/at 100% 0%/)
+      await scrollToPhase(page, turn)
+      await expect(movingCard).toHaveCount(1)
+      await expect(outgoingCard).toHaveCount(1)
       await expect
-        .poll(
-          async () => {
-            const paintedClip = await incomingCard.evaluate(
-              (element) => getComputedStyle(element).clipPath,
-            )
-
-            return Math.abs(parseFloat(paintedClip.slice(7)) - 75)
-          },
-          { intervals: [16, 32, 50, 100] },
+        .poll(() =>
+          outgoingCard.evaluate(
+            (card) => new DOMMatrixReadOnly(getComputedStyle(card).transform).m43,
+          ),
         )
+        .toBeLessThan(0)
+      await expect
+        .poll(() => outgoingCard.evaluate((card) => Number(getComputedStyle(card).opacity)))
         .toBeLessThan(1)
-      await page.screenshot({ path: `test-results/card-circle-${viewport.width}.png` })
+      await expect.poll(readOffset).toBeLessThan(0)
+      const turningOffset = await readOffset()
+      await page.screenshot({ path: `test-results/duet-turn-${viewport.width}.png` })
 
-      // The top card stays fully uncovered across its stop, including on reversal.
-      for (const position of [1.94, 1.96, 1.94]) {
-        await scrollToPhase(page, skillStart + position)
-        await expect(incomingCard).toHaveCSS('visibility', 'visible')
-        await expect
-          .poll(() =>
-            incomingCard.evaluate((card) => parseFloat(getComputedStyle(card).clipPath.slice(7))),
-          )
-          .toBeGreaterThan(145)
-      }
+      await scrollToPhase(page, nextStop)
+      await expect(nextCard).toHaveCSS('transform', 'none')
+      await expect(nextCard).toHaveAttribute('aria-hidden', 'false')
+      await scrollToPhase(page, turn)
+      await expect.poll(async () => Math.abs((await readOffset()) - turningOffset)).toBeLessThan(1)
 
       await page.locator('.skills-performance').dispatchEvent('touchend')
-      await scrollToPhase(page, skillStart + 2.1)
-      await expect(currentSkill).toContainText('Frontend Development')
+      await scrollToPhase(page, nextStop)
+      await expect(currentSkill).toContainText(skills[1].name)
 
-      const second = page.getByRole('article', { name: 'This Portfolio', exact: true })
+      const second = page.getByRole('article', { name: skills[1].projects[0].title, exact: true })
 
       await expect(second).toBeVisible()
       await second.getByRole('button', { name: /Read project/ }).click()
       await expect(page.getByRole('dialog')).toBeVisible()
       await page.getByRole('button', { name: /Close/ }).click()
-      await scrollToPhase(page, skillStart + 1.1)
+      await scrollToPhase(page, firstStop)
       await expect(firstProject).toBeVisible()
 
       // Every category uses the same navigation path as its optional direct-select control.
       for (const index of skills.keys()) {
         await page.evaluate(
-          (index) =>
+          ({ index, offset }) =>
             window.dispatchEvent(
               new CustomEvent('portfolio:select-skill', {
-                detail: { index, offset: 1.1 },
+                detail: { index, offset },
                 cancelable: true,
               }),
             ),
-          index,
+          { index, offset: projectStops[index].position - skillSegments[index].start },
         )
         await expect(currentSkill).toContainText(skills[index].name)
         await expect(
           page.getByRole('article', { name: skills[index].projects[0].title, exact: true }),
         ).toBeVisible()
       }
+
+      const overflowingLabels = await page
+        .locator('.skills-category-copy :is(h3, .skills-technologies)')
+        .evaluateAll((labels) =>
+          labels
+            .filter((label) => label.scrollWidth > label.clientWidth + 1)
+            .map((label) => label.textContent),
+        )
+
+      expect(overflowingLabels).toEqual([])
 
       await expect(page.locator('.skills-category-pill').last()).toHaveCSS('opacity', '1')
       await expect(page.locator('.skills-browser')).toHaveCSS('touch-action', 'pan-y pinch-zoom')
@@ -367,4 +380,31 @@ test('period opening follows changes to the heading and supporting text', async 
       }),
     )
     .toBeLessThan(0.5)
+})
+
+test('desktop Work commits short wheel gestures in either direction', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto(`${baseURL}/#${projectStops[0].id}`)
+  await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 12000 })
+  const track = page.locator('.scene-track')
+  const first = skillStart + projectStops[0].position
+  const next = skillStart + projectStops[1].position
+  const position = async () => Number(await track.getAttribute('data-playback-progress'))
+
+  await expect.poll(async () => Math.abs((await position()) - first)).toBeLessThan(0.01)
+  await page.locator('.skills-performance').hover()
+
+  // Small accidental movement stays put; an intentional short tick commits.
+  await page.mouse.wheel(0, 8)
+  await page.waitForTimeout(1100)
+  await expect.poll(async () => Math.abs((await position()) - first)).toBeLessThan(0.01)
+  await page.mouse.wheel(0, 80)
+  await expect
+    .poll(async () => Math.abs((await position()) - next), { timeout: 5000 })
+    .toBeLessThan(0.01)
+
+  await page.mouse.wheel(0, -80)
+  await expect
+    .poll(async () => Math.abs((await position()) - first), { timeout: 5000 })
+    .toBeLessThan(0.01)
 })

@@ -15,6 +15,7 @@ import {
   type MotionValue,
   type MotionStyle,
 } from 'motion/react'
+import { TechnologyIcons } from '@/components/atoms/TechnologyIcon'
 import { ProjectCover } from '@/components/atoms/ProjectCover'
 import { ProjectCTA } from '@/components/atoms/ProjectCTA'
 import { WordEmphasis } from '@/components/atoms/WordEmphasis'
@@ -36,7 +37,6 @@ import { useWorkPillEntrance } from '@/hooks/useWorkPillEntrance'
 import {
   clamp,
   getIntroParagraphProgress,
-  getSkillFrame,
   projectStops,
   skills,
   skillParagraphEndPortion,
@@ -137,7 +137,7 @@ function SkillCategoryPill({
           0{index + 1}
         </span>
         <div className="skills-category-copy">
-          <p className="skills-technologies">{skill.technologies.join(' \u00b7 ')}</p>
+          <TechnologyIcons technologies={skill.technologies} className="skills-technologies" />
           <h3>
             {skill.name}
             {index === skills.length - 1 && active ? (
@@ -167,26 +167,19 @@ function SkillCategoryPill({
   )
 }
 
-function SkillProjects({
+function SkillProject({
   index,
   active,
-  projectPosition,
   animated,
   onOpenProject,
 }: {
   index: number
   active: boolean
-  projectPosition: number
   animated: boolean
   onOpenProject: OpenProject
 }) {
   const skill = skills[index]
-  const first = projectStops.findIndex((stop) => stop.skillIndex === index)
-  const localPosition = projectPosition - first
-  const projectIndex = Math.round(clamp(localPosition, 0, skill.projects.length - 1))
-  const outgoing = Math.floor(projectPosition)
-  const incoming = Math.ceil(projectPosition)
-  const visible = !animated || (first <= incoming && first + skill.projects.length - 1 >= outgoing)
+  const project = skill.projects[0]
 
   return (
     <div
@@ -195,54 +188,28 @@ function SkillProjects({
       role="group"
       aria-label={`Projects in ${skill.name}`}
       data-skill={skill.name}
-      data-project={projectIndex}
-      data-visible={visible ? 'true' : undefined}
       aria-hidden={animated && !active}
       inert={animated && !active}
-      style={{
-        zIndex: animated ? 100 + index : 1,
-      }}
     >
-      <div className="skills-project-caption">
-        <span>{skill.name}</span>
-      </div>
       <div className="skills-project-window">
-        {skill.projects.map((project, position) => (
-          <article
-            key={`${skill.name}-${project.title}`}
-            id={workProjectId(project.title)}
-            className="scene-project skill-project-card"
-            aria-label={project.title}
-            data-visible={
-              !animated || first + position === outgoing || first + position === incoming
-                ? 'true'
-                : undefined
-            }
-            aria-hidden={animated && (!active || position !== projectIndex)}
-            inert={animated && (!active || position !== projectIndex)}
-            style={
-              {
-                '--card-reveal':
-                  first + position === incoming && incoming !== outgoing
-                    ? `${(projectPosition - outgoing) * 150}%`
-                    : '150%',
-                '--information-reveal': 1,
-                zIndex: 100 + position,
-              } as CSSProperties
-            }
-          >
-            <div className="artwork-frame project-cover" data-artwork={project.artwork}>
-              <ProjectCover artwork={project.artwork} title={project.title} />
-            </div>
-            <div className="skill-project-ribbon">
-              <ProjectCTA
-                title={project.title}
-                description={project.description}
-                onOpen={(trigger) => onOpenProject(project, trigger)}
-              />
-            </div>
-          </article>
-        ))}
+        <article
+          id={workProjectId(project.title)}
+          className="scene-project skill-project-card"
+          aria-label={project.title}
+          aria-hidden={animated && !active}
+          style={{ '--information-reveal': 1 } as CSSProperties}
+        >
+          <div className="artwork-frame project-cover" data-artwork={project.artwork}>
+            <ProjectCover artwork={project.artwork} title={project.title} />
+          </div>
+          <div className="skill-project-ribbon">
+            <ProjectCTA
+              title={project.title}
+              description={project.description}
+              onOpen={(trigger) => onOpenProject(project, trigger)}
+            />
+          </div>
+        </article>
       </div>
     </div>
   )
@@ -251,8 +218,8 @@ function SkillProjects({
 function SkillsWheelIntroCopy() {
   return (
     <>
-      <h3>Skills in practice.</h3>
-      <p>Explore the tools behind each project.</p>
+      <h3>A Few Things I&rsquo;ve Made.</h3>
+      <p>Some for work, Some just to see if I could.</p>
     </>
   )
 }
@@ -276,7 +243,7 @@ function SkillsWheelIntro() {
 }
 
 export function SkillsScene() {
-  const [selection, setSelection] = useState({ ...getSkillFrame(0), intro: 0, textIntro: 0 })
+  const [selection, setSelection] = useState({ intro: 0, textIntro: 0 })
   const [pinned, setPinned] = useState(false)
   const [openedProject, setOpenedProject] = useState<Project | null>(null)
   const [projectOrigin, setProjectOrigin] = useState<{ x: number; y: number } | null>(null)
@@ -318,6 +285,26 @@ export function SkillsScene() {
       const stacked = sharedRows && !sharedColumns
       const pillHeights = pills.map((pill) => pill.offsetHeight * workPillScale)
       const tallest = Math.max(0, ...pillHeights)
+      const focusedHeight = pillHeights[categoryIndex] ?? tallest
+
+      // Reserve the focused pill's natural size without stretching its surface.
+      element.parentElement?.style.setProperty('--work-pill-row-height', `${focusedHeight}px`)
+
+      const performance = element.parentElement
+      if (stacked && performance && intro) {
+        const gap = parseFloat(getComputedStyle(performance).rowGap) || 0
+        const available = Math.max(
+          0,
+          performance.clientHeight - intro.offsetHeight - focusedHeight - gap * 2,
+        )
+
+        // Give the card 80% of its former slot and distribute the freed room
+        // outside the complete stack, rather than between its three elements.
+        performance.style.setProperty('--work-project-row-height', `${available * 0.8}px`)
+      } else {
+        performance?.style.removeProperty('--work-project-row-height')
+      }
+
       const anchor = pills[0]
       const center = anchor.offsetTop
       const height = element.clientHeight
@@ -362,7 +349,7 @@ export function SkillsScene() {
     pills.forEach((pill) => observer.observe(pill))
 
     return () => observer.disconnect()
-  }, [animated, wheelBounds])
+  }, [animated, categoryIndex, wheelBounds])
 
   const scene = useRef<HTMLDivElement>(null)
   const period = useRef<HTMLSpanElement>(null)
@@ -432,21 +419,14 @@ export function SkillsScene() {
   }, [categoryIndex])
   useEffect(() => {
     function update(event: Event) {
-      const { progress, intro, textIntro } = (
-        event as CustomEvent<{ progress: number; intro: number; textIntro: number }>
-      ).detail
+      const { intro, textIntro } = (event as CustomEvent<{ intro: number; textIntro: number }>)
+        .detail
 
-      const next = getSkillFrame(progress)
-
-      // Commit the wipe and card visibility together when crossing a project stop.
       setPinned(true)
       setSelection((previous) => {
-        const unchanged =
-          previous.projectPosition === next.projectPosition &&
-          previous.intro === intro &&
-          previous.textIntro === textIntro
+        const unchanged = previous.intro === intro && previous.textIntro === textIntro
 
-        return unchanged ? previous : { ...next, intro, textIntro }
+        return unchanged ? previous : { intro, textIntro }
       })
     }
 
@@ -538,11 +518,10 @@ export function SkillsScene() {
           <div className="skills-performance">
             <div ref={projects} className="skills-projects">
               {skills.map((skill, index) => (
-                <SkillProjects
+                <SkillProject
                   key={skill.name}
                   index={index}
-                  active={selection.index === index}
-                  projectPosition={selection.projectPosition}
+                  active={categoryIndex === index}
                   animated
                   onOpenProject={openProject}
                 />
@@ -619,13 +598,7 @@ export function SkillsScene() {
           </div>
           {skills.map((skill, index) => (
             <section className="skills-pair" key={skill.name} aria-label={skill.name}>
-              <SkillProjects
-                index={index}
-                active
-                projectPosition={0}
-                animated={false}
-                onOpenProject={openProject}
-              />
+              <SkillProject index={index} active animated={false} onOpenProject={openProject} />
               <SkillCategoryPill
                 index={index}
                 active

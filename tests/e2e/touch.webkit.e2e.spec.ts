@@ -429,7 +429,23 @@ test('long and short swipes advance one project and reverse across category gaps
   }
 })
 
-test('landscape Work clears the navigation and places the intro above both columns', async ({
+test('a forward drag leaves the final Skills project without snapping back', async ({ page }) => {
+  const last = projectStops[projectStops.length - 1]
+  const end = skillStart + last.position
+
+  await page.goto(`${baseURL}/#${last.id}`)
+  const progress = () =>
+    page.locator('.scene-track').getAttribute('data-playback-progress').then(Number)
+
+  await expect.poll(async () => Math.abs((await progress()) - end)).toBeLessThan(0.01)
+  await swipe(page, '.skills-browser', 700, 140)
+  // Wait through the idle snap window to catch a return to the last card.
+  await expect.poll(progress).toBeGreaterThan(end + 0.02)
+  await page.waitForTimeout(900)
+  expect(await progress()).toBeGreaterThan(end + 0.02)
+})
+
+test('landscape Work aligns the intro with the focused pill below the navigation', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 750, height: 342 })
@@ -449,8 +465,9 @@ test('landscape Work clears the navigation and places the intro above both colum
 
   expect(introBounds.y - (headerBounds.y + headerBounds.height)).toBeGreaterThanOrEqual(24)
   expect(projectBounds.y - (introBounds.y + introBounds.height)).toBeGreaterThanOrEqual(12)
-  expect(pillBounds.y).toBeGreaterThan(projectBounds.y)
+  expect(pillBounds.y).toBeGreaterThan(introBounds.y + introBounds.height)
   expect(pillBounds.x - (projectBounds.x + projectBounds.width)).toBeGreaterThanOrEqual(12)
+  expect(introBounds.x).toBeCloseTo(pillBounds.x, 1)
   expect(pillBounds.y + pillBounds.height).toBeLessThan(330)
 
   await page.screenshot({ path: test.info().outputPath('work-landscape.png'), scale: 'css' })

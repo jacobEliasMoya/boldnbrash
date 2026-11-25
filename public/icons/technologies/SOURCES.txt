@@ -1,0 +1,7 @@
+Brand SVGs: https://github.com/simple-icons/simple-icons (CC0; brand trademarks belong to their respective owners).
+React Three Fiber: https://github.com/pmndrs/react-three-fiber/blob/master/docs/logo.jpg
+Pillow: https://github.com/python-pillow/pillow-logo/blob/main/pillow-logo-248x250.png
+WebP mark: https://developers.google.com/static/speed/webp/images/webp-devsite-icon.png
+Gravity Forms: https://www.gravityforms.com/brand-assets/ (official Color badge from the linked brand guidelines).
+Concept icons (WCAG/accessibility, local models/CPU, tool calling/wrench, piexif/image metadata): https://github.com/lucide-icons/lucide (ISC).
+These concept symbols are descriptive icons, not brand logos.
