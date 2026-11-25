@@ -8,6 +8,7 @@ import {
   projectStops,
   sceneDuration,
   skillStart,
+  skillSegments,
 } from '../../src/components/organisms/skillsTimeline'
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000'
@@ -402,7 +403,7 @@ test('long and short swipes advance one project and reverse across category gaps
             cancelable: true,
           }),
         ),
-      { index: stop.skillIndex, offset: stop.projectIndex + 0.95 },
+      { index: stop.skillIndex, offset: stop.position - skillSegments[stop.skillIndex].start },
     )
 
     const progress = () =>
@@ -426,6 +427,68 @@ test('long and short swipes advance one project and reverse across category gaps
       .poll(async () => Math.abs((await progress()) - initial), { timeout: 5000 })
       .toBeLessThan(0.01)
   }
+})
+
+test('landscape Work clears the navigation and places the intro above both columns', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 750, height: 342 })
+  await page.goto(`${baseURL}/#${projectStops[0].id}`)
+
+  const intro = page.locator('ul.skills-browser > li[data-wheel-static]:first-child')
+  const pill = page.locator('.skills-category-pill[data-active]')
+
+  await expect(intro).toHaveCSS('opacity', '1')
+  await expect(pill).toBeVisible()
+  await expect(pill).not.toHaveAttribute('data-work-entering')
+
+  const headerBounds = (await page.locator('.site-header').boundingBox())!
+  const introBounds = (await intro.boundingBox())!
+  const projectBounds = (await page.locator('.skills-projects').boundingBox())!
+  const pillBounds = (await pill.boundingBox())!
+
+  expect(introBounds.y - (headerBounds.y + headerBounds.height)).toBeGreaterThanOrEqual(24)
+  expect(projectBounds.y - (introBounds.y + introBounds.height)).toBeGreaterThanOrEqual(12)
+  expect(pillBounds.y).toBeGreaterThan(projectBounds.y)
+  expect(pillBounds.x - (projectBounds.x + projectBounds.width)).toBeGreaterThanOrEqual(12)
+  expect(pillBounds.y + pillBounds.height).toBeLessThan(330)
+
+  await page.screenshot({ path: test.info().outputPath('work-landscape.png'), scale: 'css' })
+  await page.locator(`#${projectStops[0].id}`).getByRole('button').tap()
+  await expect(page.getByRole('dialog')).toBeVisible()
+})
+
+test('an oversized touch sample stays bounded and cancellation does not snap a project', async ({
+  page,
+}) => {
+  const consumed = await swipe(page, '.hero-copy', 600, -100000)
+  expect(consumed.every(Boolean)).toBe(true)
+  const progress = () =>
+    page.locator('.scene-track').getAttribute('data-playback-progress').then(Number)
+  expect(await progress()).toBeLessThan(skillStart)
+
+  await page.goto(`${baseURL}/#${projectStops[0].id}`)
+  await expect(page.locator('.portfolio[data-work-projects]')).toBeVisible()
+  await page.locator('.skills-browser').evaluate(async (target) => {
+    const send = (type: string, y: number) => {
+      const event = new Event(type, { bubbles: true, cancelable: true })
+      Object.defineProperty(event, 'touches', {
+        value: type === 'touchcancel' ? [] : [{ identifier: 9, clientX: 180, clientY: y }],
+      })
+      target.dispatchEvent(event)
+    }
+    send('touchstart', 600)
+    for (let i = 1; i <= 4; i++) {
+      send('touchmove', 600 - i * 10)
+      await new Promise(requestAnimationFrame)
+    }
+    send('touchcancel', 560)
+  })
+  // Wait past the release-snap delay to catch a canceled gesture starting a snap.
+  await page.waitForTimeout(900)
+  const stopped = await progress()
+  expect(stopped).toBeGreaterThan(skillStart + projectStops[0].position + 0.1)
+  expect(stopped).toBeLessThan(skillStart + projectStops[1].position - 0.1)
 })
 
 test('pulling past the beginning is consumed instead of escaping the app', async ({ page }) => {

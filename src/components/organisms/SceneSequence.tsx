@@ -34,6 +34,7 @@ import {
   skillParagraphEnd,
   skillTravel,
   projectStops,
+  workIntroSettle,
 } from './skillsTimeline'
 import { BlendedLogo } from '@/components/atoms/BlendedLogo'
 import { BlendedNav } from '@/components/atoms/BlendedNav'
@@ -80,7 +81,21 @@ const showcaseCenterPath = 'M12 12 L12 12 L12 12 L12 12 M12 12 L12 12 L12 12 L12
 const showcasePlayOvershoot = 'M7.5 4.7 L18.7 12 L7.5 19.3 L7.5 4.7 M7.5 12 L7.5 12 L7.5 12 L7.5 12'
 const showcasePauseOvershoot =
   'M8.6 5.3 L8.6 9.8 L8.6 14.2 L8.6 18.7 M15.4 5.3 L15.4 9.8 L15.4 14.2 L15.4 18.7'
+// Input bounds preserve normal thumb travel while limiting pathological samples
+// and how far a target can lead the visible pose. Clock leads use timeline pacing units.
+const scrollLimits = {
+  wheelPixels: 120,
+  touchMinPixels: 160,
+  touchMaxPixels: 320,
+  touchViewportPortion: 0.4,
+  touchClockLead: 2.5,
+  wheelClockLead: 0.5,
+  workLead: 0.45,
+  springVelocity: 8,
+} as const
+
 const heroRevealTravel = sceneStops[1] - heroWalkOutEnd
+const workOpeningItemsDuration = 1.4
 const wordmarkDropStart = -100
 
 const origins = [
@@ -370,12 +385,17 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     let snapping = false
     let snapExpectedY = 0
 
+    const workOpeningRange = { start: skillParagraphEnd, end: skillStart + workIntroSettle }
     const transitionRanges = [
       { start: heroWalkOutEnd, end: sceneStops[1] },
-      { start: skillParagraphEnd, end: skillStart },
+      workOpeningRange,
       ...sceneStops.slice(2).map((end) => ({ start: end - 1, end })),
       { start: aboutIntroEnd, end: experienceStart },
     ].sort((first, second) => first.start - second.start)
+    const transitionStops = [
+      ...transitionRanges.flatMap(({ start, end }) => [start, end]),
+      skillStart,
+    ]
     let sceneTransition: {
       range: (typeof transitionRanges)[number]
       direction: number
@@ -419,7 +439,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         ranges.find((range) =>
           direction > 0
             ? proposed > range.start && displayed < range.end - 0.001
-            : proposed < range.end && displayed > range.start + 0.001,
+            : proposed < range.end - (range === workOpeningRange ? 0.003 : 0) &&
+              displayed > range.start + 0.001,
         )
 
       if (!range) return false
@@ -473,16 +494,36 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       transitionLatch = { direction, lastInput: now }
       track.current?.setAttribute('data-transitioning', direction > 0 ? 'forward' : 'backward')
 
-      const duration =
-        range.end === skillStart || range.end === experienceStart
-          ? introPeriodRevealDuration
-          : circleRevealTransition.duration
-      const control = animate(displayed, target, {
-        duration: Math.max(
-          0.24,
-          (duration * Math.abs(target - displayed)) / (range.end - range.start),
-        ),
-        ease: circleRevealTransition.ease,
+      const openingWork = range === workOpeningRange
+      const crossesPeriodEnd = openingWork && (displayed - skillStart) * (target - skillStart) < 0
+      const keyframes = crossesPeriodEnd ? [displayed, skillStart, target] : [displayed, target]
+      let duration = 0
+      const stops = [0]
+      const easing = keyframes.slice(1).map((end, index) => {
+        const start = keyframes[index]
+        const workItems = openingWork && Math.max(start, end) > skillStart
+
+        // Keep the circle's original pace. The items follow their own eased shapes
+        // at a steady timeline rate, in either direction.
+        const secondsPerUnit = workItems
+          ? workOpeningItemsDuration / workIntroSettle
+          : openingWork
+            ? introPeriodRevealDuration / (skillStart - skillParagraphEnd)
+            : (range.end === experienceStart
+                ? introPeriodRevealDuration
+                : circleRevealTransition.duration) /
+              (range.end - range.start)
+
+        duration += Math.abs(end - start) * secondsPerUnit
+        stops.push(duration)
+
+        return workItems ? ('linear' as const) : circleRevealTransition.ease
+      })
+
+      const control = animate(displayed, keyframes, {
+        duration: Math.max(0.24, duration),
+        times: duration > 0 ? stops.map((stop) => stop / duration) : undefined,
+        ease: easing,
         onUpdate: (value) => {
           displayed = requested = value
           gestureTargetClock = toPlaybackTime(value)
@@ -609,7 +650,16 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     function advanceInput(pixels: number, target: Element | null, touchInput = false) {
       const node = track.current
 
-      if (!node || media.matches || !pixels) return false
+      if (!node || media.matches || !Number.isFinite(pixels) || !pixels) return false
+
+      // Bound dropped/coalesced events without amplifying ordinary small movements.
+      const inputLimit = touchInput
+        ? Math.max(
+            scrollLimits.touchMinPixels,
+            Math.min(scrollLimits.touchMaxPixels, innerHeight * scrollLimits.touchViewportPortion),
+          )
+        : scrollLimits.wheelPixels
+      pixels = clamp(pixels, -inputLimit, inputLimit)
 
       if (target?.closest('dialog, input, textarea, select, [contenteditable="true"]')) return false
 
@@ -660,6 +710,19 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       // Forward the same travel to the document after nested scroll areas have
       // had a chance to handle it; keep the skills timeline free of a queue.
       if (current === 1 || readingIntro) {
+        if (inputDirection && inputDirection !== direction && !sceneTransition) {
+          // Start a reversal at the visible pose, not at the end of queued travel.
+          stopPlayback?.()
+          stopPlayback = undefined
+          requested = displayed
+          playbackClock.jump(toPlaybackTime(displayed))
+          window.scrollTo({
+            top: start + (distance * displayed) / sceneDuration,
+            behavior: 'instant',
+          })
+        }
+        inputDirection = direction
+
         let travel = touchInput ? pixels * 1.25 : pixels
 
         if (!sceneTransition && readingIntro) {
@@ -730,11 +793,22 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           }
         }
 
-        const proposed = ((window.scrollY + travel - start) / distance) * sceneDuration
+        if (!touchInput && !readingIntro && !sceneTransition) {
+          // Bound trackpad momentum in Work as well as the reading introductions.
+          const lead = Math.max(0, scrollLimits.workLead - direction * (requested - displayed))
+          travel = direction * Math.min(Math.abs(travel), (lead * distance) / sceneDuration)
+          if (!travel) return true
+        }
+
+        const proposed = clamp(
+          ((window.scrollY + travel - start) / distance) * sceneDuration,
+          0,
+          sceneDuration,
+        )
 
         if (triggerSceneTransition(pixels, proposed, start, distance, touchInput)) return true
 
-        window.scrollTo({ top: window.scrollY + travel, behavior: 'instant' })
+        window.scrollTo({ top: start + (distance * proposed) / sceneDuration, behavior: 'instant' })
         update()
 
         if (touchInput) gestureTargetClock = toPlaybackTime(requested)
@@ -767,12 +841,20 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       const inputGain = touchInput ? (current === 0 ? 0.005 : 0.003) : 0.0015
       const desired =
         base +
-        direction * (touchInput ? Math.abs(pixels) : Math.min(Math.abs(pixels), 120)) * inputGain
+        direction *
+          (touchInput ? Math.abs(pixels) : Math.min(Math.abs(pixels), scrollLimits.wheelPixels)) *
+          inputGain
       const limit =
         direction > 0 && current === 0 && displayed < heroWalkOutEnd - 0.02
           ? heroWalkOutEnd
           : sceneDuration
-      const bounded = Math.max(0, Math.min(toPlaybackTime(limit), desired))
+      // Limit queued timeline travel so a burst cannot leave a large catch-up after release.
+      const lead = touchInput ? scrollLimits.touchClockLead : scrollLimits.wheelClockLead
+      const bounded = clamp(
+        desired,
+        Math.max(0, currentClock - lead),
+        Math.min(toPlaybackTime(limit), currentClock + lead),
+      )
       const proposed = fromPlaybackTime(bounded)
 
       if (triggerSceneTransition(pixels, proposed, start, distance, touchInput)) {
@@ -825,6 +907,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     }
 
     let touch: {
+      id: number
       x: number
       y: number
       lastY: number
@@ -840,7 +923,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       const target = event.target instanceof Element ? event.target : null
 
       if (event.touches.length !== 1 || media.matches || target?.closest('.site-scrollbar')) {
-        touch = null
+        cancelTouch()
 
         return
       }
@@ -850,6 +933,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       gestureTargetClock = toPlaybackTime(requested)
       transitionLatch = null
       touch = {
+        id: point.identifier,
         x: point.clientX,
         y: point.clientY,
         lastY: point.clientY,
@@ -862,7 +946,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
 
     function moveTouch(event: TouchEvent) {
       if (event.touches.length !== 1 || media.matches) {
-        touch = null
+        cancelTouch()
 
         return
       }
@@ -878,7 +962,12 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       // These surfaces own their gestures; pinch zoom and form controls stay native.
       if (touch.target?.closest('dialog, input, textarea, select, [contenteditable="true"]')) return
 
-      const point = event.touches[0]
+      const point = Array.from(event.touches).find((point) => point.identifier === touch!.id)
+
+      if (!point) {
+        cancelTouch()
+        return
+      }
 
       if (!touch.axis) {
         const dx = Math.abs(point.clientX - touch.x)
@@ -895,6 +984,17 @@ export function SceneSequence({ children }: { children: ReactNode }) {
 
       if (touch.axis === 'vertical' && advanceInput(pixels, touch.target, true))
         event.preventDefault()
+    }
+
+    function cancelTouch() {
+      touch = null
+      clearExperienceInput()
+      cancelSnap()
+      gestureTargetClock = toPlaybackTime(displayed)
+    }
+
+    function cancelHiddenTouch() {
+      if (document.hidden) cancelTouch()
     }
 
     function endTouch() {
@@ -914,7 +1014,11 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       if (next === requested && stopPlayback && !immediate && !snapping) return
 
       requested = next
-      const velocity = playbackClock.getVelocity()
+      const velocity = clamp(
+        playbackClock.getVelocity(),
+        -scrollLimits.springVelocity,
+        scrollLimits.springVelocity,
+      )
       stopPlayback?.()
       stopPlayback = undefined
 
@@ -971,7 +1075,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
               ease: [0.22, 1, 0.36, 1] as const,
             }),
         onUpdate: (time) => {
-          displayed = fromPlaybackTime(time)
+          displayed = clamp(fromPlaybackTime(time), 0, sceneDuration)
           renderScene(displayed)
         },
         onComplete: () => {
@@ -1024,9 +1128,9 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         0,
         Math.min(sceneDuration, (-bounds.top / travel) * sceneDuration),
       )
-      const boundary = transitionRanges
-        .flatMap(({ start, end }) => [start, end])
-        .find((stop) => (Math.abs(stop - rawProgress) * travel) / sceneDuration < 1)
+      const boundary = transitionStops.find(
+        (stop) => (Math.abs(stop - rawProgress) * travel) / sceneDuration < 1,
+      )
       const progress = boundary ?? rawProgress
 
       if (
@@ -1490,10 +1594,14 @@ export function SceneSequence({ children }: { children: ReactNode }) {
 
       const detail = (event as CustomEvent<number | { index: number; offset: number }>).detail
       const index = typeof detail === 'number' ? detail : detail.index
-      const offset = typeof detail === 'number' ? 0.95 : detail.offset
-
       if (!Number.isInteger(index) || index < 0 || index >= skillSegments.length || media.matches)
         return
+
+      const offset =
+        typeof detail === 'number'
+          ? projectStops.find((stop) => stop.skillIndex === index)!.position -
+            skillSegments[index].start
+          : detail.offset
 
       if (!Number.isFinite(offset) || offset < 0 || offset > skillSegments[index].duration) return
 
@@ -1532,7 +1640,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     function seekScroll(event: Event) {
       pauseShowcase()
 
-      const fraction = (event as CustomEvent<number>).detail
+      const detail = (event as CustomEvent<number | { progress: number; section: string }>).detail
+      const fraction = typeof detail === 'number' ? detail : detail.progress
       const node = track.current
 
       if (!node || media.matches || !Number.isFinite(fraction)) return
@@ -1541,7 +1650,13 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       cancelSnap()
       pendingFocus = null
 
-      const range = sectionScrollRanges[getScrollSection(displayed)]
+      // Keep captured drags in the range where they started, even at a section boundary.
+      const range =
+        (typeof detail === 'object'
+          ? sectionScrollRanges.find(
+              (range) => (range.label ?? scenes[range.sceneIndex].label) === detail.section,
+            )
+          : undefined) ?? sectionScrollRanges[getScrollSection(displayed)]
       const position = range.start + Math.max(0, Math.min(1, fraction)) * (range.end - range.start)
       const start = scrollY + node.getBoundingClientRect().top
       const distance = node.offsetHeight - (node.firstElementChild?.clientHeight ?? innerHeight)
@@ -1708,12 +1823,13 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     window.addEventListener('scroll', schedule, { passive: true })
     window.addEventListener('pointerdown', cancelSnap, { passive: true })
     window.addEventListener('keydown', cancelSnap)
-    window.addEventListener('blur', cancelSnap)
+    window.addEventListener('blur', cancelTouch)
     window.addEventListener('wheel', normalizeWheel, { passive: false })
     document.addEventListener('touchstart', startTouch, { passive: true })
     document.addEventListener('touchmove', moveTouch, { passive: false })
     document.addEventListener('touchend', endTouch, { passive: true })
-    document.addEventListener('touchcancel', endTouch, { passive: true })
+    document.addEventListener('touchcancel', cancelTouch, { passive: true })
+    document.addEventListener('visibilitychange', cancelHiddenTouch)
     window.addEventListener('resize', resizeScene)
     document.addEventListener('click', navigate)
     window.addEventListener('portfolio:select-skill', selectSkill)
@@ -1752,13 +1868,14 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       cancelSnap()
       window.removeEventListener('pointerdown', cancelSnap)
       window.removeEventListener('keydown', cancelSnap)
-      window.removeEventListener('blur', cancelSnap)
+      window.removeEventListener('blur', cancelTouch)
       window.removeEventListener('scroll', schedule)
       window.removeEventListener('wheel', normalizeWheel)
       document.removeEventListener('touchstart', startTouch)
       document.removeEventListener('touchmove', moveTouch)
       document.removeEventListener('touchend', endTouch)
-      document.removeEventListener('touchcancel', endTouch)
+      document.removeEventListener('touchcancel', cancelTouch)
+      document.removeEventListener('visibilitychange', cancelHiddenTouch)
       window.removeEventListener('resize', resizeScene)
       document.removeEventListener('click', navigate)
       window.removeEventListener('portfolio:select-skill', selectSkill)

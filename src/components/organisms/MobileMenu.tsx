@@ -74,7 +74,7 @@ export function MobileMenu({
     if (pendingLink.current?.index !== highlighted) pendingLink.current = null
   }, [highlighted])
 
-  const drag = useRef<{ y: number; index: number; moved: boolean } | null>(null)
+  const drag = useRef<{ id: number; y: number; index: number; moved: boolean } | null>(null)
   const wheelInput = useRef({ delta: 0, time: 0 })
   const [gathering, setGathering] = useState(false)
   const [phase, setPhase] = useState<Phase>('menu')
@@ -491,7 +491,7 @@ export function MobileMenu({
                   aria-label="Mobile portfolio"
                   inert={phase !== 'menu'}
                   onWheel={(event) => {
-                    if (phase !== 'menu') return
+                    if (phase !== 'menu' || event.ctrlKey || !Number.isFinite(event.deltaY)) return
 
                     event.stopPropagation()
 
@@ -511,9 +511,8 @@ export function MobileMenu({
                     wheelInput.current.delta += delta
 
                     if (Math.abs(wheelInput.current.delta) >= 32) {
-                      const step =
-                        Math.sign(delta) *
-                        Math.max(1, Math.floor(Math.abs(wheelInput.current.delta) / 60))
+                      // One discrete selection per wheel event, even for page-mode bursts.
+                      const step = Math.sign(delta)
 
                       setHighlighted((current) =>
                         Math.max(0, Math.min(scenes.length - 1, current + step)),
@@ -525,11 +524,22 @@ export function MobileMenu({
                     drag.current = null
 
                     if (event.pointerType !== 'mouse' && event.isPrimary) {
-                      drag.current = { y: event.clientY, index: highlighted, moved: false }
+                      drag.current = {
+                        id: event.pointerId,
+                        y: event.clientY,
+                        index: highlighted,
+                        moved: false,
+                      }
                     }
                   }}
                   onPointerMove={(event) => {
-                    if (!drag.current || event.pointerType === 'mouse' || phase !== 'menu') return
+                    if (
+                      !drag.current ||
+                      drag.current.id !== event.pointerId ||
+                      event.pointerType === 'mouse' ||
+                      phase !== 'menu'
+                    )
+                      return
 
                     // The menu selector follows the finger rather than document scrolling.
                     const distance = event.clientY - drag.current.y
@@ -542,6 +552,12 @@ export function MobileMenu({
                         Math.min(scenes.length - 1, drag.current.index + Math.round(distance / 48)),
                       ),
                     )
+                  }}
+                  onPointerUp={(event) => {
+                    if (drag.current?.id !== event.pointerId) return
+
+                    // End movement, retaining the moved flag to suppress the following click.
+                    drag.current.id = -1
                   }}
                   onPointerCancel={() => {
                     drag.current = null

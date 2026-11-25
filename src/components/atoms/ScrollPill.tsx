@@ -17,7 +17,7 @@ export function ScrollPill({
   const [value, setValue] = useState(() => progress.get() * 100)
   const [hidden, setHidden] = useState(() => recess.get() > 0.8)
   const travel = useRef<HTMLDivElement>(null)
-  const drag = useRef<{ id: number; offset: number } | null>(null)
+  const drag = useRef<{ id: number; offset: number; section: string } | null>(null)
   const frame = useRef(0)
   const top = useTransform(progress, (position) => `${position * 100}%`)
   const x = useTransform(recess, (position) => 26 * position)
@@ -26,20 +26,27 @@ export function ScrollPill({
   useMotionValueEvent(recess, 'change', (position) => setHidden(position > 0.8))
 
   function seek(percent: number) {
+    if (!Number.isFinite(percent)) return
+
     const position = Math.max(0, Math.min(1, percent / 100))
 
     if (onSeek) onSeek(position)
-    else window.dispatchEvent(new CustomEvent('portfolio:seek-scroll', { detail: position }))
+    else
+      window.dispatchEvent(
+        new CustomEvent('portfolio:seek-scroll', {
+          detail: { progress: position, section: drag.current?.section ?? section },
+        }),
+      )
   }
 
   function seekAt(y: number) {
     const bounds = travel.current?.getBoundingClientRect()
 
-    if (bounds?.height) seek((100 * (y - bounds.top)) / bounds.height)
+    if (bounds?.height && Number.isFinite(y)) seek((100 * (y - bounds.top)) / bounds.height)
   }
 
   function startDrag(event: PointerEvent<HTMLInputElement>) {
-    if (!event.isPrimary || event.button !== 0 || !travel.current) return
+    if (drag.current || !event.isPrimary || event.button !== 0 || !travel.current) return
 
     event.preventDefault()
 
@@ -48,7 +55,11 @@ export function ScrollPill({
     const offset = event.clientY - center
     const halfThumbHeight = bounds.top - event.currentTarget.getBoundingClientRect().top
 
-    drag.current = { id: event.pointerId, offset: Math.abs(offset) <= halfThumbHeight ? offset : 0 }
+    drag.current = {
+      id: event.pointerId,
+      offset: Math.abs(offset) <= halfThumbHeight ? offset : 0,
+      section,
+    }
     event.currentTarget.focus({ preventScroll: true })
     event.currentTarget.setPointerCapture(event.pointerId)
     seekAt(event.clientY - drag.current.offset)
@@ -73,7 +84,18 @@ export function ScrollPill({
     drag.current = null
   }
 
-  useEffect(() => () => cancelAnimationFrame(frame.current), [])
+  useEffect(() => {
+    const cancel = () => {
+      cancelAnimationFrame(frame.current)
+      drag.current = null
+    }
+    window.addEventListener('blur', cancel)
+
+    return () => {
+      cancel()
+      window.removeEventListener('blur', cancel)
+    }
+  }, [])
 
   return (
     <motion.div className="site-scrollbar" style={{ x }} inert={hidden}>

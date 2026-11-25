@@ -173,6 +173,15 @@ export const skillSegments = skills.map((skill, index) => ({
   duration: skill.projects.length + 1.6,
 }))
 export const skillTravel = skillSegments.reduce((sum, segment) => sum + segment.duration, 0)
+
+export const workCategoryTravel = 0.95
+export const workProjectTravel = 0.8
+
+// The opening sequence gives the first project, copy, and category separate turns.
+export const workIntroCopyStart = workProjectTravel
+export const workIntroCopyEnd = 1.05
+export const workIntroSettle = workCategoryTravel + workProjectTravel
+
 export const heroFillEnd = 1
 export const heroParagraphEnd = heroFillEnd + 1.08
 export const heroWalkOutStart = heroParagraphEnd - 0.18
@@ -234,7 +243,7 @@ export const projectStops = skills.flatMap((skill, skillIndex) =>
     id: workProjectId(project.title),
     skillIndex,
     projectIndex,
-    position: skillSegments[skillIndex].start + projectIndex + 1.75,
+    position: skillSegments[skillIndex].start + projectIndex + workIntroSettle,
   })),
 )
 
@@ -252,16 +261,13 @@ export function getSkillFrame(progress: number) {
   const projectPosition = previous + fraction
   const active = projectStops[Math.round(projectPosition)]
 
-  // Each category enters in the interval leading to its first project stop.
+  // The first category waits for the intro. Later categories lead their project.
   const entrance =
     next === 0
-      ? { index: 0, phase: clamp(position / to.position) }
+      ? { index: 0, phase: clamp((position - workIntroCopyEnd) / (to.position - workIntroCopyEnd)) }
       : from.skillIndex !== to.skillIndex
-        ? { index: to.skillIndex, phase: fraction }
+        ? { index: to.skillIndex, phase: clamp((fraction * workIntroSettle) / workCategoryTravel) }
         : null
-
-  // The category releases first; the featured card uses the remaining entrance interval.
-  if (entrance) entrance.phase = clamp(entrance.phase * (1.75 / 0.95))
 
   return {
     index: active.skillIndex,

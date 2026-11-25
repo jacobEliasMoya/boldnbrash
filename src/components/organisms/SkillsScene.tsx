@@ -2,12 +2,14 @@
 
 import { IntroDropText } from '@/components/atoms/IntroDropText'
 
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import { useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import {
   cancelFrame,
+  easeOut,
   frame,
   motion,
   useMotionValue,
+  useMotionValueEvent,
   useReducedMotion,
   useTransform,
   type MotionValue,
@@ -17,6 +19,7 @@ import { ProjectCover } from '@/components/atoms/ProjectCover'
 import { ProjectCTA } from '@/components/atoms/ProjectCTA'
 import { WordEmphasis } from '@/components/atoms/WordEmphasis'
 import { ProjectDialog } from './ProjectDialog'
+import { WorkPillMotion } from './ExperienceMotion'
 import {
   pillWheelDepth,
   pillWheelOpacity,
@@ -38,6 +41,10 @@ import {
   skills,
   skillParagraphEndPortion,
   skillTitleFillPortion,
+  skillSegments,
+  skillTravel,
+  workIntroCopyEnd,
+  workIntroCopyStart,
   workProjectId,
 } from './skillsTimeline'
 
@@ -48,6 +55,52 @@ type OpenProject = (project: Project, trigger: HTMLButtonElement) => void
 const introText =
   'See what I’ve built across client websites, design systems, and developer tools, plus a few experiments in 3D and AI.'
 
+type WheelBounds = { upperClearance: number; pillHeights: number[] }
+
+function useSkillWheelPose(
+  index: number,
+  ringPosition: MotionValue<number>,
+  radius: number,
+  compact: boolean,
+  bounds: MotionValue<WheelBounds>,
+) {
+  const distance = useTransform(ringPosition, (position) => index - position)
+  const rotateX = useTransform(distance, (value) =>
+    pillWheelRotation(value, compact, workCompactPitch),
+  )
+  const y = useTransform(distance, (value) => pillWheelVertical(value, radius))
+  const z = useTransform(distance, (value) =>
+    pillWheelDepth(value, radius, compact, workCompactDepth),
+  )
+  // Tuck the outgoing pill into the wheel as it tilts, using the same scroll clock.
+  const scale = useTransform(distance, (value) => {
+    const recede = easeOut(clamp(-value / 0.8))
+
+    return workPillScale * (1 - 0.2 * recede)
+  })
+  const opacity = useTransform(() => {
+    const value = distance.get()
+    const { upperClearance, pillHeights } = bounds.get()
+    const halfHeight = (pillHeights[index] ?? 0) / 2
+    const tilt = (rotateX.get() * Math.PI) / 180
+    const top = y.get() - halfHeight * Math.cos(tilt)
+    const baseOpacity = pillWheelOpacity(value) * clamp((value + 1.75) / 0.45)
+
+    if (value >= 0 || baseOpacity === 0) return baseOpacity
+
+    const fadeRoom = clamp(upperClearance - halfHeight, 1, workPillClearance)
+
+    // Use the unprojected edge to clear the content above even if 3D transforms flatten.
+    return baseOpacity * clamp((upperClearance + top) / fadeRoom)
+  })
+  const visibility = useTransform(distance, (value) =>
+    value <= 0 && value > -1.75 ? 'visible' : 'hidden',
+  )
+  const zIndex = useTransform(distance, (value) => 20 - Math.round(Math.abs(value) * 4))
+
+  return { rotateX, y, z, opacity, visibility, zIndex, scale }
+}
+
 function SkillCategoryPill({
   index,
   active,
@@ -55,6 +108,7 @@ function SkillCategoryPill({
   ringPosition,
   radius,
   compact = false,
+  bounds,
   onSelect,
 }: {
   index: number
@@ -63,43 +117,19 @@ function SkillCategoryPill({
   ringPosition: MotionValue<number>
   radius: number
   compact?: boolean
+  bounds: MotionValue<WheelBounds>
   onSelect: (index: number) => void
 }) {
   const skill = skills[index]
-  // A perspective ring brings the active skill forward while its neighbours tilt away.
-  const distance = useTransform(ringPosition, (position) => index - position)
-  const rotation = useTransform(distance, (value) =>
-    pillWheelRotation(value, compact, workCompactPitch),
-  )
-  const vertical = useTransform(distance, (value) => pillWheelVertical(value, radius))
-  const depth = useTransform(distance, (value) =>
-    pillWheelDepth(value, radius, compact, workCompactDepth),
-  )
-  const opacity = useTransform(distance, (value) => {
-    // Finish fading the outgoing pill before removing it from the wheel.
-    return pillWheelOpacity(value) * clamp((value + 1.75) / 0.45)
-  })
-  const visibility = useTransform(distance, (value) =>
-    value <= 0 && value > -1.75 ? 'visible' : 'hidden',
-  )
-  const order = useTransform(distance, (value) => 20 - Math.round(Math.abs(value) * 4))
+  const pose = useSkillWheelPose(index, ringPosition, radius, compact, bounds)
+  const Item = animated ? motion.li : motion.div
 
   return (
-    <motion.div
-      role={animated ? 'listitem' : undefined}
+    <Item
       className="skills-category-pill"
       data-active={active ? '' : undefined}
       style={
-        {
-          rotateX: animated ? rotation : 0,
-          y: animated ? vertical : 0,
-          z: animated ? depth : 0,
-          opacity: animated ? opacity : 1,
-          scale: animated ? workPillScale : 1,
-          visibility: animated ? visibility : 'visible',
-          zIndex: animated ? order : 1,
-          '--work-pill-scale': workPillScale,
-        } as MotionStyle
+        animated ? ({ ...pose, '--work-pill-scale': workPillScale } as MotionStyle) : undefined
       }
     >
       <div className="skills-category-current" data-skill={skill.name}>
@@ -133,7 +163,7 @@ function SkillCategoryPill({
           />
         )}
       </div>
-    </motion.div>
+    </Item>
   )
 }
 
@@ -218,6 +248,33 @@ function SkillProjects({
   )
 }
 
+function SkillsWheelIntroCopy() {
+  return (
+    <>
+      <h3>Skills in practice.</h3>
+      <p>Explore the tools behind each project.</p>
+    </>
+  )
+}
+
+function SkillsWheelIntro() {
+  const progress = useContext(WorkPillMotion)?.progress
+
+  // Follow the scene opening while staying independent of the category wheel.
+  const opacity = useTransform(() => {
+    const travel = (progress?.get() ?? 0) * skillTravel
+
+    return easeOut(clamp((travel - workIntroCopyStart) / (workIntroCopyEnd - workIntroCopyStart)))
+  })
+  const visibility = useTransform(opacity, (value) => (value > 0 ? 'visible' : 'hidden'))
+
+  return (
+    <motion.li className="skills-wheel-intro" data-wheel-static style={{ opacity, visibility }}>
+      <SkillsWheelIntroCopy />
+    </motion.li>
+  )
+}
+
 export function SkillsScene() {
   const [selection, setSelection] = useState({ ...getSkillFrame(0), intro: 0, textIntro: 0 })
   const [pinned, setPinned] = useState(false)
@@ -226,11 +283,22 @@ export function SkillsScene() {
   const trigger = useRef<HTMLButtonElement | null>(null)
   const reduceMotion = useReducedMotion()
   const animated = pinned && !reduceMotion
-  const wheel = useRef<HTMLDivElement>(null)
+  const wheel = useRef<HTMLUListElement>(null)
+  const projects = useRef<HTMLDivElement>(null)
   const pendingCategoryFocus = useRef<number | null>(null)
   const [radius, setRadius] = useState(340)
   const [compactWheel, setCompactWheel] = useState(false)
   const ringPosition = useMotionValue(0)
+  const wheelBounds = useMotionValue<WheelBounds>({
+    upperClearance: Infinity,
+    pillHeights: [],
+  })
+  const [categoryIndex, setCategoryIndex] = useState(0)
+
+  // Category selection follows the visible wheel, independently of the project wipe.
+  useMotionValueEvent(ringPosition, 'change', (position) => {
+    setCategoryIndex(Math.round(clamp(position, 0, skills.length - 1)))
+  })
   useWorkPillEntrance(wheel, animated, ringPosition, radius, compactWheel)
 
   useLayoutEffect(() => {
@@ -238,11 +306,31 @@ export function SkillsScene() {
 
     if (!element || !animated) return
 
+    const intro = element.querySelector<HTMLElement>('[data-wheel-static]')
+    const pills = Array.from(element.querySelectorAll<HTMLElement>('.skills-category-pill'))
+    const projectDeck = projects.current
+
     const measure = () => {
       const compact = window.matchMedia('(max-width: 900px)').matches
-      const pills = Array.from(element.querySelectorAll<HTMLElement>('.skills-category-pill'))
-      const tallest = Math.max(0, ...pills.map((pill) => pill.offsetHeight * workPillScale))
-      let compactRadius = Math.max(80, element.clientHeight * 0.6)
+      const layout = getComputedStyle(element)
+      const sharedRows = layout.gridTemplateRows.startsWith('subgrid')
+      const sharedColumns = layout.gridTemplateColumns.startsWith('subgrid')
+      const stacked = sharedRows && !sharedColumns
+      const pillHeights = pills.map((pill) => pill.offsetHeight * workPillScale)
+      const tallest = Math.max(0, ...pillHeights)
+      const anchor = pills[0]
+      const center = anchor.offsetTop
+      const height = element.clientHeight
+      // The final shared row contains the rotating pills.
+      const orbitHeight = sharedRows ? 2 * (height - center) : height
+      const contentBottom =
+        stacked && projectDeck
+          ? projectDeck.getBoundingClientRect().bottom - element.getBoundingClientRect().top
+          : intro
+            ? intro.offsetTop + intro.offsetHeight
+            : -Infinity
+      const upperClearance = center - contentBottom - 4
+      let compactRadius = Math.max(80, orbitHeight * 0.6)
       const maximumRadius = (tallest + workPillClearance) * Math.SQRT2
 
       // Keep the orbit tight and expand it only as far as the tilted edges require.
@@ -255,7 +343,13 @@ export function SkillsScene() {
       }
 
       setCompactWheel(compact)
-      setRadius(compact ? compactRadius : Math.max(130, element.clientHeight * 0.46))
+      setRadius(compact ? compactRadius : Math.max(130, height * 0.46))
+      element.style.setProperty('--work-wheel-center', `${center}px`)
+      element.style.setProperty(
+        '--work-wheel-center-x',
+        sharedColumns ? `${anchor.offsetLeft + anchor.offsetWidth / 2}px` : '50%',
+      )
+      wheelBounds.set({ upperClearance, pillHeights })
     }
 
     measure()
@@ -263,10 +357,12 @@ export function SkillsScene() {
     const observer = new ResizeObserver(measure)
 
     observer.observe(element)
-    element.querySelectorAll('.skills-category-pill').forEach((pill) => observer.observe(pill))
+    if (intro) observer.observe(intro)
+    if (projectDeck) observer.observe(projectDeck)
+    pills.forEach((pill) => observer.observe(pill))
 
     return () => observer.disconnect()
-  }, [animated])
+  }, [animated, wheelBounds])
 
   const scene = useRef<HTMLDivElement>(null)
   const period = useRef<HTMLSpanElement>(null)
@@ -321,19 +417,19 @@ export function SkillsScene() {
     }
   }, [animated])
   useLayoutEffect(() => {
-    if (pendingCategoryFocus.current === selection.index) {
+    if (pendingCategoryFocus.current === categoryIndex) {
       const focusCategory = () => {
         pendingCategoryFocus.current = null
         wheel.current
           ?.querySelectorAll<HTMLButtonElement>('.skills-pill-toggle')
-          [selection.index]?.focus({ preventScroll: true })
+          [categoryIndex]?.focus({ preventScroll: true })
       }
 
       frame.postRender(focusCategory)
 
       return () => cancelFrame(focusCategory)
     }
-  }, [selection.index])
+  }, [categoryIndex])
   useEffect(() => {
     function update(event: Event) {
       const { progress, intro, textIntro } = (
@@ -362,7 +458,12 @@ export function SkillsScene() {
   function selectSkill(index: number) {
     window.dispatchEvent(
       new CustomEvent('portfolio:select-skill', {
-        detail: { index, offset: 0.95 },
+        detail: {
+          index,
+          offset:
+            projectStops.find((stop) => stop.skillIndex === index)!.position -
+            skillSegments[index].start,
+        },
         cancelable: true,
       }),
     )
@@ -435,7 +536,7 @@ export function SkillsScene() {
           aria-hidden={expansion < 1}
         >
           <div className="skills-performance">
-            <div className="skills-projects">
+            <div ref={projects} className="skills-projects">
               {skills.map((skill, index) => (
                 <SkillProjects
                   key={skill.name}
@@ -447,7 +548,8 @@ export function SkillsScene() {
                 />
               ))}
             </div>
-            <div
+            {/* Preserve list semantics in Safari with list markers hidden. */}
+            <ul
               ref={wheel}
               className="skills-browser"
               role="list"
@@ -460,7 +562,7 @@ export function SkillsScene() {
                   return
 
                 const last = skills.length - 1
-                let next = selection.index
+                let next = categoryIndex
 
                 switch (event.key) {
                   case 'ArrowUp':
@@ -487,29 +589,34 @@ export function SkillsScene() {
 
                 event.preventDefault()
 
-                if (next === selection.index) return
+                if (next === categoryIndex) return
 
                 pendingCategoryFocus.current = next
                 selectSkill(next)
               }}
             >
+              <SkillsWheelIntro />
               {skills.map((skill, index) => (
                 <SkillCategoryPill
                   key={skill.name}
                   index={index}
-                  active={selection.index === index}
+                  active={categoryIndex === index}
                   animated
                   ringPosition={ringPosition}
                   radius={radius}
                   compact={compactWheel}
+                  bounds={wheelBounds}
                   onSelect={selectSkill}
                 />
               ))}
-            </div>
+            </ul>
           </div>
         </div>
       ) : (
         <div className="skills-fallback">
+          <div className="skills-wheel-intro">
+            <SkillsWheelIntroCopy />
+          </div>
           {skills.map((skill, index) => (
             <section className="skills-pair" key={skill.name} aria-label={skill.name}>
               <SkillProjects
@@ -525,13 +632,14 @@ export function SkillsScene() {
                 animated={false}
                 radius={radius}
                 ringPosition={ringPosition}
+                bounds={wheelBounds}
                 onSelect={selectSkill}
               />
             </section>
           ))}
         </div>
       )}
-      {selection.index !== skills.length - 1 && (
+      {categoryIndex !== skills.length - 1 && (
         <span className="skills-index-portal" data-portal="about" aria-hidden="true" />
       )}
       <ProjectDialog

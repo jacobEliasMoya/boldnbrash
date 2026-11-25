@@ -35,7 +35,11 @@ export default defineConfig({
     },
     {
       name: 'webkit-touch',
-      testMatch: ['**/touch.webkit.e2e.spec.ts', '**/loader-hydration.e2e.spec.ts'],
+      testMatch: [
+        '**/touch.webkit.e2e.spec.ts',
+        '**/loader-hydration.e2e.spec.ts',
+        '**/skill-rotation.e2e.spec.ts',
+      ],
       use: { ...devices['iPhone 13'], browserName: 'webkit' },
     },
   ],

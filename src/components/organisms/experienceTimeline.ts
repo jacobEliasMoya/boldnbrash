@@ -62,6 +62,27 @@ const releaseSpring = spring({
   restDelta: 0.001,
 })
 
+function getReleaseDepth(lift: number, inset: number, release: number, project: boolean) {
+  if (release === 0) return lift
+
+  const springPosition = releaseSpring.next(release * 850).value
+
+  // Soften the last few pixels of the crest before it crosses the flat frame.
+  if (springPosition >= 0) {
+    const pull = lift * springPosition
+
+    const soften = ease(clamp(release / 0.15))
+
+    return pull * mix(1, ease(clamp(pull / inset)), soften)
+  }
+
+  // A large card used to hit its inward limit almost immediately. Scale the dip
+  // to the frame thickness so every item takes the full spring arc to recede.
+  const rebound = ease(clamp(-springPosition / 0.07))
+
+  return -inset * (project ? 0.27 : 0.4) * rebound
+}
+
 type Pill = { x: number; top: number; width: number; height: number; radius: number }
 
 export type ExperienceDock = {
@@ -125,9 +146,7 @@ export function getExperienceDock(
       : narrow
         ? visible + rim + mobileRise
         : exposed * 1.14
-  const pull = lift * releaseSpring.next(release * 850).value
-  const insetLimit = inset * (profile === 'project' ? 0.45 : 0.62)
-  const depth = pull < 0 ? insetLimit * Math.tanh(pull / insetLimit) : pull
+  const depth = getReleaseDepth(lift, inset, release, profile === 'project')
 
   // The spring can overlap the pill after it clears the flat frame.
   // Keep the opening until the crest passes below it.

@@ -4,6 +4,10 @@ import {
   sceneDuration,
   skillStart,
   projectStops,
+  workIntroCopyStart,
+  workIntroCopyEnd,
+  workIntroSettle,
+  workProjectTravel,
 } from '../../src/components/organisms/skillsTimeline'
 import { experiencePillTravel } from '../../src/components/organisms/experienceTimeline'
 
@@ -55,14 +59,16 @@ for (const width of [320, 390, 440, 1440]) {
         Object.defineProperty(event, 'touches', { value: [{ clientX: 190, clientY: 480 }] })
         element.dispatchEvent(event)
       })
-      await seek(page, skillStart + 0.95 * 0.43)
+      await seek(page, skillStart + (workIntroCopyStart + workIntroCopyEnd) / 2)
+      await shot('03-intro-copy')
+      await seek(page, skillStart + workIntroCopyEnd + (workIntroSettle - workIntroCopyEnd) * 0.43)
       await shot('03-category-attached')
       for (const [name, phase] of [
         ['attached', 0.43],
         ['release', 0.76],
         ['recoil', 0.86],
       ] as const) {
-        await seek(page, skillStart + 0.95 + 0.8 * phase)
+        await seek(page, skillStart + workProjectTravel * phase)
         await shot(`04-project-${name}`)
       }
       await seek(page, skillStart + projectStops[0].position + 0.04)

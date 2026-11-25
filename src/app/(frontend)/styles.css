@@ -309,7 +309,8 @@ ul {
   position: sticky;
   top: 0;
   height: 100dvh;
-  overflow: hidden;
+  /* Clip pinned scenes without creating an extra scroll container for hash/focus navigation. */
+  overflow: clip;
 }
 .portfolio[data-enhanced] .scene {
   position: absolute;
@@ -358,13 +359,14 @@ ul {
   color: var(--ink);
 }
 
-/* Mix the tint once so the hero's gradient cannot change the watermark color. */
+/* Fade the JM diagonally, retaining each scene's existing tint at the far edge. */
 .scene-top::before,
 .scene-skills::after,
 .skills-reveal::before,
 .scene-about::before,
 .experience::before {
-  background-color: color-mix(in srgb, var(--blue) 12%, var(--canvas));
+  --watermark-tint: color-mix(in srgb, var(--blue) 12%, var(--canvas));
+  background: linear-gradient(135deg, transparent 0%, var(--watermark-tint) 100%);
 }
 
 /* The actual JM silhouette supplies the background geometry. */
@@ -3174,16 +3176,36 @@ ul {
   min-height: 0;
   align-items: center;
 }
+.skills-wheel-intro {
+  color: var(--ink);
+}
+.skills-browser > [data-wheel-static] {
+  grid-row: 1;
+  min-width: 0;
+}
+.skills-wheel-intro h3 {
+  margin: 0;
+  font: 900 clamp(2rem, 4vw, 4rem) / 1.05 var(--display);
+  letter-spacing: -0.04em;
+}
+.skills-wheel-intro p {
+  max-width: 46ch;
+  margin: 8px 0 0;
+  font: 16px / 1.5 var(--mono);
+}
 .portfolio[data-enhanced] .skills-duet .skills-browser {
   grid-column: 2;
   grid-row: 1;
+  display: grid;
+  grid-template: auto minmax(0, 1fr) / minmax(0, 1fr);
+  row-gap: 12px;
   height: 100%;
   min-height: 0;
-  max-height: 720px;
+  max-height: 420px;
   padding: 0;
   overflow: visible;
   perspective: 1100px;
-  perspective-origin: 50% 50%;
+  perspective-origin: var(--work-wheel-center-x, 50%) var(--work-wheel-center, 50%);
   touch-action: pan-y pinch-zoom;
   cursor: auto;
   user-select: auto;
@@ -3198,6 +3220,7 @@ ul {
   overflow: visible;
 }
 .portfolio[data-enhanced] .skills-duet .skills-category-pill {
+  grid-area: 2 / 1 / 3 / 2;
   left: 0;
   width: 100%;
 }
@@ -3283,6 +3306,9 @@ ul {
 .skills-fallback {
   margin-top: 64px;
 }
+.skills-fallback > .skills-wheel-intro {
+  margin-bottom: 32px;
+}
 .skills-pair {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -3318,6 +3344,13 @@ ul {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr) 200px;
     gap: 20px;
+  }
+  .skills-wheel-intro h3 {
+    font-size: clamp(1.5rem, 6.8vw, 2.25rem);
+  }
+  .skills-wheel-intro p {
+    margin-top: 4px;
+    font-size: clamp(0.6875rem, 3.3vw, 0.9375rem);
   }
   .portfolio[data-enhanced] .skills-duet .skills-browser {
     grid-column: 1;
@@ -3402,6 +3435,13 @@ ul {
     grid-template-rows: minmax(0, 1fr);
     gap: 28px;
   }
+  .skills-wheel-intro h3 {
+    font-size: clamp(1.375rem, 3.7vw, 2.375rem);
+  }
+  .skills-wheel-intro p {
+    margin-top: 4px;
+    font-size: clamp(0.75rem, 1.75vw, 0.875rem);
+  }
   .portfolio[data-enhanced] .skills-duet .skills-browser {
     grid-column: 2;
     grid-row: 1;
@@ -3446,6 +3486,91 @@ ul {
   }
   .skills-duet .skills-project-caption {
     font-size: 8px;
+  }
+}
+
+@media (max-height: 280px) and (min-width: 500px) {
+  .portfolio[data-enhanced] .skills-duet .skills-reveal {
+    padding-top: 68px;
+    padding-bottom: 14px;
+  }
+
+  .skills-reveal .skills-category-pill {
+    padding-block: 12px;
+  }
+
+  .skills-reveal .skills-technologies {
+    font-size: 12px;
+  }
+}
+
+@supports (grid-template-rows: subgrid) {
+  @media (max-width: 900px) and (min-height: 300px) {
+    .portfolio[data-enhanced] .skills-duet .skills-reveal {
+      padding-top: max(108px, calc(env(safe-area-inset-top, 0px) + 86px));
+    }
+
+    .skills-performance {
+      grid-template-rows: auto minmax(0, 1fr) clamp(128px, 20dvh, 166px);
+      gap: clamp(12px, 2.4dvh, 20px);
+    }
+
+    /* Share the rows so the intro can sit above the project as part of the wheel list. */
+    .portfolio[data-enhanced] .skills-duet .skills-browser {
+      grid-row: 1 / -1;
+      grid-template-rows: subgrid;
+      row-gap: normal;
+      align-self: stretch;
+      height: auto;
+      max-height: none;
+      pointer-events: none;
+    }
+
+    .skills-browser > [data-wheel-static] {
+      width: 94%;
+      justify-self: center;
+      pointer-events: auto;
+    }
+
+    .portfolio[data-enhanced] .skills-duet .skills-category-pill {
+      grid-row: 3 / 4;
+      pointer-events: auto;
+    }
+
+    .skills-projects {
+      grid-row: 2;
+    }
+  }
+
+  @media (min-width: 500px) and (max-width: 900px) and (min-height: 300px) and (max-height: 560px) {
+    .portfolio[data-enhanced] .skills-duet .skills-reveal {
+      padding-top: max(104px, calc(env(safe-area-inset-top, 0px) + 82px));
+    }
+
+    .skills-performance {
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 12px 28px;
+    }
+
+    .portfolio[data-enhanced] .skills-duet .skills-browser {
+      grid-column: 1 / -1;
+      grid-template-columns: subgrid;
+      column-gap: normal;
+    }
+
+    .skills-browser > [data-wheel-static] {
+      grid-column: 1 / -1;
+      width: 97%;
+    }
+
+    .portfolio[data-enhanced] .skills-duet .skills-category-pill {
+      grid-area: 2 / 2 / 3 / 3;
+    }
+
+    .skills-duet .skills-project-caption {
+      min-height: 16px;
+      margin-bottom: 6px;
+    }
   }
 }
 
@@ -4754,4 +4879,10 @@ ul {
 
 .project-detail-window::-webkit-scrollbar {
   display: none;
+}
+
+/* The Work stage belongs to the scene clock, never a hidden nested scroll offset. */
+.portfolio[data-enhanced] .scene-skills {
+  overflow: clip;
+  overflow-anchor: none;
 }

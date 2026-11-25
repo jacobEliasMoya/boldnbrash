@@ -10,6 +10,8 @@ import {
   skills,
   skillStart,
   skillTravel,
+  workCategoryTravel,
+  workIntroSettle,
 } from '../../src/components/organisms/skillsTimeline'
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000'
@@ -816,7 +818,7 @@ test('category controls and project details work by keyboard', async ({ page }) 
   await cms.press('Enter')
   await expect(
     page.locator('.skills-category-pill[data-active] .skills-category-current h3').last(),
-  ).toHaveText('Headless CMS')
+  ).toHaveText('Headless CMS.')
   await scrollTimeline(page, skillStart + skillSegments[1].start + 1.1)
 
   const read = page
@@ -1283,7 +1285,7 @@ test('mobile header stays transparent and the menu settles without depth jitter'
   await expect(page.getByRole('dialog', { name: 'Mobile navigation' })).not.toBeVisible()
 })
 
-test('the ring keeps each skill centered through project reveals on desktop and mobile', async ({
+test('the ring centers each skill below the fixed intro on desktop and mobile', async ({
   page,
 }) => {
   test.setTimeout(120000)
@@ -1297,31 +1299,27 @@ test('the ring keeps each skill centered through project reveals on desktop and 
 
     for (const index of [0, 1, skills.length - 1]) {
       const pill = list.locator('.skills-category-pill').nth(index)
+      const settle = index === 0 ? workIntroSettle : workCategoryTravel
 
-      for (const phase of [0.95]) {
-        await scrollTimeline(page, skillStart + skillSegments[index].start + phase)
-        await expect
-          .poll(() =>
-            pill.evaluate((element) => {
-              const container = element.parentElement!
-              const bounds = element.getBoundingClientRect()
+      await scrollTimeline(page, skillStart + skillSegments[index].start + settle)
+      await expect
+        .poll(() =>
+          pill.evaluate((element) => {
+            const list = element.parentElement!
+            const rowCenter = list.getBoundingClientRect().top + (element as HTMLElement).offsetTop
+            const bounds = element.getBoundingClientRect()
 
-              return Math.abs(
-                bounds.top +
-                  bounds.height / 2 -
-                  (container.getBoundingClientRect().top + container.clientHeight / 2),
-              )
-            }),
-          )
-          .toBeLessThan(2)
-        await expect
-          .poll(() =>
-            pill.evaluate((element) =>
-              Math.abs(new DOMMatrixReadOnly(getComputedStyle(element).transform).m43),
-            ),
-          )
-          .toBeLessThan(1)
-      }
+            return Math.abs(bounds.top + bounds.height / 2 - rowCenter)
+          }),
+        )
+        .toBeLessThan(2)
+      await expect
+        .poll(() =>
+          pill.evaluate((element) =>
+            Math.abs(new DOMMatrixReadOnly(getComputedStyle(element).transform).m43),
+          ),
+        )
+        .toBeLessThan(1)
     }
   }
 })
