@@ -47,7 +47,7 @@
   --scroll-liquid-radius: 46px;
   --portfolio-pill-radius: 64px;
   --portfolio-pill-surface: #080809;
-  --experience-pill-surface: var(--portfolio-pill-surface);
+  --experience-pill-surface: #000;
   --blue: #3814ff;
   --accent: #ffc857;
   --accent-ink: #805000;
@@ -2486,7 +2486,7 @@ ul {
 /* After hours keeps the same composition with softer surfaces and deeper blue. */
 :root[data-theme='dark'] {
   --canvas: #101014;
-  --frame-color: #53505f;
+  --frame-color: #fff;
   --ink: #efebe1;
   --portfolio-pill-surface: #4b3b63;
   --experience-pill-surface: #fff;
@@ -2940,6 +2940,11 @@ ul {
   --experience-frame: var(--experience-pill-surface);
 }
 
+/* Item formations share pure black/white surfaces with the frame in each theme. */
+.portfolio:is([data-experience-active], [data-work-projects]) {
+  --frame-color: var(--experience-pill-surface);
+}
+
 /* Overlap the same-colored edges so antialiasing cannot expose the canvas through the cut. */
 .liquid-experience-cut {
   stroke: white;
@@ -2965,10 +2970,10 @@ ul {
 /* The liquid continues the solid frame without blending with scene backgrounds. */
 .portfolio[data-enhanced] .liquid-boundary {
   mix-blend-mode: normal;
-  fill: var(--experience-frame, #000);
+  fill: var(--frame-color);
 }
 :root[data-theme='dark'] .portfolio[data-enhanced] .liquid-boundary {
-  fill: var(--experience-frame, #fff);
+  fill: var(--frame-color);
 }
 /* Explicit surface colours avoid complementary green text over purple scenes. */
 .liquid-blended-nav,
@@ -2980,10 +2985,10 @@ ul {
 }
 .portfolio .liquid-surround {
   z-index: 70;
-  fill: var(--experience-frame, #000);
+  fill: var(--frame-color);
 }
 :root[data-theme='dark'] .portfolio .liquid-surround {
-  fill: var(--experience-frame, #fff);
+  fill: var(--frame-color);
 }
 .liquid-blended-nav[data-tone='dark'],
 .liquid-blended-logo[data-tone='dark'],
@@ -3852,27 +3857,30 @@ ul {
 .skill-project-card,
 .portfolio[data-enhanced] .skills-duet .skill-project-card {
   --ribbon-overhang: clamp(8px, 1vw, 12px);
+  --project-frame-width: var(--frame-inset, 12px);
+  --project-frame-radius: 28px;
   padding: 0;
   gap: 0;
   border: 0;
-  border-radius: 28px;
-  background: #1b0c2d;
+  border-radius: var(--project-frame-radius);
+  background: var(--frame-color);
   isolation: isolate;
   overflow: visible;
 }
 .skill-project-card .artwork-frame.project-cover,
 .skills-duet .skill-project-card .artwork-frame.project-cover {
+  /* Inset the artwork, keeping the measured outer card identical to the liquid cutout. */
   position: absolute;
   z-index: 1;
-  inset: 0;
+  inset: var(--project-frame-width);
   display: grid;
   place-items: center;
-  width: 100%;
-  height: 100%;
+  width: calc(100% - 2 * var(--project-frame-width));
+  height: calc(100% - 2 * var(--project-frame-width));
   min-height: 0;
   margin: 0;
   overflow: hidden;
-  border-radius: inherit;
+  border-radius: max(0px, calc(var(--project-frame-radius) - var(--project-frame-width)));
   background: radial-gradient(ellipse at 65% 25%, #36204b, #160924 80%);
 }
 .skill-project-card .artwork-frame.project-cover[data-artwork='model'],
@@ -4514,6 +4522,7 @@ ul {
   align-content: center;
   padding: clamp(15px, 1.8dvh, 26px) clamp(32px, 5.5vw, 96px);
   border-radius: var(--portfolio-pill-radius);
+  /* Keep the pill and its liquid connection on the same black/white surface. */
   background: var(--experience-pill-surface);
   color: var(--paper);
 }
@@ -4599,7 +4608,8 @@ ul {
 
 .portfolio[data-enhanced] .experience-role[data-receding] {
   transform: translateZ(var(--experience-depth)) rotateX(var(--experience-tilt));
-  opacity: var(--experience-opacity);
+  /* Keep the black/white surface solid while depth and tilt convey recession. */
+  opacity: 1;
   backface-visibility: hidden;
 }
 
@@ -4735,4 +4745,13 @@ ul {
 
 [data-intro-drop-complete] .skills-title-fill [data-intro-drop='letter'] {
   visibility: hidden;
+}
+
+/* Project details use the shared measured scroll pill instead of native scrollbar chrome. */
+.project-detail-window {
+  scrollbar-width: none;
+}
+
+.project-detail-window::-webkit-scrollbar {
+  display: none;
 }

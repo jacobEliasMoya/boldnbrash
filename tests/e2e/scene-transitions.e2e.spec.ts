@@ -54,7 +54,7 @@ test('Work categories dock with the liquid and return to their project slot', as
   const nextProject = projectStops.findIndex((stop) => stop.skillIndex === 1)
   const from = projectStops[nextProject - 1].position
   const to = projectStops[nextProject].position
-  const midEntry = skillStart + from + (to - from) * 0.43
+  const midEntry = skillStart + from + (to - from) * (0.95 / 1.75) * 0.43
   const second = page.locator('.skills-category-pill').nth(1)
   const first = page.locator('.skills-category-pill').first()
 
@@ -70,7 +70,7 @@ test('Work categories dock with the liquid and return to their project slot', as
   await expect(first).toHaveCSS('visibility', 'hidden')
   await expect(page.locator('.skills-reveal')).toHaveAttribute('inert', '')
 
-  await moveToBoundary(page, skillStart + projectStops[0].position * 0.43)
+  await moveToBoundary(page, skillStart + 0.95 * 0.43)
   await expect(first).toHaveAttribute('data-work-docked', '')
   await expect(first).toHaveCSS('visibility', 'visible')
 
@@ -90,7 +90,7 @@ test('Work categories dock with the liquid and return to their project slot', as
     .raw()
     .toBuffer()
 
-  expect(Array.from(edge)).toEqual([8, 8, 9])
+  expect(Array.from(edge)).toEqual([0, 0, 0])
 
   await moveToBoundary(page, skillStart + to + 0.035)
   await expect(second).toHaveAttribute('data-active', '')
@@ -106,6 +106,102 @@ test('Work categories dock with the liquid and return to their project slot', as
 
   await moveToBoundary(page, skillStart - 0.1)
   await expect(first).toHaveCSS('visibility', 'hidden')
+})
+
+test('desktop Work project enters from the left and reverses', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto(`${baseURL}/#${projectStops[0].id}`)
+  const card = page.locator('.skill-project-card').first()
+
+  await page.locator('.skills-performance').evaluate((target) => {
+    const event = new Event('touchstart', { bubbles: true })
+    Object.defineProperty(event, 'touches', { value: [{ clientX: 900, clientY: 480 }] })
+    target.dispatchEvent(event)
+  })
+
+  const entry = skillStart + 0.95 + 0.8 * 0.25
+  await moveToBoundary(page, entry)
+  await expect(card).toHaveAttribute('data-project-entering', '')
+  const attached = (await card.boundingBox())!
+  expect(attached.x).toBeLessThan(0)
+  await expect(page.locator('.liquid-experience-shoulders')).toHaveAttribute(
+    'transform',
+    /matrix\(0 1 -1 0/,
+  )
+  await page.screenshot({ path: test.info().outputPath('project-liquid-desktop.png') })
+
+  await moveToBoundary(page, skillStart + projectStops[0].position + 0.04)
+  await expect(card).not.toHaveAttribute('data-project-entering')
+  const settled = (await card.boundingBox())!
+  expect(settled.x).toBeGreaterThan(0)
+  expect(settled.y).toBeCloseTo(attached.y, 0)
+
+  await moveToBoundary(page, entry)
+  await expect(card).toHaveAttribute('data-project-entering', '')
+  await expect.poll(async () => (await card.boundingBox())!.x).toBeCloseTo(attached.x, 0)
+  await expect(page.locator('.skill-project-card')).toHaveCount(projectStops.length)
+})
+
+test('mobile Work project enters from the left and reverses', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(`${baseURL}/#${projectStops[0].id}`)
+  const card = page.locator('.skill-project-card').first()
+
+  await page.locator('.skills-performance').evaluate((target) => {
+    const event = new Event('touchstart', { bubbles: true })
+    Object.defineProperty(event, 'touches', { value: [{ clientX: 190, clientY: 480 }] })
+    target.dispatchEvent(event)
+  })
+
+  const entry = skillStart + 0.95 + 0.8 * 0.25
+  await moveToBoundary(page, entry)
+  const entering = (await card.boundingBox())!
+  expect(entering.x).toBeLessThan(0)
+  const liquid = page.locator('.liquid-experience-shoulders')
+  await expect(liquid).toHaveAttribute('transform', /matrix\(0 1 -1 0/)
+  await expect(liquid).toHaveAttribute('d', /M/)
+  await expect(liquid).toHaveAttribute('d', /C/)
+  await page.screenshot({ path: test.info().outputPath('project-liquid-mobile.png') })
+  const colors = await liquid.evaluate((element) => ({
+    liquid: getComputedStyle(element).fill,
+    border: getComputedStyle(document.querySelector('.frame-surround') ?? element)
+      .getPropertyValue('--frame-color')
+      .trim(),
+  }))
+  expect(colors.liquid).toBe('rgb(0, 0, 0)')
+  expect(colors.border).toMatch(/^#(?:000|000000)$/)
+
+  await moveToBoundary(page, skillStart + projectStops[0].position + 0.04)
+  const settled = (await card.boundingBox())!
+  expect(settled.x).toBeGreaterThan(0)
+  expect(settled.y).toBeCloseTo(entering.y, 0)
+
+  await moveToBoundary(page, entry)
+  await expect.poll(async () => (await card.boundingBox())!.x).toBeCloseTo(entering.x, 0)
+})
+
+test('project details reuse the scroll pill with their own measured range', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 500 })
+  await page.goto(`${baseURL}/#${projectStops[0].id}`)
+  await page.locator('.skill-project-card').first().getByRole('button').click()
+  const dialog = page.getByRole('dialog')
+  const slider = dialog.getByRole('slider', { name: 'Astro Platform scroll position' })
+  await expect(slider).toBeVisible()
+  const backgroundScroll = await page.evaluate(() => scrollY)
+  await slider.focus()
+  await slider.press('End')
+  await expect
+    .poll(() =>
+      dialog.locator('.project-detail-window').evaluate((element) => {
+        return element.scrollTop / (element.scrollHeight - element.clientHeight)
+      }),
+    )
+    .toBeCloseTo(1, 2)
+  expect(await page.evaluate(() => scrollY)).toBe(backgroundScroll)
+  await slider.press('Home')
+  await expect
+    .poll(() => dialog.locator('.project-detail-window').evaluate((element) => element.scrollTop))
+    .toBe(0)
 })
 
 test('Experience keeps its pill spacing when the entrance reverses on a small screen', async ({
@@ -184,30 +280,29 @@ test('Experience docks the entering role to the viewport and reverses cleanly', 
 
     const entering = (await third.boundingBox())!
 
-    // The shared surface must paint through the masked join without a halo in either theme.
-    const edgeY = Math.floor(entering.y)
-
-    for (const y of [edgeY - 1, edgeY, edgeY + 1])
-      expect(pixel(Math.round(info.width / 2), y)).toEqual(surface)
+    // The liquid matches the outer border while the pill keeps its own surface.
+    const frame = await page
+      .locator('.liquid-experience-shoulders')
+      .evaluate((element) => getComputedStyle(element).fill.match(/\d+/g)!.map(Number))
 
     // The rising frame wraps over the pill as well as around its sides.
-    expect(pixel(Math.round(info.width / 2), Math.floor(entering.y - 8))).toEqual(surface)
+    expect(pixel(Math.round(info.width / 2), Math.floor(entering.y - 8))).toEqual(frame)
 
     // Both shoulders rise above the flat frame outside the pill's outline.
-    expect(pixel(Math.floor(entering.x - 12), info.height - 18)).toEqual(surface)
-    expect(pixel(Math.ceil(entering.x + entering.width + 12), info.height - 18)).toEqual(surface)
+    expect(pixel(Math.floor(entering.x - 12), info.height - 18)).toEqual(frame)
+    expect(pixel(Math.ceil(entering.x + entering.width + 12), info.height - 18)).toEqual(frame)
 
     for (const x of [4, Math.floor(entering.x - 4), Math.ceil(entering.x + entering.width + 4)]) {
       const outside = pixel(x)
 
-      for (const [index, channel] of surface.entries())
+      for (const [index, channel] of frame.entries())
         expect(Math.abs(outside[index] - channel)).toBeLessThanOrEqual(2)
     }
   }
 
   await expect(canvas).toHaveCSS('background-color', 'rgb(255, 255, 255)')
   await expect(canvas).toHaveCSS('color', 'rgb(8, 8, 9)')
-  await expectDockPixels([8, 8, 9])
+  await expectDockPixels([0, 0, 0])
 
   await nightMode.click()
   await expect(canvas).toHaveCSS('background-color', 'rgb(16, 16, 20)')
@@ -306,7 +401,7 @@ test('Experience docks the entering role to the viewport and reverses cleanly', 
     )
     .toBeGreaterThan(0.95)
   const outgoingOpacity = await second.evaluate((role) => Number(getComputedStyle(role).opacity))
-  expect(outgoingOpacity).toBeCloseTo(0.35, 2)
+  expect(outgoingOpacity).toBe(1)
 
   const outgoing = await second.evaluate((element) => {
     const pose = new DOMMatrixReadOnly(getComputedStyle(element).transform)

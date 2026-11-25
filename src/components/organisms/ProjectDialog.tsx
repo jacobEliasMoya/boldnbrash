@@ -4,6 +4,8 @@ import { DotIcon } from '@/components/atoms/dot-icons/DotIcon'
 import { playDotClick } from '@/components/atoms/dot-icons/dotMotion'
 import { useEffect, useRef } from 'react'
 import { animate, motion, useAnimationControls, useReducedMotion } from 'motion/react'
+import { ScrollPill } from '@/components/atoms/ScrollPill'
+import { useMotionValue, useSpring } from 'motion/react'
 import { ProjectCover } from '@/components/atoms/ProjectCover'
 
 type ProjectDetails = {
@@ -27,6 +29,35 @@ export function ProjectDialog({
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
   const reduced = useReducedMotion()
+  const scrollWindow = useRef<HTMLDivElement>(null)
+  const scrollProgress = useMotionValue(0)
+  const scrollRecess = useSpring(1, { stiffness: 340, damping: 34, mass: 0.85 })
+
+  // Measure the actual overflow, including font reflow and responsive artwork changes.
+  useEffect(() => {
+    const element = scrollWindow.current
+
+    if (!project || !element) return
+
+    element.scrollTop = 0
+    const measure = () => {
+      const range = Math.max(0, element.scrollHeight - element.clientHeight)
+      scrollProgress.set(range ? element.scrollTop / range : 0)
+      if (reduced) scrollRecess.jump(range > 1 ? 0 : 1)
+      else scrollRecess.set(range > 1 ? 0 : 1)
+    }
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    if (element.firstElementChild) observer.observe(element.firstElementChild)
+    element.addEventListener('scroll', measure, { passive: true })
+    measure()
+
+    return () => {
+      observer.disconnect()
+      element.removeEventListener('scroll', measure)
+    }
+  }, [project, reduced, scrollProgress, scrollRecess])
+
   const closeIconControls = useAnimationControls()
   const closing = useRef(false)
   const stopAnimation = useRef<(() => void) | null>(null)
@@ -108,7 +139,7 @@ export function ProjectDialog({
       }}
     >
       {project && (
-        <div className="project-detail-window">
+        <div ref={scrollWindow} className="project-detail-window">
           <div className="project-detail-layout">
             <div
               className="project-detail-cover project-cover"
@@ -167,6 +198,20 @@ export function ProjectDialog({
             </div>
           </div>
         </div>
+      )}
+      {project && (
+        <ScrollPill
+          progress={scrollProgress}
+          recess={scrollRecess}
+          section={project.title}
+          onSeek={(position) => {
+            const element = scrollWindow.current
+
+            if (!element) return
+
+            element.scrollTop = position * Math.max(0, element.scrollHeight - element.clientHeight)
+          }}
+        />
       )}
     </dialog>
   )

@@ -2,7 +2,8 @@
 
 import { DotIcon } from '@/components/atoms/dot-icons/DotIcon'
 import { playDotClick } from './dot-icons/dotMotion'
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
+import { openLiquidCurve } from './liquidContour'
 import {
   motion,
   useAnimationControls,
@@ -21,7 +22,26 @@ export function ProjectCTA({
   description: string
   onOpen: (trigger: HTMLButtonElement) => void
 }) {
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const size = useMotionValue({ width: 1000, height: 200 })
+  const viewBox = useTransform(size, ({ width, height }) => `0 0 ${width} ${height}`)
   const reduced = useReducedMotion()
+
+  useEffect(() => {
+    const button = buttonRef.current
+
+    if (!button) return
+
+    // Measure the real ribbon so the liquid retains its shape at every aspect ratio.
+    const measure = () =>
+      size.set({ width: Math.max(1, button.clientWidth), height: Math.max(1, button.clientHeight) })
+    const observer = new ResizeObserver(measure)
+    observer.observe(button)
+    measure()
+
+    return () => observer.disconnect()
+  }, [size])
+
   const arrowControls = useAnimationControls()
   const opening = useRef(false)
   const hovered = useRef(false)
@@ -33,19 +53,22 @@ export function ProjectCTA({
   const trailing = useSpring(pointer, { stiffness: 115, damping: 22, mass: 1.1 })
   const path = useTransform(() => {
     const amount = reduced ? target.get() : fill.get()
-    const head = (reduced ? 0.5 : center.get()) * 200
-    const tail = (reduced ? 0.5 : trailing.get()) * 200
+    const { width, height } = size.get()
+    const head = (reduced ? 0.5 : center.get()) * height
+    const tail = (reduced ? 0.5 : trailing.get()) * height
+    const reach = Math.min(width * 0.16, height * 0.58)
     const points = Array.from({ length: 41 }, (_, index) => {
-      const y = index * 5
+      const y = (index * height) / 40
       const depth =
-        70 *
+        reach *
         amount *
-        (0.78 * Math.exp(-(((y - head) / 95) ** 2)) + 0.22 * Math.exp(-(((y - tail) / 115) ** 2)))
+        (0.78 * Math.exp(-(((y - head) / (height * 0.475)) ** 2)) +
+          0.22 * Math.exp(-(((y - tail) / (height * 0.575)) ** 2)))
 
-      return `${1000 - depth},${y}`
+      return { x: width - depth, y }
     })
 
-    return `M1000,0 L${points.join(' L')} L1000,200 Z`
+    return `M${width} 0 ${openLiquidCurve(points, 'L')} L${width} ${height} Z`
   })
 
   function update() {
@@ -54,6 +77,7 @@ export function ProjectCTA({
 
   return (
     <motion.button
+      ref={buttonRef}
       type="button"
       className="skill-project-band"
       aria-haspopup="dialog"
@@ -99,15 +123,15 @@ export function ProjectCTA({
       whileFocus={reduced ? undefined : { '--band-arrow-x': '3px', '--band-arrow-y': '-3px' }}
       transition={{ type: 'spring', stiffness: 340, damping: 22 }}
     >
-      <svg
+      <motion.svg
         className="project-cta-liquid"
-        viewBox="0 0 1000 200"
+        viewBox={viewBox}
         preserveAspectRatio="none"
         aria-hidden="true"
         focusable="false"
       >
         <motion.path d={path} />
-      </svg>
+      </motion.svg>
       <span className="skill-project-band-copy">
         <span className="skill-project-title">{title}</span>{' '}
         <span className="skill-project-information">{description}</span>

@@ -1,6 +1,6 @@
 import { experienceTravel } from './experienceTimeline'
 
-export const skills = [
+const skillCatalog = [
   {
     name: 'Frontend Development',
     technologies: ['React', 'Next.js', 'TypeScript', 'Astro'],
@@ -161,10 +161,16 @@ export const skills = [
   },
 ] as const
 
+// Keep the full catalog available here; feature one project per category in the Work sequence.
+export const skills = skillCatalog.map((skill) => ({
+  ...skill,
+  projects: [skill.projects[0]],
+}))
+
 // Each project gets one reading interval; selection and the final pause get 0.8.
 export const skillSegments = skills.map((skill, index) => ({
-  start: skills.slice(0, index).reduce((sum, item) => sum + item.projects.length + 0.8, 0),
-  duration: skill.projects.length + 0.8,
+  start: skills.slice(0, index).reduce((sum, item) => sum + item.projects.length + 1.6, 0),
+  duration: skill.projects.length + 1.6,
 }))
 export const skillTravel = skillSegments.reduce((sum, segment) => sum + segment.duration, 0)
 export const heroFillEnd = 1
@@ -228,7 +234,7 @@ export const projectStops = skills.flatMap((skill, skillIndex) =>
     id: workProjectId(project.title),
     skillIndex,
     projectIndex,
-    position: skillSegments[skillIndex].start + projectIndex + 0.95,
+    position: skillSegments[skillIndex].start + projectIndex + 1.75,
   })),
 )
 
@@ -253,6 +259,9 @@ export function getSkillFrame(progress: number) {
       : from.skillIndex !== to.skillIndex
         ? { index: to.skillIndex, phase: fraction }
         : null
+
+  // The category releases first; the featured card uses the remaining entrance interval.
+  if (entrance) entrance.phase = clamp(entrance.phase * (1.75 / 0.95))
 
   return {
     index: active.skillIndex,

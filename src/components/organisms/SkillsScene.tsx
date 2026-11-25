@@ -175,9 +175,6 @@ function SkillProjects({
     >
       <div className="skills-project-caption">
         <span>{skill.name}</span>
-        <span>
-          0{projectIndex + 1} / 0{skill.projects.length}
-        </span>
       </div>
       <div className="skills-project-window">
         {skill.projects.map((project, position) => (

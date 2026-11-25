@@ -7,10 +7,12 @@ export function ScrollPill({
   progress,
   recess,
   section,
+  onSeek,
 }: {
   progress: MotionValue<number>
   recess: MotionValue<number>
   section: string
+  onSeek?: (progress: number) => void
 }) {
   const [value, setValue] = useState(() => progress.get() * 100)
   const [hidden, setHidden] = useState(() => recess.get() > 0.8)
@@ -24,7 +26,10 @@ export function ScrollPill({
   useMotionValueEvent(recess, 'change', (position) => setHidden(position > 0.8))
 
   function seek(percent: number) {
-    window.dispatchEvent(new CustomEvent('portfolio:seek-scroll', { detail: percent / 100 }))
+    const position = Math.max(0, Math.min(1, percent / 100))
+
+    if (onSeek) onSeek(position)
+    else window.dispatchEvent(new CustomEvent('portfolio:seek-scroll', { detail: position }))
   }
 
   function seekAt(y: number) {

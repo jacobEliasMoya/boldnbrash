@@ -95,7 +95,9 @@ export function LiquidBoundary({
         schedule()
       }
 
-      const transform = shape ? `translate(${shape.x - surroundLeft} ${shape.y - surroundTop})` : ''
+      const transform = shape
+        ? `translate(${shape.x - surroundLeft} ${shape.y - surroundTop}) ${shape.transform ?? ''}`
+        : ''
 
       if (transform !== experienceTransform) {
         for (const path of [dockCut.current, dockShoulders.current, dockRecoil.current]) {

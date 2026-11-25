@@ -15,6 +15,25 @@ export function closedLiquidCurve(vertices: Point[]) {
   return path + ' Z'
 }
 
+// Trace measured item edges with cubic tangents instead of visible polyline joins.
+// Keeping the original sample positions also keeps contrast masks on the same edge.
+export function openLiquidCurve(points: Point[], command: 'M' | 'L' = 'M') {
+  if (!points.length) return ''
+
+  let path = `${command}${points[0].x} ${points[0].y}`
+
+  for (let index = 0; index < points.length - 1; index++) {
+    const before = points[Math.max(0, index - 1)]
+    const start = points[index]
+    const end = points[index + 1]
+    const after = points[Math.min(points.length - 1, index + 2)]
+
+    path += ` C${start.x + (end.x - before.x) / 6} ${start.y + (end.y - before.y) / 6} ${end.x - (after.x - start.x) / 6} ${end.y - (after.y - start.y) / 6} ${end.x} ${end.y}`
+  }
+
+  return path
+}
+
 export function liquidPull(distance: number, depth: number, radius: number, power: number) {
   return depth * Math.exp(-((distance / radius) ** power))
 }
@@ -163,6 +182,47 @@ function roundedLiquidSwell(pull: BottomLiquidPull, pill: RoundedPill) {
     `C${mirror(capStart - capHandle)} ${top} ${mirror(exitX)} ${exitY} ${mirror(shoulderX)} ${shoulderY}`,
     `C${mirror(entryX)} ${entryY} ${mirror(footX + run / 2)} ${footY} ${mirror(footX)} ${footY}`,
     `C${mirror(footX - footHandle)} ${footY} ${mirror(side)} ${sideY + footHandle} ${mirror(side)} ${sideY}`,
+    `H${width} V${floor + 2} H0 Z`,
+  ].join(' ')
+}
+
+// Project cards need their own shoulders: a broad, flat crest follows the image
+// frame, then tangent-matched cubics ease back into the viewport edge.
+export function projectLiquidContour(
+  pull: BottomLiquidPull,
+  card: { width: number; corner: number; rim: number },
+) {
+  const { width, floor, inset, center, depth } = pull
+  const edge = floor - inset - liquidFrameOverlap
+  const half = Math.min(card.width / 2 + card.rim, width / 2 - inset)
+  const reach = Math.min(96, Math.max(24, card.corner * 2.4))
+  const left = Math.max(inset + liquidFrameCorner, center - half - reach)
+  const right = Math.min(width - inset - liquidFrameCorner, center + half + reach)
+
+  if (depth < 0) {
+    // Keep the returning dip local to the card rather than pulling the whole edge.
+    const dip = edge - depth
+
+    return `M${left} ${edge - 2} C${left + (center - left) * 0.55} ${edge - 2} ${center - half * 0.35} ${dip} ${center} ${dip} C${center + half * 0.35} ${dip} ${right - (right - center) * 0.55} ${edge - 2} ${right} ${edge - 2} Z`
+  }
+
+  const top = edge - depth
+  const corner = Math.max(0, Math.min(card.corner + card.rim, depth * 0.7, half))
+  const capLeft = Math.max(left, center - half)
+  const capRight = Math.min(right, center + half)
+  const shoulder = top + corner
+  const handle = corner * 0.55228475
+  const rise = Math.max(0, edge - shoulder)
+  const leftRun = capLeft - left
+  const rightRun = right - capRight
+
+  return [
+    `M0 ${edge} H${left}`,
+    `C${left + leftRun * 0.55} ${edge} ${capLeft} ${shoulder + rise * 0.48} ${capLeft} ${shoulder}`,
+    `C${capLeft} ${shoulder - handle} ${capLeft + corner - handle} ${top} ${capLeft + corner} ${top}`,
+    `H${capRight - corner}`,
+    `C${capRight - corner + handle} ${top} ${capRight} ${shoulder - handle} ${capRight} ${shoulder}`,
+    `C${capRight} ${shoulder + rise * 0.48} ${right - rightRun * 0.55} ${edge} ${right} ${edge}`,
     `H${width} V${floor + 2} H0 Z`,
   ].join(' ')
 }

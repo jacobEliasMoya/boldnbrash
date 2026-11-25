@@ -428,6 +428,8 @@ test('the edge scroll pill seeks and carries its liquid with it', async ({ page 
 
   const workSlider = page.getByRole('slider', { name: 'Work scroll position', exact: true })
 
+  // Seeking the intro is available once its heading entrance has completed.
+  await expect(page.locator('.scene-skills')).toHaveAttribute('data-intro-drop-complete', '')
   await workSlider.press('End')
   await expect(workSlider).toHaveAttribute('aria-valuetext', '100% of Work')
   await expect(page.locator('.skills-reveal')).toHaveAttribute('inert', '')

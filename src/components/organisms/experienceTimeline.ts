@@ -1,6 +1,7 @@
 import { spring } from 'motion'
 import {
   bottomLiquidContour,
+  projectLiquidContour,
   liquidFrameOverlap,
   wordmarkPullPower,
   wordmarkPullRadius,
@@ -64,6 +65,7 @@ const releaseSpring = spring({
 type Pill = { x: number; top: number; width: number; height: number; radius: number }
 
 export type ExperienceDock = {
+  transform?: string
   cut: string
   touching: boolean
   shoulders: string
@@ -95,6 +97,7 @@ export function getExperienceDock(
   inset: number,
   width: number,
   release: number,
+  profile: 'pill' | 'project' = 'pill',
 ) {
   if (pill.top >= floor) return null
 
@@ -115,9 +118,15 @@ export function getExperienceDock(
   const mobileRise = Math.min(8, pill.height * 0.09) * ease(clamp((emergence - 0.97) / 0.03))
 
   // Let the wide crest follow the pill with a shallower overhang.
-  const lift = narrow ? visible + rim + mobileRise : exposed * 1.14
+  const projectRim = Math.min(inset * 0.64, 8) * ease(clamp(visible / 24))
+  const lift =
+    profile === 'project'
+      ? visible + projectRim
+      : narrow
+        ? visible + rim + mobileRise
+        : exposed * 1.14
   const pull = lift * releaseSpring.next(release * 850).value
-  const insetLimit = inset * 0.62
+  const insetLimit = inset * (profile === 'project' ? 0.45 : 0.62)
   const depth = pull < 0 ? insetLimit * Math.tanh(pull / insetLimit) : pull
 
   // The spring can overlap the pill after it clears the flat frame.
@@ -135,7 +144,7 @@ export function getExperienceDock(
   const footprint = Math.max(1, Math.min(pill.width, sideRoom))
 
   const radius = narrow ? corner * 1.5 : wordmarkPullRadius(footprint, Math.min(1, footprint / 180))
-  const contour = bottomLiquidContour({
+  const pullShape = {
     width,
     floor,
     inset,
@@ -145,7 +154,15 @@ export function getExperienceDock(
     power: narrow ? 2 : wordmarkPullPower,
     stretch: narrow ? swellWidth / 2 - corner : (pill.width - footprint) / 2,
     roundedPill: narrow ? { width: swellWidth, corner, rim: rim * (1 - separation) } : undefined,
-  })
+  }
+  const contour =
+    profile === 'project'
+      ? projectLiquidContour(pullShape, {
+          width: pill.width,
+          corner,
+          rim: projectRim,
+        })
+      : bottomLiquidContour(pullShape)
 
   return { cut, touching, shoulders: depth > 0 ? contour : '', recoil: depth < 0 ? contour : '' }
 }

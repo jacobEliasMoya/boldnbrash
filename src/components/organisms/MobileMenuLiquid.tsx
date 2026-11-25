@@ -1,5 +1,6 @@
 'use client'
 
+import { openLiquidCurve } from '@/components/atoms/liquidContour'
 import { useCallback, useEffect, useRef, type RefObject } from 'react'
 import {
   animate,
@@ -61,13 +62,14 @@ export function MobileMenuLiquid({
         reach *
         (0.78 * liquidFalloff(y - center, radius + stretch) +
           0.22 * liquidFalloff(y - tail, radius * 1.15))
-      const points = Array.from({ length: Math.ceil(height / 2) + 1 }, (_, i) => {
-        const y = Math.min(i * 2, height)
+      // Cubic tangents keep the edge smooth with fewer samples during pointer motion.
+      const points = Array.from({ length: Math.ceil(height / 6) + 1 }, (_, i) => {
+        const y = Math.min(i * 6, height)
 
-        return `${edgeAt(y)},${y}`
+        return { x: edgeAt(y), y }
       })
 
-      path.set(`M0,0 L${points.join(' L')} L0,${height} Z`)
+      path.set(`M0 0 ${openLiquidCurve(points, 'L')} L0 ${height} Z`)
 
       const motionAmount = reduced ? 0 : reach * Math.min(Math.abs(center - tail) / 18, 1)
       const displaced = numbers.map((number) => {
@@ -124,14 +126,14 @@ export function MobileMenuLiquid({
   const drawFooter = useCallback(
     (offset: number) => {
       const { width, bottom, center, radius, depth } = footer.current
-      const points = Array.from({ length: Math.ceil(width / 2) + 1 }, (_, index) => {
-        const x = Math.min(index * 2, width)
+      const points = Array.from({ length: Math.ceil(width / 6) + 1 }, (_, index) => {
+        const x = Math.min(index * 6, width)
         const rise = Math.max(0, depth * liquidFalloff(x - center, radius, 4) - offset)
 
-        return `${x},${bottom - rise}`
+        return { x, y: bottom - rise }
       })
 
-      socialPath.set(`M${points.join(' L')} L${width},${bottom} L0,${bottom} Z`)
+      socialPath.set(`${openLiquidCurve(points)} L${width} ${bottom} L0 ${bottom} Z`)
     },
     [socialPath],
   )

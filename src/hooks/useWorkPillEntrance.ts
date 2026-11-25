@@ -1,7 +1,7 @@
 'use client'
 
 import { useContext, useLayoutEffect, type RefObject } from 'react'
-import type { MotionValue } from 'motion/react'
+import { cancelFrame, frame as motionFrame, type MotionValue } from 'motion/react'
 import { WorkPillMotion } from '@/components/organisms/ExperienceMotion'
 import {
   experienceEntryTravel,
@@ -14,7 +14,12 @@ import {
   workPillClearance,
   workPillScale,
 } from '@/components/organisms/pillWheel'
-import { getSkillFrame } from '@/components/organisms/skillsTimeline'
+import {
+  clamp,
+  getSkillFrame,
+  skillSegments,
+  skillTravel,
+} from '@/components/organisms/skillsTimeline'
 
 export function useWorkPillEntrance(
   wheel: RefObject<HTMLDivElement | null>,
@@ -39,8 +44,73 @@ export function useWorkPillEntrance(
     let inset = 0
     let boxes: { width: number; height: number; radius: number }[] = []
 
+    const projects = Array.from(stage.querySelectorAll<HTMLElement>('.skill-project-card'))
+    const captions = Array.from(stage.querySelectorAll<HTMLElement>('.skills-project-caption'))
+
+    // Give the category and its card separate turns at the same liquid floor.
+    const paintProjects = (position: number) => {
+      const travel = position * skillTravel
+      let projectDock = null
+
+      projects.forEach((project, index) => {
+        const phase = clamp((travel - skillSegments[index].start - 0.95) / 0.8)
+        project.style.removeProperty('transform')
+        const bounds = project.getBoundingClientRect()
+        const stageBounds = stage.getBoundingClientRect()
+        // Projects emerge from the left at every width, distinct from category pills.
+        // Rotate the shared lift coordinates so the card and liquid release stay together.
+        const rest = stageBounds.width - (bounds.right - stageBounds.left)
+        const entryFloor = stageBounds.width + stageBounds.left
+        const { y, release } = getPillLift(
+          phase * experienceEntryTravel,
+          bounds.width,
+          rest,
+          entryFloor,
+        )
+
+        project.toggleAttribute('data-project-entering', phase > 0 && phase < 1)
+        project.style.transform = `translateX(${rest - y}px)`
+        project.style.clipPath = 'none'
+        project.style.opacity = phase > 0 ? '1' : '0'
+        project.style.pointerEvents = phase === 1 ? '' : 'none'
+        if (captions[index]) captions[index].style.opacity = String(clamp((phase - 0.8) / 0.2))
+
+        if (phase > 0 && phase < 1) {
+          // The stage can reposition after its intro grid finishes settling without
+          // another scroll event. Keep the attached cutout measured until release.
+          motionFrame.postRender(paint)
+          const shape = getExperienceDock(
+            {
+              width: bounds.height,
+              height: bounds.width,
+              radius: parseFloat(getComputedStyle(project).borderTopLeftRadius) || 0,
+              x: bounds.top + bounds.height / 2 - stageBounds.top,
+              top: y,
+            },
+            entryFloor,
+            inset,
+            stageBounds.height,
+            release,
+            'project',
+          )
+
+          if (shape) {
+            projectDock = {
+              ...shape,
+              x: stageBounds.left,
+              y: stageBounds.top,
+              transform: `matrix(0 1 -1 0 ${stageBounds.width} 0)`,
+            }
+          }
+        }
+      })
+
+      return projectDock
+    }
+
     const paint = () => {
       const position = progress.get()
+      const projectDock = paintProjects(position)
       const frame = getSkillFrame(position)
       const entry = position < 0 ? null : frame.entrance
       const pill =
@@ -57,10 +127,13 @@ export function useWorkPillEntrance(
 
       if (!pill || !entry) {
         ringPosition.set(frame.ringPosition)
-        dock.set(null)
+        dock.set(projectDock)
         browser.toggleAttribute('data-work-ready', position >= 0 && (!entry || entry.phase === 1))
         return
       }
+
+      // Keep the category's mask attached while the split layout settles, too.
+      motionFrame.postRender(paint)
 
       // The split layout can move the wheel without changing its dimensions.
       const bounds = stage.getBoundingClientRect()
@@ -139,7 +212,12 @@ export function useWorkPillEntrance(
     observer.observe(stage)
     observer.observe(browser)
     pills.forEach((pill) => observer.observe(pill))
-    const stop = progress.on('change', paint)
+    const stop = progress.on('change', () => {
+      paint()
+      // Scene transforms can commit later in the same Motion frame. Remeasure
+      // after that commit so the card and SVG cutout use identical coordinates.
+      motionFrame.postRender(paint)
+    })
 
     viewport?.addEventListener('resize', measure)
     viewport?.addEventListener('scroll', measure)
@@ -148,6 +226,7 @@ export function useWorkPillEntrance(
     return () => {
       observer.disconnect()
       stop()
+      cancelFrame(paint)
       viewport?.removeEventListener('resize', measure)
       viewport?.removeEventListener('scroll', measure)
       browser.removeAttribute('data-liquid-entry')
@@ -155,6 +234,13 @@ export function useWorkPillEntrance(
       active?.removeAttribute('data-work-entering')
       active?.removeAttribute('data-work-docked')
       active?.style.removeProperty('--work-entry-y')
+      projects.forEach((project) => {
+        project.removeAttribute('data-project-entering')
+        for (const property of ['transform', 'clip-path', 'opacity', 'pointer-events']) {
+          project.style.removeProperty(property)
+        }
+      })
+      captions.forEach((caption) => caption.style.removeProperty('opacity'))
       dock.set(null)
     }
   }, [animated, compact, dock, progress, radius, ringPosition, wheel])
