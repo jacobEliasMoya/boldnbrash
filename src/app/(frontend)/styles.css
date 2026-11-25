@@ -1908,12 +1908,6 @@ ul {
   transform: scale(var(--category-scale));
   transform-origin: left center;
 }
-.skills-technologies {
-  margin-top: 12px;
-  font-size: calc(14px - 2px * var(--pill-reveal));
-  line-height: 1.6;
-  color: var(--paper);
-}
 .skills-category-note {
   margin-top: 8px;
   font-size: 10px;
@@ -3246,28 +3240,36 @@ ul {
   max-width: 100%;
 }
 .skills-technology {
-  --technology-amber: #ffc857;
+  --technology-badge-size: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 32px;
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--technology-amber);
+  flex: 0 0 var(--technology-badge-size);
+  width: var(--technology-badge-size);
+  height: var(--technology-badge-size);
+  border: 1px solid currentColor;
   border-radius: 50%;
   background: #000;
+  color: var(--accent);
 }
 .technology-brand-mark {
   width: 20px;
   height: 20px;
-  background: var(--technology-amber);
+  background: currentColor;
   mask: var(--technology-icon) center / var(--technology-icon-size, contain) no-repeat;
 }
 .technology-brand-mark[data-format='image'] {
   /* The raster marks use brightness to keep their internal details in amber. */
   mask-mode: luminance;
 }
-.skills-duet .skills-technologies,
+@media (forced-colors: active) {
+  .skills-technology {
+    /* Preserve the mask while using the visitor's high-contrast colors. */
+    forced-color-adjust: none;
+    background: Canvas;
+    color: CanvasText;
+  }
+}
 .experience-meta {
   font-family: 'JetBrains Mono', monospace;
   font-size: 16px;
@@ -3400,7 +3402,6 @@ ul {
   .skills-duet .skills-category-current > .eyebrow {
     margin-bottom: 7px;
   }
-  .skills-duet .skills-technologies,
   .experience-meta {
     font-size: 14px;
   }
@@ -3515,10 +3516,6 @@ ul {
 
   .skills-reveal .skills-category-pill {
     padding-block: 12px;
-  }
-
-  .skills-reveal .skills-technologies {
-    font-size: 12px;
   }
 }
 
@@ -3788,7 +3785,7 @@ ul {
   .portfolio[data-enhanced]
   .skills-reveal
   .skills-category-pill
-  :is(.skills-category-number, .skills-technologies, .skills-category-note) {
+  :is(.skills-category-number, .skills-category-note) {
   color: #805000;
 }
 
