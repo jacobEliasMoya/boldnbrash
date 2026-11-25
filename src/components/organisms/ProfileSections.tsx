@@ -2,6 +2,7 @@
 
 import { useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { IntroDropText } from '@/components/atoms/IntroDropText'
+import { TechnologyIcons } from '@/components/atoms/TechnologyIcon'
 import { WordEmphasis } from '@/components/atoms/WordEmphasis'
 import { aboutTitleFillPortion, clamp, getAboutParagraphProgress } from './skillsTimeline'
 import { ExperienceMotion } from './ExperienceMotion'
@@ -84,7 +85,15 @@ function ExperienceRole({
           {record.employer} <span className="experience-dates">{record.dates}</span>
         </p>
         <h3>{record.role}</h3>
+      </div>
+      <div className="experience-body">
         <p className="experience-detail">{record.detail}</p>
+        {record.highlight && (
+          <p className="experience-highlight">
+            <strong>{record.highlight.value}</strong> {record.highlight.label}
+          </p>
+        )}
+        <TechnologyIcons className="experience-technologies" technologies={record.technologies} />
       </div>
     </li>
   )
@@ -157,8 +166,11 @@ export function ProfileSections() {
           role.style.setProperty('--experience-depth', `${pose.depth}px`)
         if (pose.opacity !== previous?.opacity)
           role.style.setProperty('--experience-opacity', String(pose.opacity))
-        if (pose.detail !== previous?.detail)
+        if (pose.detail !== previous?.detail) {
           role.style.setProperty('--experience-detail', String(pose.detail))
+          if (pose.detail > 0 !== (previous?.detail ?? 0) > 0)
+            role.toggleAttribute('data-detail-visible', pose.detail > 0)
+        }
         if (pose.visible !== previous?.visible) role.dataset.visible = String(pose.visible)
 
         role.inert = !pose.visible || (pose.entering && !pose.featured)
@@ -232,6 +244,7 @@ export function ProfileSections() {
         role.removeAttribute('data-visible')
         role.removeAttribute('data-docked')
         role.removeAttribute('data-receding')
+        role.removeAttribute('data-detail-visible')
         role.removeAttribute('aria-current')
       }
     }

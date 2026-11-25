@@ -15,27 +15,41 @@ import {
   pillWheelVertical,
 } from './pillWheel'
 
-export const experienceRoles = [
+type ExperienceRoleRecord = {
+  id: string
+  employer: string
+  role: string
+  dates: string
+  detail: string
+  technologies: readonly string[]
+  highlight?: { value: string; label: string }
+}
+
+export const experienceRoles: readonly ExperienceRoleRecord[] = [
   {
     id: 'varep-developer',
     employer: 'VAREP National',
     role: 'Junior Web Developer',
     dates: '2019–2021',
-    detail: 'Helped rebuild a veterans nonprofit’s site from Joomla to WordPress.',
+    detail:
+      'Helped move a veterans nonprofit’s site from Joomla to WordPress and built responsive pages.',
+    technologies: ['WordPress', 'Gravity Forms'],
   },
   {
     id: 'biziq-developer-i',
     employer: 'BIZIQ',
     role: 'Web Developer I',
     dates: '2021–2022',
-    detail: 'Built and launched responsive client sites in WordPress and Shopify.',
+    detail: 'Launched responsive WordPress and Shopify sites and earned a promotion after a year.',
+    technologies: ['WordPress', 'Gutenberg'],
   },
   {
     id: 'biziq-developer-ii',
     employer: 'BIZIQ',
     role: 'Web Developer II',
     dates: '2022–2025',
-    detail: 'Built reusable WordPress features, including a custom reviews template.',
+    detail: 'Built a reusable PHP reviews template and improved site accessibility.',
+    technologies: ['WordPress', 'PHP', 'WCAG'],
   },
   {
     id: 'inenvi-engineer',
@@ -43,8 +57,10 @@ export const experienceRoles = [
     role: 'Software Engineer',
     dates: '2025–Present',
     detail: 'Helped modernize a legacy web platform with Next.js and Strapi.',
+    technologies: ['Next.js', 'Strapi', 'Astro'],
+    highlight: { value: '50+', label: 'state sites in scope for one shared Astro build' },
   },
-] as const
+]
 
 export const experiencePillTravel = 1.04
 export const experienceEntryTravel = experiencePillTravel + 0.24

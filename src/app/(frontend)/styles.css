@@ -4706,6 +4706,7 @@ ul {
   width: var(--experience-width);
   min-height: clamp(112px, 18dvh, 198px);
   align-content: center;
+  row-gap: clamp(9px, 1.3dvh, 15px);
   padding: clamp(15px, 1.8dvh, 26px) clamp(32px, 5.5vw, 96px);
   border-radius: var(--portfolio-pill-radius);
   /* Keep the pill and its liquid connection on the same black/white surface. */
@@ -4717,7 +4718,9 @@ ul {
   color: #080809;
 }
 
-:root[data-theme='dark'] .experience-role :is(.experience-meta, .experience-number) {
+:root[data-theme='dark']
+  .experience-role
+  :is(.experience-meta, .experience-number, .experience-highlight strong) {
   color: #805000;
 }
 
@@ -4731,15 +4734,41 @@ ul {
   gap: 6px;
 }
 
-.experience-detail {
+.experience-body {
+  grid-column: 2;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  max-inline-size: 66ch;
+}
+
+.experience-detail,
+.experience-highlight {
   font-size: clamp(12px, 1.15vw, 16px);
   line-height: 1.45;
   text-wrap: pretty;
 }
 
-.portfolio[data-enhanced] .experience-detail {
-  opacity: var(--experience-detail, 0);
+.experience-highlight strong {
+  color: var(--accent);
+}
+
+.experience-technologies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.portfolio[data-enhanced] .experience-body {
   translate: 0 calc(6px * (1 - var(--experience-detail, 0)));
+}
+
+.portfolio[data-enhanced] .experience-body > * {
+  opacity: var(--experience-detail, 0);
+}
+
+.portfolio[data-enhanced] .experience-role:not([data-detail-visible]) .experience-body {
+  visibility: hidden;
 }
 
 .experience-dates {
@@ -4822,6 +4851,19 @@ ul {
     padding-block: clamp(10px, 1.35dvh, 18px);
     padding-inline: clamp(16px, 5.6vw, 38px);
     column-gap: clamp(10px, 3.1vw, 16px);
+  }
+
+  .experience-body {
+    grid-column: 1 / -1;
+  }
+
+  .experience-technologies .skills-technology {
+    --technology-badge-size: 24px;
+  }
+
+  .experience-technologies :is(.technology-brand-mark, .technology-brand-glyph) {
+    width: 15px;
+    height: 15px;
   }
 }
 

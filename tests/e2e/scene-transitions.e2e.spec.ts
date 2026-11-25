@@ -421,6 +421,7 @@ test('Experience docks the entering role to the viewport and reverses cleanly', 
   await moveToBoundary(page, midEntry)
   await expect(third).toHaveAttribute('data-docked', '')
   await expect(third.locator('.experience-detail')).toHaveCSS('opacity', '0')
+  await expect(third.locator('.experience-technologies')).toBeHidden()
   await expect(second).toHaveAttribute('aria-current', 'true')
   await expect(second).toHaveCSS('transform', 'none')
   await expect(third).toHaveCSS('transform', 'none')
@@ -570,6 +571,11 @@ test('Experience docks the entering role to the viewport and reverses cleanly', 
         .evaluate((detail) => Number(getComputedStyle(detail).opacity)),
     )
     .toBeGreaterThan(0.95)
+  for (const name of ['WordPress', 'PHP', 'WCAG']) {
+    await expect(third.getByRole('img', { name, exact: true })).toBeVisible()
+  }
+  await expect(second.locator('.experience-technologies')).toBeHidden()
+
   const outgoingOpacity = await second.evaluate((role) => Number(getComputedStyle(role).opacity))
   expect(outgoingOpacity).toBe(1)
 
@@ -595,6 +601,9 @@ test('Experience docks the entering role to the viewport and reverses cleanly', 
   const currentRole = about.locator('[data-role="inenvi-engineer"]')
   await expect(currentRole).toHaveAttribute('aria-current', 'true')
   await expect(currentRole).toHaveAttribute('data-portal', 'contact')
+  await expect(currentRole.locator('.experience-highlight')).toHaveText(
+    '50+ state sites in scope for one shared Astro build',
+  )
 
   await page.mouse.move(10, 400)
   await page.mouse.wheel(0, 120)
