@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { experienceRoles } from '../../src/components/organisms/experienceTimeline'
 import {
   heroFillEnd,
   heroParagraphEnd,
@@ -618,7 +619,9 @@ test('section reveals remain partial until further scrolling and reverse with sc
   await expect(page.locator('.hero-letter').nth(5)).toHaveCSS('--letter-fill', '100%')
 
   const description = page.locator('.hero-description')
-  await expect(description).toHaveText('Take a scroll. See what pops.')
+  await expect(description).toHaveText(
+    'I turn thoughtful design into accessible interfaces and reusable systems.',
+  )
   const words = description.locator('.word-emphasis')
   const firstWordMiddle =
     heroFillEnd + (heroParagraphEnd - heroFillEnd) / (2 * (await words.count()))
@@ -708,6 +711,49 @@ test('mobile retains reveals and scrollable content; reduced motion retains docu
   await expect(
     page.getByRole('list', { name: 'Job experience' }).getByRole('listitem'),
   ).toHaveCount(4)
+})
+
+test('Experience disclosures expose each role in reduced-motion document flow', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto(`${baseURL}/#about-profile`)
+  const list = page.getByRole('list', { name: 'Job experience' })
+  const toggles = list.getByRole('button')
+  await expect(toggles).toHaveCount(experienceRoles.length)
+
+  for (const [index, record] of experienceRoles.entries()) {
+    const role = list.locator(`[data-role="${record.id}"]`)
+    const toggle = toggles.nth(index)
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await expect(toggle).toHaveAccessibleName(new RegExp(record.role))
+    await expect(toggle).toContainText(record.employer)
+    await expect(toggle).toContainText(record.dates)
+    await toggle.click()
+
+    const panel = page.locator(`#${await toggle.getAttribute('aria-controls')}`)
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    await expect(panel.getByText(record.detail, { exact: true })).toBeVisible()
+    await expect(panel.getByRole('heading', { name: 'Key Work' })).toBeVisible()
+    await expect(panel.getByRole('heading', { name: 'Tech' })).toBeVisible()
+    await expect(panel.getByRole('listitem')).toHaveText([...record.keyWork])
+
+    // Icons carry the names. The layout shows one mark for each recorded platform.
+    await expect(panel.getByRole('img')).toHaveCount(record.technologies.length)
+    for (const name of record.technologies) {
+      await expect(panel.getByRole('img', { name, exact: true })).toBeVisible()
+      await expect(panel.getByText(name, { exact: true })).toHaveCount(0)
+    }
+
+    await expect(role.locator('dt')).toHaveText(record.stats.map(({ label }) => label))
+    await expect(role.locator('dd')).toHaveText(record.stats.map(({ value }) => value))
+  }
+
+  // Each role owns its disclosure, including when more than one is open in document flow.
+  await expect(list.locator('[aria-expanded="true"]')).toHaveCount(experienceRoles.length)
+  await toggles.first().press('Space')
+  await expect(toggles.first()).toHaveAttribute('aria-expanded', 'false')
+  await expect(toggles.last()).toHaveAttribute('aria-expanded', 'true')
 })
 
 async function scrollTimeline(page: Page, value: number, settled = true) {
@@ -1329,8 +1375,10 @@ test.describe('mobile wheel input', () => {
     await page.goto(`${baseURL}/#skills`)
     await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 15000 })
 
-    const lines = page.locator('#skills .skills-title-fill')
+    const work = page.locator('#skills')
+    const lines = work.locator('.skills-title-fill')
 
+    await expect(work).toHaveAttribute('data-intro-drop-complete', '')
     await expect(lines.first()).toHaveCSS('--title-fill', '0%')
     await page.mouse.move(180, 400)
     await page.mouse.wheel(0, 120)

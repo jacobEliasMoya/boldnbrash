@@ -1,11 +1,20 @@
 'use client'
 
-import { IntroDropText, ScrollIntroDropText } from '@/components/atoms/IntroDropText'
-import { WordEmphasis } from '@/components/atoms/WordEmphasis'
+import { IntroDropText } from '@/components/atoms/IntroDropText'
 
-import { useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import {
+  Fragment,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react'
+import {
+  animate,
   cancelFrame,
+  cubicBezier,
   easeOut,
   frame,
   motion,
@@ -36,6 +45,7 @@ import { getIntroPeriodGeometry, getPeriodOpening } from '@/components/atoms/per
 import { useWorkPillEntrance } from '@/hooks/useWorkPillEntrance'
 import {
   clamp,
+  getSkillFrame,
   getWorkOpeningTiming,
   projectStops,
   skills,
@@ -47,11 +57,14 @@ import {
 } from './skillsTimeline'
 
 type Project = (typeof skills)[number]['projects'][number]
-
 type OpenProject = (project: Project, trigger: HTMLButtonElement) => void
 
-const workProjectsCopy =
-  'See what I’ve built across client websites, design systems, and developer tools, plus a few experiments in 3D and AI.'
+type CategoryTitleSweep = { stop: number; fill: number; complete: boolean }
+
+const titleSweepPeak = 0.2
+const titleSweepEnd = 0.3
+const workStopTolerance = 0.003
+const copyEase = cubicBezier(0.36, 0.1, 0.64, 0.9)
 
 type WheelBounds = {
   upperClearance: number
@@ -109,6 +122,7 @@ function SkillCategoryPill({
   active,
   animated,
   ringPosition,
+  categoryTitleSweep,
   radius,
   compact = false,
   bounds,
@@ -118,6 +132,7 @@ function SkillCategoryPill({
   active: boolean
   animated: boolean
   ringPosition: MotionValue<number>
+  categoryTitleSweep: MotionValue<CategoryTitleSweep>
   radius: number
   compact?: boolean
   bounds: MotionValue<WheelBounds>
@@ -125,7 +140,31 @@ function SkillCategoryPill({
 }) {
   const skill = skills[index]
   const pose = useSkillWheelPose(index, ringPosition, radius, compact, bounds)
+  const titleFill = useTransform(() => {
+    const { stop, fill } = categoryTitleSweep.get()
+    const turn = Math.abs(index - ringPosition.get())
+
+    if (projectStops[stop].skillIndex !== index || fill === 0) return '0%'
+
+    // Compact layouts can start the turn early to clear the arriving pill.
+    const facing = clamp(1 - turn / 0.08)
+
+    return `${fill * facing * 100}%`
+  })
   const Item = animated ? motion.li : motion.div
+  const title = (
+    <>
+      {skill.name}
+      {index === skills.length - 1 && active ? (
+        <>
+          <span data-portal-glyph>.</span>
+          <span className="skills-about-portal" data-portal="about" aria-hidden="true" />
+        </>
+      ) : (
+        '.'
+      )}
+    </>
+  )
 
   return (
     <Item
@@ -142,14 +181,15 @@ function SkillCategoryPill({
         <div className="skills-category-copy">
           <TechnologyIcons technologies={skill.technologies} className="skills-technologies" />
           <h3>
-            {skill.name}
-            {index === skills.length - 1 && active ? (
-              <>
-                <span data-portal-glyph>.</span>
-                <span className="skills-about-portal" data-portal="about" aria-hidden="true" />
-              </>
+            {animated ? (
+              <motion.span
+                className="skills-title-fill skills-category-title-fill"
+                style={{ '--title-fill': titleFill } as MotionStyle}
+              >
+                {title}
+              </motion.span>
             ) : (
-              '.'
+              title
             )}
           </h3>
         </div>
@@ -218,58 +258,118 @@ function SkillProject({
   )
 }
 
-const workProjectsHeading = 'A Few Things I\u2019ve Made.'
-
-function SkillsWheelIntroCopy({ progress }: { progress?: number }) {
-  if (progress === undefined) {
-    return (
-      <>
-        <h3>{workProjectsHeading}</h3>
-        <p>{workProjectsCopy}</p>
-      </>
-    )
-  }
-
-  // Keep the heading's timing and overlap while giving the paragraph a longer reveal.
-  const { headingEnd, paragraphStart, end } = workIntroCopyTiming
-  const travel = progress * end
-
-  return (
-    <>
-      <h3 aria-label={workProjectsHeading}>
-        <span aria-hidden="true">
-          <ScrollIntroDropText text={workProjectsHeading} progress={clamp(travel / headingEnd)} />
-        </span>
-      </h3>
-      <p>
-        <WordEmphasis
-          text={workProjectsCopy}
-          progress={clamp((travel - paragraphStart) / (end - paragraphStart))}
-          scrollReveal
-        />
-      </p>
-    </>
-  )
-}
-
-function SkillsWheelIntro({ compact }: { compact: boolean }) {
+function SkillsWheelIntro({ compact, categoryIndex }: { compact: boolean; categoryIndex: number }) {
   const progress = useContext(WorkPillMotion)?.progress
-  const { copyStart, copyEnd } = getWorkOpeningTiming(compact)
+  const { copyStart } = getWorkOpeningTiming(compact)
+  const { headingEnd, paragraphStart, end } = workIntroCopyTiming
 
-  // The type and the liquid entrances share one scroll clock in both directions.
+  // Scrubbing back through the opening retraces the same two fades.
   const copy = useTransform(() => {
     const travel = (progress?.get() ?? 0) * skillTravel
 
-    return clamp((travel - copyStart) / (copyEnd - copyStart))
+    return clamp(travel - copyStart, 0, end)
   })
-  const [copyProgress, setCopyProgress] = useState(() => copy.get())
-  useMotionValueEvent(copy, 'change', setCopyProgress)
+  const [opened, setOpened] = useState(() => copy.get() === end)
+  const [visibleTitle, setVisibleTitle] = useState(categoryIndex)
+  const [visibleDescription, setVisibleDescription] = useState(categoryIndex)
+  const titleOpacity = useMotionValue(1)
+  const descriptionOpacity = useMotionValue(1)
+  const titleAlpha = useTransform(
+    () => copyEase(clamp(copy.get() / headingEnd)) * titleOpacity.get(),
+  )
+  const descriptionAlpha = useTransform(() => {
+    const reveal = clamp((copy.get() - paragraphStart) / (end - paragraphStart))
+
+    return copyEase(reveal) * descriptionOpacity.get()
+  })
+  const titleY = useTransform(titleAlpha, [0, 1], [4, 0])
+
+  useMotionValueEvent(copy, 'change', (value) => {
+    if (value === end) {
+      setVisibleTitle(categoryIndex)
+      setVisibleDescription(categoryIndex)
+      setOpened(true)
+      return
+    }
+
+    if (copy.getPrevious() !== end) return
+
+    setOpened(false)
+    titleOpacity.jump(1)
+    descriptionOpacity.jump(1)
+  })
+
+  useLayoutEffect(() => {
+    if (!opened) return
+
+    let control: ReturnType<typeof animate> | undefined
+
+    function swapCopy(
+      visible: number,
+      opacity: MotionValue<number>,
+      replace: (index: number) => void,
+      onShown?: () => void,
+    ) {
+      const isCurrent = visible === categoryIndex
+      const target = isCurrent ? 1 : 0
+      const distance = Math.abs(opacity.get() - target)
+
+      if (isCurrent && distance === 0) {
+        onShown?.()
+        return
+      }
+
+      // Hold the outgoing sentence briefly after the new title settles.
+      const holdSentence = opacity === descriptionOpacity && !isCurrent && distance === 1
+
+      // Commit the text while it's hidden. The next render brings it back in.
+      control = animate(opacity, target, {
+        type: 'tween',
+        duration: distance * (isCurrent ? 0.74 : 0.36),
+        delay: holdSentence ? 0.18 : 0,
+        ease: copyEase,
+        onComplete: () => {
+          if (isCurrent) onShown?.()
+          else replace(categoryIndex)
+        },
+      })
+    }
+
+    swapCopy(visibleTitle, titleOpacity, setVisibleTitle, () => {
+      swapCopy(visibleDescription, descriptionOpacity, setVisibleDescription)
+    })
+
+    return () => control?.stop()
+  }, [categoryIndex, descriptionOpacity, opened, titleOpacity, visibleDescription, visibleTitle])
+
   const opacity = useTransform(copy, (value) => (value > 0 ? 1 : 0))
   const visibility = useTransform(copy, (value) => (value > 0 ? 'visible' : 'hidden'))
+  const title = skills[opened ? visibleTitle : categoryIndex].copy.title
+  const description = skills[opened ? visibleDescription : categoryIndex].copy.description
 
   return (
     <motion.li className="skills-wheel-intro" data-wheel-static style={{ opacity, visibility }}>
-      <SkillsWheelIntroCopy progress={copyProgress} />
+      {/* Each row reserves room for its longest text, including during the swap. */}
+      {skills.map(({ name, copy }) => (
+        <Fragment key={name}>
+          <span className="skills-wheel-title" aria-hidden="true">
+            {copy.title}
+          </span>
+          <span className="skills-wheel-description" aria-hidden="true">
+            {copy.description}
+          </span>
+        </Fragment>
+      ))}
+      <motion.h3
+        className="skills-wheel-title"
+        aria-label={title}
+        style={{ opacity: titleAlpha, y: titleY }}
+      >
+        {title}
+      </motion.h3>
+      <motion.p className="skills-wheel-description" style={{ opacity: descriptionAlpha }}>
+        {description}
+      </motion.p>
     </motion.li>
   )
 }
@@ -288,6 +388,46 @@ export function SkillsScene() {
   const [radius, setRadius] = useState(340)
   const [compactWheel, setCompactWheel] = useState(false)
   const ringPosition = useMotionValue(0)
+  const workProgress = useContext(WorkPillMotion)?.progress
+  const projectPosition = useTransform(
+    () => getSkillFrame(workProgress?.get() ?? 0).projectPosition,
+  )
+  const categoryTitleSweep = useMotionValue<CategoryTitleSweep>({
+    stop: 0,
+    fill: 0,
+    complete: false,
+  })
+
+  useMotionValueEvent(projectPosition, 'change', (position) => {
+    const nearest = Math.round(position)
+    if (Math.abs(position - nearest) < workStopTolerance) {
+      categoryTitleSweep.set({ stop: nearest, fill: 0, complete: false })
+      return
+    }
+
+    const earlier = Math.floor(position)
+    const later = Math.ceil(position)
+    const sweep = categoryTitleSweep.get()
+    let stop = sweep.stop
+
+    // Keep the same source until the scroll lands on or passes a project stop.
+    if (stop !== earlier && stop !== later) {
+      const previous = projectPosition.getPrevious() ?? position
+      stop = position > previous ? earlier : later
+    }
+
+    const travel = Math.abs(position - stop)
+
+    // A completed sweep stays clear if the gesture reverses before it settles.
+    const complete = (stop === sweep.stop && sweep.complete) || travel >= titleSweepEnd
+    const fill = complete
+      ? 0
+      : clamp(travel / titleSweepPeak) *
+        clamp((titleSweepEnd - travel) / (titleSweepEnd - titleSweepPeak))
+
+    categoryTitleSweep.set({ stop, fill, complete })
+  })
+
   const wheelBounds = useMotionValue<WheelBounds>({
     upperClearance: Infinity,
     pillHeights: [],
@@ -599,7 +739,7 @@ export function SkillsScene() {
                 selectSkill(next)
               }}
             >
-              <SkillsWheelIntro compact={compactWheel} />
+              <SkillsWheelIntro compact={compactWheel} categoryIndex={categoryIndex} />
               {skills.map((skill, index) => (
                 <SkillCategoryPill
                   key={skill.name}
@@ -607,6 +747,7 @@ export function SkillsScene() {
                   active={categoryIndex === index}
                   animated
                   ringPosition={ringPosition}
+                  categoryTitleSweep={categoryTitleSweep}
                   radius={radius}
                   compact={compactWheel}
                   bounds={wheelBounds}
@@ -618,11 +759,12 @@ export function SkillsScene() {
         </div>
       ) : (
         <div className="skills-fallback">
-          <div className="skills-wheel-intro">
-            <SkillsWheelIntroCopy />
-          </div>
           {skills.map((skill, index) => (
             <section className="skills-pair" key={skill.name} aria-label={skill.name}>
+              <div className="skills-wheel-intro skills-fallback-copy">
+                <h3 className="skills-wheel-title">{skill.copy.title}</h3>
+                <p className="skills-wheel-description">{skill.copy.description}</p>
+              </div>
               <SkillProject index={index} active animated={false} onOpenProject={openProject} />
               <SkillCategoryPill
                 index={index}
@@ -630,6 +772,7 @@ export function SkillsScene() {
                 animated={false}
                 radius={radius}
                 ringPosition={ringPosition}
+                categoryTitleSweep={categoryTitleSweep}
                 bounds={wheelBounds}
                 onSelect={selectSkill}
               />

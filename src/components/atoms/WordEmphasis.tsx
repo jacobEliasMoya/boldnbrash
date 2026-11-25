@@ -16,6 +16,22 @@ export function getWordEmphasis(phase: number) {
   }
 }
 
+function getWordRevealStyle(progress: number, wordIndex: number, wordCount: number) {
+  const phase = progress * (wordCount + wordEntrySteps) - wordIndex
+  const emphasis = getWordEmphasis(phase - wordEntrySteps)
+
+  if (phase >= wordEntrySteps) return emphasis
+
+  // Overlap the drops and let the emphasis pulse follow each landing.
+  const entry = Math.max(0, phase)
+
+  return {
+    ...emphasis,
+    opacity: Math.min(1, entry * 2),
+    y: -12 * (1 - easeOut(entry / wordEntrySteps)),
+  }
+}
+
 export function WordEmphasis({
   text,
   progress,
@@ -33,7 +49,6 @@ export function WordEmphasis({
 
   const tokens = text.split(/(\s+)/)
   const wordCount = tokens.filter((token) => /\S/.test(token)).length
-  const revealSteps = scrollReveal && !reducedMotion ? wordEntrySteps : 0
   const firstWord = tokens[0] ? 0 : 1
 
   return tokens.map((token, index) => {
@@ -41,16 +56,10 @@ export function WordEmphasis({
 
     // The split keeps whitespace between words, including any leading space.
     const wordIndex = index / 2 - firstWord
-    const phase = reducedMotion ? 0 : progress * (wordCount + revealSteps) - wordIndex
-
-    const style: MotionStyle & { '--word-emphasis': string } = getWordEmphasis(phase - revealSteps)
-
-    // The next word starts after a third of the drop. The color pulse follows each landing.
-    if (revealSteps && phase < revealSteps) {
-      const entry = Math.max(0, phase)
-      style.opacity = Math.min(1, entry * 2)
-      style.y = -12 * (1 - easeOut(entry / revealSteps))
-    }
+    const style: MotionStyle & { '--word-emphasis': string } =
+      scrollReveal && !reducedMotion
+        ? getWordRevealStyle(progress, wordIndex, wordCount)
+        : getWordEmphasis(reducedMotion ? 0 : progress * wordCount - wordIndex)
 
     return (
       <motion.span key={index} className="word-emphasis" style={style}>

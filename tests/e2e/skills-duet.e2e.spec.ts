@@ -221,9 +221,10 @@ for (const viewport of [
       const nextStop = skillStart + projectStops[1].position
       await scrollToPhase(page, firstStop)
       await expect(intro).toHaveAttribute('aria-hidden', 'true')
-      await expect(work.locator('.skills-wheel-intro p')).toHaveText(
-        'See what I’ve built across client websites, design systems, and developer tools, plus a few experiments in 3D and AI.',
-      )
+      const categoryCopy = work.locator('.skills-wheel-intro')
+      await expect(categoryCopy.getByRole('heading')).toHaveText(skills[0].copy.title)
+      await expect(categoryCopy.locator('p')).toHaveText(skills[0].copy.description)
+      const projectSlot = (await work.locator('.skills-projects').boundingBox())!
 
       const currentSkill = page.locator('.skills-category-pill[data-active]')
 
@@ -305,6 +306,11 @@ for (const viewport of [
       await page.locator('.skills-performance').dispatchEvent('touchend')
       await scrollToPhase(page, nextStop)
       await expect(currentSkill).toContainText(skills[1].name)
+      await expect(categoryCopy.getByRole('heading')).toHaveText(skills[1].copy.title)
+      await expect(categoryCopy.locator('p')).toHaveText(skills[1].copy.description)
+      const newProjectSlot = (await work.locator('.skills-projects').boundingBox())!
+      expect(newProjectSlot.height).toBeCloseTo(projectSlot.height, 1)
+      expect(newProjectSlot.y).toBeCloseTo(projectSlot.y, 1)
 
       const second = page.getByRole('article', { name: skills[1].projects[0].title, exact: true })
 
@@ -357,6 +363,12 @@ test('reduced motion presents each skill beside its projects without hiding cont
   await expect(page.locator('.skills-performance')).toHaveCount(0)
   await expect(page.locator('.skills-pair')).toHaveCount(skills.length)
   await expect(page.locator('.skills-fallback article[aria-hidden="true"]')).toHaveCount(0)
+  await expect(page.locator('.skills-fallback .skills-wheel-title')).toHaveText(
+    skills.map(({ copy }) => copy.title),
+  )
+  await expect(page.locator('.skills-fallback .skills-wheel-description')).toHaveText(
+    skills.map(({ copy }) => copy.description),
+  )
 })
 
 test('period opening follows changes to the heading', async ({ page }) => {
@@ -382,6 +394,110 @@ test('period opening follows changes to the heading', async ({ page }) => {
       }),
     )
     .toBeLessThan(0.5)
+})
+
+test('Work fills the departing pill and swaps the heading before the paragraph', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto(`${baseURL}/#${projectStops[0].id}`)
+  await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 15000 })
+  const first = skillStart + projectStops[0].position
+  const next = skillStart + projectStops[1].position
+  const fills = () =>
+    page
+      .locator('.skills-category-title-fill')
+      .evaluateAll((titles) =>
+        titles.map((title) => parseFloat(getComputedStyle(title).getPropertyValue('--title-fill'))),
+      )
+  const empty = skills.map(() => 0)
+
+  for (const [start, end, departing] of [
+    [first, next, 0],
+    [next, first, 1],
+  ]) {
+    await scrollToPhase(page, start)
+    const distance = end - start
+    await scrollToPhase(page, start + distance * 0.14)
+    await expect.poll(async () => (await fills())[departing]).toBeGreaterThan(40)
+    expect((await fills()).filter((_, index) => index !== departing)).toEqual(empty.slice(1))
+
+    // The entering title stays clear through the handoff, including a canceled turn.
+    for (const fraction of [0.42, 0.64, 0.84, 0.14]) {
+      await scrollToPhase(page, start + distance * fraction)
+      await expect.poll(fills).toEqual(empty)
+    }
+
+    await scrollToPhase(page, end)
+    await expect.poll(fills).toEqual(empty)
+  }
+
+  const copy = page.locator('.skills-browser .skills-wheel-intro')
+
+  for (const stop of [projectStops[1], projectStops[0]]) {
+    const previous = skills[stop.skillIndex === 1 ? 0 : 1].copy
+    await expect(copy.getByRole('heading', { name: previous.title })).toBeVisible()
+    await expect(copy.locator('h3')).toHaveCSS('opacity', '1')
+    await expect(copy.locator('p')).toHaveText(previous.description)
+    await expect(copy.locator('p')).toHaveCSS('opacity', '1')
+
+    const nextCopy = skills[stop.skillIndex].copy
+
+    const swap = await copy.evaluate(
+      async (intro, { detail, nextCopy }) => {
+        const heading = intro.querySelector('h3')!
+        const paragraph = intro.querySelector('p')!
+        const oldDescription = paragraph.textContent
+        const height = intro.getBoundingClientRect().height
+        let headingFaded = false
+        let paragraphFaded = false
+        let headingSettledFirst = true
+        let layoutStayedStill = true
+
+        window.dispatchEvent(
+          new CustomEvent('portfolio:select-skill', { detail, cancelable: true }),
+        )
+
+        const deadline = performance.now() + 3500
+        while (performance.now() < deadline) {
+          await new Promise(requestAnimationFrame)
+          const headingAlpha = Number(getComputedStyle(heading).opacity)
+          const paragraphAlpha = Number(getComputedStyle(paragraph).opacity)
+          const titleIsCurrent = heading.getAttribute('aria-label') === nextCopy.title
+          const descriptionIsCurrent = paragraph.textContent === nextCopy.description
+
+          headingFaded ||= headingAlpha > 0 && headingAlpha < 1
+          paragraphFaded ||= paragraphAlpha > 0 && paragraphAlpha < 1
+          layoutStayedStill &&= intro.getBoundingClientRect().height === height
+
+          if (paragraphAlpha < 1 || paragraph.textContent !== oldDescription) {
+            headingSettledFirst &&= titleIsCurrent && headingAlpha === 1
+          }
+
+          if (descriptionIsCurrent && paragraphAlpha === 1) break
+        }
+
+        return { headingFaded, paragraphFaded, headingSettledFirst, layoutStayedStill }
+      },
+      {
+        detail: {
+          index: stop.skillIndex,
+          offset: stop.position - skillSegments[stop.skillIndex].start,
+        },
+        nextCopy,
+      },
+    )
+
+    await expect(copy.getByRole('heading')).toHaveText(nextCopy.title)
+    await expect(copy.locator('p')).toHaveText(nextCopy.description)
+    await expect(copy.locator('p')).toHaveCSS('opacity', '1')
+    expect(swap).toEqual({
+      headingFaded: true,
+      paragraphFaded: true,
+      headingSettledFirst: true,
+      layoutStayedStill: true,
+    })
+  }
 })
 
 test('desktop Work commits short wheel gestures in either direction', async ({ page }) => {

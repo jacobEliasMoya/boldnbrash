@@ -14,6 +14,7 @@ import {
   skillSegments,
   projectStops,
   experienceStart,
+  workIntroCopyTiming,
   workIntroPillStart,
   workIntroSettle,
   workProjectTravel,
@@ -267,27 +268,46 @@ test('mobile Work project enters from the left and reverses', async ({ page }) =
   const { copyStart, projectStart } = getWorkOpeningTiming(true)
   const copyPosition = skillStart + copyStart
   const intro = page.locator('.skills-browser [data-wheel-static]')
-  const letters = intro.locator('.intro-title-glyph')
-  const words = intro.locator('.word-emphasis')
+  const heading = intro.locator('h3')
+  const paragraph = intro.locator('p')
+  const { headingEnd, paragraphStart, end } = workIntroCopyTiming
+  const headingMid = copyPosition + headingEnd / 2
 
-  await moveToBoundary(page, copyPosition + 0.24)
-  await expect(letters.first()).toHaveCSS('opacity', '1')
-  await expect(letters.last()).toHaveCSS('opacity', '0')
-  await expect(words.first()).toHaveCSS('opacity', '0')
+  const alpha = (element: typeof heading) =>
+    element.evaluate((el) => Number(getComputedStyle(el).opacity))
+
+  await moveToBoundary(page, headingMid)
+  await expect.poll(() => alpha(heading)).toBeCloseTo(0.5, 1)
+  await expect(paragraph).toHaveCSS('opacity', '0')
   await expect(card).toBeHidden()
 
-  // The heading has settled, but the copy is still arriving past its old endpoint.
-  await moveToBoundary(page, copyPosition + 1.08)
-  await expect(letters.last()).toHaveCSS('transform', 'none')
-  await expect(words.first()).toHaveCSS('opacity', '1')
-  await expect(words.last()).toHaveCSS('opacity', '0')
+  await moveToBoundary(page, copyPosition + (headingEnd + paragraphStart) / 2)
+  await expect(heading).toHaveCSS('opacity', '1')
+  await expect(paragraph).toHaveCSS('opacity', '0')
+
+  await moveToBoundary(page, copyPosition + (paragraphStart + end) / 2)
+  await expect(heading).toHaveCSS('transform', 'none')
+  await expect.poll(() => alpha(paragraph)).toBeCloseTo(0.5, 1)
   await expect(card).toBeHidden()
 
   const entry = skillStart + projectStart + workProjectTravel * 0.25
   await moveToBoundary(page, entry)
   await expect(intro).toHaveCSS('opacity', '1')
-  await expect(words.last()).toHaveCSS('opacity', '1')
+  await expect(paragraph).toHaveCSS('opacity', '1')
   await expect(page.locator('.skills-browser .skills-category-pill').first()).toBeHidden()
+
+  // Sample the card after the spring reaches the browser's rounded scroll position.
+  await expect
+    .poll(() =>
+      page.locator('.scene-track').evaluate((track, duration) => {
+        const travel = track.clientHeight - track.firstElementChild!.clientHeight
+        const target = (-track.getBoundingClientRect().top / travel) * duration
+
+        return Math.abs(Number(track.getAttribute('data-playback-progress')) - target)
+      }, sceneDuration),
+    )
+    .toBeLessThan(0.0001)
+
   const entering = (await card.boundingBox())!
   expect(entering.x).toBeLessThan(0)
   const liquid = page.locator('.liquid-experience-shoulders')
@@ -312,9 +332,9 @@ test('mobile Work project enters from the left and reverses', async ({ page }) =
   await moveToBoundary(page, entry)
   await expect.poll(async () => (await card.boundingBox())!.x).toBeCloseTo(entering.x, 0)
 
-  await moveToBoundary(page, copyPosition + 0.24)
-  await expect(letters.last()).toHaveCSS('opacity', '0')
-  await expect(words.first()).toHaveCSS('opacity', '0')
+  await moveToBoundary(page, headingMid)
+  await expect.poll(() => alpha(heading)).toBeCloseTo(0.5, 1)
+  await expect(paragraph).toHaveCSS('opacity', '0')
   await expect(card).toBeHidden()
 })
 
@@ -401,9 +421,28 @@ test('Experience keeps its pill spacing when the entrance reverses on a small sc
   }
 
   await moveToBoundary(page, start + experienceEntryTravel * 0.99)
-  await expect(incoming.getByText('Performance & UX', { exact: true })).toBeInViewport()
-  await expect(incoming.getByText('REST APIs', { exact: true })).toBeInViewport()
-  await expect(incoming).toBeInViewport({ ratio: 1 })
+  const toggle = incoming.getByRole('button', { name: /Web Developer II/ })
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  await toggle.click()
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  await expect(incoming.getByRole('img', { name: 'REST APIs' })).toHaveCount(1)
+
+  // A short viewport may scroll the body while the toggle remains within reach.
+  const metric = incoming.getByText('Custom Features', { exact: true })
+  await metric.scrollIntoViewIfNeeded()
+  await expect(metric).toBeInViewport()
+  await expect(toggle).toBeInViewport()
+  await toggle.click()
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+
+  await moveToBoundary(page, start + experienceEntryTravel * 1.99)
+  const last = page.locator('[data-role="inenvi-engineer"]')
+  await expect(last.getByRole('button', { name: /Software Engineer/ })).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  )
+  const lastBounds = (await last.boundingBox())!
+  expect(lastBounds.y + lastBounds.height).toBeLessThanOrEqual(568)
 })
 
 test('Experience docks the entering role to the viewport and reverses cleanly', async ({
@@ -423,21 +462,17 @@ test('Experience docks the entering role to the viewport and reverses cleanly', 
   const thirdStart = experienceStart + experienceEntryTravel * 2
   const midEntry = thirdStart + experiencePillTravel * 0.43
 
+  await moveToBoundary(page, thirdStart - 0.02)
+  const previousRest = (await second.boundingBox())!
+
   await moveToBoundary(page, midEntry)
   await expect(third).toHaveAttribute('data-docked', '')
-  await expect(third.locator('.experience-detail')).toHaveCSS('opacity', '0')
-  await expect(third.locator('.experience-technologies')).toBeHidden()
+  await expect(third.locator('button[aria-expanded]')).toHaveAttribute('aria-expanded', 'false')
   await expect(second).toHaveAttribute('aria-current', 'true')
   await expect(second).toHaveCSS('transform', 'none')
   await expect(third).toHaveCSS('transform', 'none')
   const docked = (await third.boundingBox())!
-  const focused = (await second.boundingBox())!
-  await expect(about.locator('.experience-role h3')).toHaveText([
-    'Junior Web Developer',
-    'Web Developer I',
-    'Web Developer II',
-    'Software Engineer',
-  ])
+  await expect(about.locator('.experience-role button[aria-expanded="false"]')).toHaveCount(4)
 
   async function expectDockPixels(surface: number[]) {
     const { data, info } = await sharp(await page.screenshot({ scale: 'css' }))
@@ -503,6 +538,7 @@ test('Experience docks the entering role to the viewport and reverses cleanly', 
   )
   expect(liftOffTilt).toBeGreaterThan(0)
   expect(liftOffTilt).toBeLessThan(0.08)
+  await expect(second).toHaveJSProperty('inert', true)
   await expect(swell).toHaveAttribute('d', / Q/)
 
   await moveToBoundary(page, thirdStart + experiencePillTravel * 0.76)
@@ -567,33 +603,26 @@ test('Experience docks the entering role to the viewport and reverses cleanly', 
   expect(settled.width).toBeCloseTo(docked.width, 1)
   expect(settled.height).toBeCloseTo(docked.height, 1)
   expect(settled.y + settled.height).toBeLessThan(900)
-  expect(settled.y + settled.height / 2).toBeCloseTo(focused.y + focused.height / 2, 0)
+  expect(settled.y).toBeGreaterThan((await about.locator('.experience-heading').boundingBox())!.y)
   await expect(third).toHaveAttribute('aria-current', 'true')
-  await expect
-    .poll(() =>
-      third
-        .locator('.experience-detail')
-        .evaluate((detail) => Number(getComputedStyle(detail).opacity)),
-    )
-    .toBeGreaterThan(0.95)
-  await expect(third.locator('.experience-detail')).toHaveText(
-    'Built reusable WordPress features, including a custom reviews template.',
-  )
-  await expect(third.locator('.experience-stats dd')).toHaveText(['200+', '12K+', '50+'])
-  await expect(third.locator('.experience-stats dt')).toHaveText([
-    'Sites Built',
-    'Tasks Delivered',
-    'Custom Features',
-  ])
-  for (const name of ['WordPress', 'PHP', 'JavaScript', 'React', 'REST APIs']) {
-    await expect(third.getByRole('img', { name, exact: true })).toBeVisible()
-    await expect(third.getByText(name, { exact: true })).toBeVisible()
-  }
-  await expect(third.locator('.experience-key-work li')).toHaveText([
-    'Multi-site builds',
-    'Performance & UX',
-  ])
-  await expect(second.locator('.experience-technologies')).toBeHidden()
+  await expect(second).toHaveJSProperty('inert', true)
+  const toggle = third.getByRole('button', { name: /Web Developer II/ })
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  const title = third.getByText('Web Developer II', { exact: true })
+  const titleTop = (await title.boundingBox())!.y
+
+  await toggle.press('Enter')
+  await expect(toggle).toBeFocused()
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  const panel = page.locator(`#${await toggle.getAttribute('aria-controls')}`)
+  await expect(panel.getByText('Custom Features', { exact: true })).toBeInViewport()
+  expect((await title.boundingBox())!.y).toBeCloseTo(titleTop, 0)
+
+  await toggle.press('Space')
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  await expect(third.getByRole('img', { name: 'REST APIs' })).toHaveCount(0)
+  await expect.poll(async () => (await third.boundingBox())!.height).toBeCloseTo(settled.height, 0)
+  expect((await title.boundingBox())!.y).toBeCloseTo(titleTop, 0)
 
   const outgoingOpacity = await second.evaluate((role) => Number(getComputedStyle(role).opacity))
   expect(outgoingOpacity).toBe(1)
@@ -615,13 +644,15 @@ test('Experience docks the entering role to the viewport and reverses cleanly', 
   await expect(third).toHaveAttribute('data-docked', '')
   await expect(second).toHaveAttribute('aria-current', 'true')
   await expect(second).toHaveCSS('transform', 'none')
+  expect((await second.boundingBox())!.y).toBeCloseTo(previousRest.y, 0)
 
   await moveToBoundary(page, sceneStops[3] - 1 - 0.01)
   const currentRole = about.locator('[data-role="inenvi-engineer"]')
   await expect(currentRole).toHaveAttribute('aria-current', 'true')
   await expect(currentRole).toHaveAttribute('data-portal', 'contact')
-  await expect(currentRole.locator('.experience-highlight')).toHaveText(
-    '50+ state sites in scope for one shared Astro build',
+  await expect(currentRole.getByRole('button', { name: /Software Engineer/ })).toHaveAttribute(
+    'aria-expanded',
+    'false',
   )
 
   await page.mouse.move(10, 400)
@@ -771,30 +802,51 @@ test('a short mobile drag reveals the intro, project, and pill in order and reve
   await moveToBoundary(page, skillTitleEnd - 0.01)
   const progress = () =>
     page.locator('.scene-track').getAttribute('data-playback-progress').then(Number)
-  const [order] = await Promise.all([
+  const [entrance] = await Promise.all([
     page.evaluate(async (firstProject) => {
       const order: string[] = []
+      const times: Record<string, number> = {}
       const record = (name: string) => {
-        if (!order.includes(name)) order.push(name)
+        if (name in times) return
+
+        times[name] = performance.now()
+        order.push(name)
       }
 
-      const expires = performance.now() + 4000
-      while (order.length < 3 && performance.now() < expires) {
+      const intro = document.querySelector('.skills-browser .skills-wheel-intro')!
+      const heading = intro.querySelector('h3')!
+      const paragraph = intro.querySelector('p')!
+      const expires = performance.now() + 6500
+
+      while (!('category' in times) && performance.now() < expires) {
         await new Promise(requestAnimationFrame)
+        const titleAlpha = Number(getComputedStyle(heading).opacity)
+        const paragraphAlpha = Number(getComputedStyle(paragraph).opacity)
         const card = document.getElementById(firstProject)
-        const intro = document.querySelector(
-          'ul.skills-browser > li[data-wheel-static]:first-child',
-        )
+
+        if (titleAlpha > 0.01) record('heading')
+        if (titleAlpha >= 0.99) record('heading settled')
+        if (paragraphAlpha > 0.01) record('paragraph')
+        if (paragraphAlpha >= 0.99) record('paragraph settled')
         if (card?.hasAttribute('data-project-entering')) record('project')
-        if (intro && Number(getComputedStyle(intro).opacity) > 0.05) record('intro')
         if (document.querySelector('.skills-category-pill[data-work-entering]')) record('category')
       }
 
-      return order
+      return { order, times }
     }, projectStops[0].id),
     drag(1),
   ])
-  expect(order).toEqual(['intro', 'project', 'category'])
+  expect(entrance.order).toEqual([
+    'heading',
+    'heading settled',
+    'paragraph',
+    'paragraph settled',
+    'project',
+    'category',
+  ])
+  expect(entrance.times['heading settled'] - entrance.times.heading).toBeGreaterThan(450)
+  expect(entrance.times.paragraph - entrance.times['heading settled']).toBeGreaterThan(100)
+  expect(entrance.times['paragraph settled'] - entrance.times.paragraph).toBeGreaterThan(500)
   await expect.poll(progress).toBeCloseTo(skillStart + workIntroSettle, 2)
   const wheel = page.locator('ul.skills-browser')
   const intro = wheel.locator(':scope > li[data-wheel-static]:first-child')

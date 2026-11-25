@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Spacing Pass'
+  short_description: 'Compare edge insets, alignment, and spacing between groups'
+  default_prompt: 'Use $spacing-pass to check this layout and show matched before-and-after screenshots at the clearest viewport.'

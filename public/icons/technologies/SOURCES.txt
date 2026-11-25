@@ -3,5 +3,5 @@ React Three Fiber: https://github.com/pmndrs/react-three-fiber/blob/master/docs/
 Pillow: stacked image glyph drawn for the Work badge.
 WebP mark: https://developers.google.com/static/speed/webp/images/webp-devsite-icon.png
 Gravity Forms: https://www.gravityforms.com/brand-assets/ (official Color badge from the linked brand guidelines).
-Concept icons (WCAG/accessibility, local models/CPU, tool calling/wrench, piexif/image metadata): https://github.com/lucide-icons/lucide (ISC).
+Concept icons (WCAG/accessibility, REST APIs/network, local models/CPU, tool calling/wrench, piexif/image metadata): https://github.com/lucide-icons/lucide (ISC).
 These concept symbols are descriptive icons, not brand logos.

@@ -165,7 +165,10 @@ export function PortfolioHero() {
           animate={clientReady ? (introReady ? entered : entrance) : undefined}
           transition={entranceTransition(2.18, reduceMotion)}
         >
-          <WordEmphasis text="Take a scroll. See what pops." progress={paragraphProgress} />
+          <WordEmphasis
+            text="I turn thoughtful design into accessible interfaces and reusable systems."
+            progress={paragraphProgress}
+          />
         </motion.p>
       </div>
       <div className="hero-mark">

@@ -3,6 +3,11 @@ import { experienceTravel } from './experienceTimeline'
 const skillCatalog = [
   {
     name: 'Frontend Development',
+    copy: {
+      title: 'One Build, Many Sites.',
+      description:
+        'I helped consolidate roughly 16 builds into one Astro build for 50+ state sites.',
+    },
     technologies: ['React', 'Next.js', 'TypeScript', 'Astro'],
     note: '',
     projects: [
@@ -30,6 +35,10 @@ const skillCatalog = [
   },
   {
     name: 'Headless CMS',
+    copy: {
+      title: 'Pages Editors Shape.',
+      description: 'I modeled content in Strapi so editors can build pages from reusable sections.',
+    },
     technologies: ['Strapi', 'GraphQL'],
     note: '',
     projects: [
@@ -44,6 +53,11 @@ const skillCatalog = [
   },
   {
     name: 'Backend & Dev Tools',
+    copy: {
+      title: 'Tools for the Terminal.',
+      description:
+        'I built a Go tool for working with Git and a Rust tool for gathering codebase context.',
+    },
     technologies: ['Go (Golang)', 'Rust'],
     note: '',
     projects: [
@@ -69,6 +83,11 @@ const skillCatalog = [
   },
   {
     name: '3D Development',
+    copy: {
+      title: 'A Ship From Scratch.',
+      description:
+        'I modeled a low-poly spaceship in Blender, shaping its silhouette with a few simple forms.',
+    },
     technologies: ['Blender', 'React Three Fiber'],
     note: '',
     projects: [
@@ -83,6 +102,11 @@ const skillCatalog = [
   },
   {
     name: 'AI & Agent Development',
+    copy: {
+      title: 'AI Without a Signal.',
+      description:
+        'I’m prototyping an offline assistant with Ollama and exploring how it can call local tools.',
+    },
     technologies: ['Ollama', 'Local models', 'Tool calling'],
     note: '',
     projects: [
@@ -98,6 +122,11 @@ const skillCatalog = [
   },
   {
     name: 'Design Systems & Accessibility',
+    copy: {
+      title: 'Parts That Fit.',
+      description:
+        'I built shared React components with themes, responsive layouts, and stronger contrast.',
+    },
     technologies: ['React', 'SCSS', 'Tailwind CSS', 'WCAG'],
     note: '',
     projects: [
@@ -115,6 +144,11 @@ const skillCatalog = [
   },
   {
     name: 'WordPress & PHP',
+    copy: {
+      title: 'Built Into WordPress.',
+      description:
+        'I wrote a reusable PHP reviews template and helped move a nonprofit site to WordPress.',
+    },
     technologies: ['WordPress', 'PHP', 'Gutenberg', 'Gravity Forms'],
     note: '',
     projects: [
@@ -142,6 +176,11 @@ const skillCatalog = [
   },
   {
     name: 'Python Automation',
+    copy: {
+      title: 'A Folder at a Time.',
+      description:
+        'I wrote Python tools to compress batches of images and add GPS metadata from folder names.',
+    },
     technologies: ['Python', 'Pillow', 'piexif', 'WebP'],
     note: '',
     projects: [
@@ -173,7 +212,8 @@ const workCategorySettle = workCategoryTravel + 0.8
 // Only the opening card needs extra travel. The later project intervals retain their spacing.
 export const workProjectTravel = 1.2
 
-export const workIntroCopyTiming = { headingEnd: 0.651, paragraphStart: 0.441, end: 1.45 }
+// Reserve a reading beat between the heading and sentence on the opening scroll clock.
+export const workIntroCopyTiming = { headingEnd: 1.12, paragraphStart: 1.42, end: 2.65 }
 export const workIntroPillStart = workProjectTravel + workIntroCopyTiming.end
 export const workIntroSettle = workIntroPillStart + 0.7
 

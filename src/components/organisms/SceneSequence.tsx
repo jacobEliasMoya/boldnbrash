@@ -56,6 +56,7 @@ import {
   fromPlaybackTime,
   toShowcaseTime,
   fromShowcaseTime,
+  workHandoffDurationScale,
 } from './scrollPlayback'
 import { ExperienceMotion, WorkPillMotion, type WorkDock } from './ExperienceMotion'
 import type { ExperienceDock } from './experienceTimeline'
@@ -105,11 +106,71 @@ const heroRevealTravel = sceneStops[1] - heroWalkOutEnd
 const workOpeningSecondsPerUnit = 0.8
 const wordmarkDropStart = -100
 
+const sceneScrollSpring = { stiffness: 145, damping: 24.5, mass: 1 }
+
+// Stretch the Work springs without changing their damping ratio or the input distance.
+const workScrollSpring = {
+  ...sceneScrollSpring,
+  stiffness: sceneScrollSpring.stiffness / workHandoffDurationScale ** 2,
+  damping: sceneScrollSpring.damping / workHandoffDurationScale,
+}
+const workSnapSpring = {
+  stiffness: 100 / workHandoffDurationScale ** 2,
+  damping: 20.5 / workHandoffDurationScale,
+  mass: 1,
+}
+
 const origins = [
   [50, 50],
   [65, 30],
   [82, 72],
 ]
+
+function revealWorkHeading(lines: HTMLElement[]) {
+  const duration = 0.82
+
+  // Leave a beat between the lines. Fading each wrapper keeps the period in place.
+  return animate(
+    lines,
+    { opacity: [0, 1] },
+    {
+      type: 'tween',
+      duration,
+      delay: stagger(duration + 0.14),
+      ease: [0.36, 0.1, 0.64, 0.9],
+    },
+  )
+}
+
+function dropAboutHeading(letters: HTMLElement[]) {
+  const secondLine = letters.filter((letter) => letter.closest('.skills-title-line:nth-child(2)'))
+  const firstLine = letters.slice(0, letters.length - secondLine.length)
+  const letterGap = 0.036
+  const appear = {
+    type: 'tween' as const,
+    duration: introDropSpring.duration,
+    times: [0, 0.001, 1],
+  }
+
+  // The About lettering follows the loader's drop. Scroll drives the paragraph.
+  return animate([
+    [
+      firstLine,
+      { y: ['-0.85em', '0em'], opacity: [0, 1, 1] },
+      { ...introDropSpring, delay: stagger(letterGap), opacity: appear },
+    ],
+    [
+      secondLine,
+      { y: ['-0.18em', '0em'], opacity: [0, 1, 1] },
+      {
+        ...introDropSpring,
+        at: firstLine.length * letterGap,
+        delay: stagger(letterGap),
+        opacity: appear,
+      },
+    ],
+  ])
+}
 
 function positionAboutCopy(copy: HTMLElement | null | undefined, intro: number) {
   if (!copy) return
@@ -166,37 +227,13 @@ export function SceneSequence({ children }: { children: ReactNode }) {
 
     if (!panel) return
 
-    const letters = Array.from(panel.querySelectorAll<HTMLElement>('[data-intro-drop="letter"]'))
-    const secondLine = letters.filter((letter) => letter.closest('.skills-title-line:nth-child(2)'))
-    const firstLine = letters.slice(0, letters.length - secondLine.length)
-    const letterGap = 0.036
-    const appear = {
-      type: 'tween' as const,
-      duration: introDropSpring.duration,
-      times: [0, 0.001, 1],
-    }
+    const workHeading = activeScene === 'skills'
+    const selector = workHeading
+      ? '.skills-heading .skills-title-line'
+      : '[data-intro-drop="letter"]'
+    const subjects = Array.from(panel.querySelectorAll<HTMLElement>(selector))
+    const entrance = workHeading ? revealWorkHeading(subjects) : dropAboutHeading(subjects)
 
-    // Prepare the letters before making the heading visible to the scene reveal.
-    for (const letter of letters) letter.style.opacity = '0'
-
-    // Compress the loader's stagger for the longer headings. Scroll drives the paragraph.
-    const entrance = animate([
-      [
-        firstLine,
-        { y: ['-0.85em', '0em'], opacity: [0, 1, 1] },
-        { ...introDropSpring, delay: stagger(letterGap), opacity: appear },
-      ],
-      [
-        secondLine,
-        { y: ['-0.18em', '0em'], opacity: [0, 1, 1] },
-        {
-          ...introDropSpring,
-          at: firstLine.length * letterGap,
-          delay: stagger(letterGap),
-          opacity: appear,
-        },
-      ],
-    ])
     panel.dataset.introDropStarted = ''
 
     let disposed = false
@@ -216,9 +253,9 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       panel.removeAttribute('data-intro-drop-complete')
       entrance.stop()
 
-      for (const letter of letters) {
-        letter.style.removeProperty('opacity')
-        letter.style.removeProperty('transform')
+      for (const subject of subjects) {
+        subject.style.removeProperty('opacity')
+        subject.style.removeProperty('transform')
       }
     }
   }, [active, activeScene, enhanced, introReady, reduceMotion])
@@ -647,9 +684,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
 
         const control = animate(startTime, targetTime, {
           type: 'spring',
-          stiffness: 100,
-          damping: 20.5,
-          mass: 1,
+          ...workSnapSpring,
           velocity,
           restDelta: 0.0005,
           restSpeed: 0.005,
@@ -1169,7 +1204,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       // across wheel/touch updates so each event continues the motion already in flight.
       const spring =
         experiencePlayback || workPlayback
-          ? { stiffness: 145, damping: 24.5, mass: 1, velocity }
+          ? { ...(workPlayback ? workScrollSpring : sceneScrollSpring), velocity }
           : introPlayback
             ? { stiffness: 230, damping: 30, mass: 0.9 }
             : gesturePlayback || heroPlayback

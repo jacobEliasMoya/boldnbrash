@@ -65,9 +65,7 @@ test('the mobile liquid matches the pill corner radius throughout its entrance',
   const pill = page.locator('[data-role="biziq-developer-ii"]')
   const start = experienceStart + 2 * experienceEntryTravel
 
-  for (const phase of [0.43, 0.61, 0.43]) {
-    const progress = start + phase * experiencePillTravel
-
+  async function seek(progress: number) {
     await track.evaluate(
       (element, { progress, duration }) => {
         const start = scrollY + element.getBoundingClientRect().top
@@ -80,6 +78,10 @@ test('the mobile liquid matches the pill corner radius throughout its entrance',
     await expect
       .poll(() => track.getAttribute('data-playback-progress').then(Number))
       .toBeCloseTo(progress, 2)
+  }
+
+  for (const phase of [0.43, 0.61, 0.43]) {
+    await seek(start + phase * experiencePillTravel)
     await expect(pill).toHaveAttribute('data-docked', '')
 
     const widths = await pill.evaluate((element) => {
@@ -113,6 +115,18 @@ test('the mobile liquid matches the pill corner radius throughout its entrance',
     expect(Math.min(...widths)).toBeGreaterThan(4)
     expect(Math.max(...widths) - Math.min(...widths)).toBeLessThan(1)
   }
+
+  // Releasing the pill leaves it collapsed until a tap requests the details.
+  await seek(start + experienceEntryTravel * 0.99)
+  const toggle = pill.getByRole('button', { name: /Web Developer II/ })
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  await toggle.tap()
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  await expect(pill.getByRole('img', { name: 'REST APIs' })).toBeVisible()
+  await toggle.tap()
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  await seek(start + 0.43 * experiencePillTravel)
+  await expect(pill).toHaveAttribute('data-docked', '')
 })
 
 test('Experience follows a held swipe through release, resize, and reversal', async ({ page }) => {

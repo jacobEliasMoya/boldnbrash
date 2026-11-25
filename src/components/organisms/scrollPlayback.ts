@@ -4,11 +4,14 @@ import {
   experienceEnd,
   experienceStart,
   heroWalkOutEnd,
+  projectStops,
   sceneStops,
   skillTitleEnd,
   skillStart,
   skillTravel,
 } from './skillsTimeline'
+
+export const workHandoffDurationScale = 1.4
 
 // Base timing for the scene before input and reading pacing are applied.
 const heroUnitsPerSecond = heroEntranceTravel / (heroEntranceDuration / 1000)
@@ -115,6 +118,12 @@ function fromPacedTime(time: number, ranges: PaceRange[]) {
 const inputPacing = [paceRange(experienceStart, experienceEnd, 1.45, 0.7)]
 const showcaseReading = [
   paceRange(sceneStops[1], skillTitleEnd, 2),
+  paceRange(
+    skillStart + projectStops[0].position,
+    skillStart + projectStops[projectStops.length - 1].position,
+    workHandoffDurationScale,
+    0.35,
+  ),
   paceRange(sceneStops[2], aboutIntroEnd, 2.5),
   paceRange(experienceStart, experienceEnd, 2, 0.7),
   paceRange(experienceEnd, sceneStops[3] - 1, 5, 0.22),

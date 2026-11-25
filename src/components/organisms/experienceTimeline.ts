@@ -24,9 +24,8 @@ type ExperienceRoleRecord = {
   dates: string
   detail: string
   technologies: readonly string[]
-  highlight?: ExperienceStat
-  stats?: readonly ExperienceStat[]
-  keyWork?: readonly string[]
+  stats: readonly ExperienceStat[]
+  keyWork: readonly string[]
 }
 
 export const experienceRoles: readonly ExperienceRoleRecord[] = [
@@ -35,40 +34,72 @@ export const experienceRoles: readonly ExperienceRoleRecord[] = [
     employer: 'VAREP National',
     role: 'Junior Web Developer',
     dates: '2019–2021',
-    detail:
-      'Helped move a veterans nonprofit’s site from Joomla to WordPress and built responsive pages.',
-    technologies: ['WordPress', 'Gravity Forms'],
+    detail: 'Helped move VAREP’s site from Joomla to WordPress.',
+    stats: [
+      { value: '2 yrs', label: 'At VAREP' },
+      { value: '1', label: 'Site Rebuild' },
+      { value: '2', label: 'CMS Platforms' },
+    ],
+    technologies: ['Joomla', 'WordPress', 'Gravity Forms'],
+    keyWork: [
+      'Turned wireframes into responsive pages',
+      'Migrated content and ran launch QA',
+      'Set up forms and WordPress plugins',
+    ],
   },
   {
     id: 'biziq-developer-i',
     employer: 'BIZIQ',
     role: 'Web Developer I',
     dates: '2021–2022',
-    detail: 'Launched responsive WordPress and Shopify sites and earned a promotion after a year.',
-    technologies: ['WordPress', 'Gutenberg'],
+    detail: 'Launched client sites on WordPress, Shopify, Wix, and Squarespace.',
+    stats: [
+      { value: '4', label: 'Site Platforms' },
+      { value: '3', label: 'WordPress Builders' },
+      { value: '1 yr', label: 'To Promotion' },
+    ],
+    technologies: ['WordPress', 'Shopify', 'Elementor', 'Gutenberg'],
+    keyWork: [
+      'Connected web forms to email workflows',
+      'Built pages with Elementor and WPBakery',
+      'Helped set up hosting and DNS',
+    ],
   },
   {
     id: 'biziq-developer-ii',
     employer: 'BIZIQ',
     role: 'Web Developer II',
     dates: '2022–2025',
-    detail: 'Built reusable WordPress features, including a custom reviews template.',
+    detail: 'Built WordPress theme features and mentored junior developers.',
     stats: [
       { value: '200+', label: 'Sites Built' },
       { value: '12K+', label: 'Tasks Delivered' },
       { value: '50+', label: 'Custom Features' },
     ],
-    technologies: ['WordPress', 'PHP', 'JavaScript', 'React', 'REST APIs'],
-    keyWork: ['Multi-site builds', 'Performance & UX'],
+    technologies: ['WordPress', 'PHP', 'JavaScript', 'jQuery', 'React', 'REST APIs'],
+    keyWork: [
+      'Built a reusable PHP reviews template',
+      'Customized and integrated WordPress plugins',
+      'Improved mobile layouts, SEO, and accessibility',
+    ],
   },
   {
     id: 'inenvi-engineer',
     employer: 'Inenvi',
     role: 'Software Engineer',
     dates: '2025–Present',
-    detail: 'Helped modernize a legacy web platform with Next.js and Strapi.',
-    technologies: ['Next.js', 'Strapi', 'Astro'],
-    highlight: { value: '50+', label: 'state sites in scope for one shared Astro build' },
+    detail: 'Modernizing legacy WebForms with Next.js and Strapi.',
+    stats: [
+      { value: '50+', label: 'State Sites in Scope' },
+      { value: '40+', label: 'Pages Localized' },
+      { value: '≈21', label: 'UI Components Updated' },
+    ],
+    technologies: ['Next.js', 'TypeScript', 'Strapi', 'Astro', 'GraphQL'],
+    keyWork: [
+      'Helped merge ≈16 Astro builds into one',
+      'Built a Strapi search gateway',
+      'Automated Spanish page publishing',
+    ],
   },
 ]
 
@@ -237,7 +268,7 @@ export function getPillLift(travel: number, height: number, rest: number, floor:
 
 export function getExperiencePositions(
   progress: number,
-  heights: number[],
+  boxes: { height: number; openHeight: number }[],
   top: number,
   floor: number,
   gap: number,
@@ -245,24 +276,27 @@ export function getExperiencePositions(
   compact: boolean,
   perspective: number,
 ) {
-  const clock = clamp(progress) * heights.length
-  const current = Math.min(heights.length - 1, Math.floor(clock))
+  const clock = clamp(progress) * boxes.length
+  const current = Math.min(boxes.length - 1, Math.floor(clock))
   const travel = (clock - current) * experienceEntryTravel
-  const center = (height: number) => top + Math.max(0, (floor - inset - top - height) / 2)
-  const incomingHeight = heights[current]
-  const { y: incomingY, release } = getPillLift(
-    travel,
-    incomingHeight,
-    center(incomingHeight),
-    floor,
-  )
+  const center = (openHeight: number) =>
+    top + Math.max(0, (floor - inset - gap - top - openHeight) / 2)
+  const incoming = boxes[current]
+  const rest = center(incoming.openHeight)
+  const lift = getPillLift(travel, incoming.height, rest, floor)
+  const release = lift.release
+
+  // The actual shell leaves the floor first. By the time its header is interactive,
+  // its path allows the full disclosure to open downwards even on a paused gesture.
+  const fullLift = getPillLift(travel, incoming.openHeight, rest, floor)
+  const incomingY = mix(lift.y, fullLift.y, ease(clamp((release - 0.25) / 0.25)))
 
   // Use Work's lift-off timing while keeping the entering pill flat.
   const turn = pillWheelTurn(release)
   const featured = current - (turn < 0.5 ? 1 : 0)
 
-  const poses = heights.map((height, index) => {
-    const rest = center(height)
+  const poses = boxes.map(({ height, openHeight }, index) => {
+    const rest = center(openHeight)
     const recede = index < current ? current - index - 1 + turn : 0
     // Use the outgoing half of Work's wheel, sized to fit between the heading and the focused pill.
     const distance = -recede
@@ -280,10 +314,8 @@ export function getExperiencePositions(
       tilt: pillWheelRotation(distance, compact),
       depth: pillWheelDepth(distance, radius, compact),
       opacity: pillWheelOpacity(distance) * (1 - clamp((recede - 1) / 0.6)),
-      // Reveal the detail at the end of the lift and fade it as the pill turns away.
-      detail:
-        index === current ? ease(clamp((release - 0.85) / 0.12)) : 1 - ease(clamp(recede * 2)),
       featured: index === featured,
+      interactive: index === featured && recede === 0,
       visible: y < floor && recede < 1.6,
       entering: index === current && travel < experienceEntryTravel,
     }
@@ -295,7 +327,7 @@ export function getExperiencePositions(
   // Reserve the layout gap between the projected edges, starting with the flat incoming pill.
   for (let index = current - 1; index >= 0 && poses[index].visible; index--) {
     const pose = poses[index]
-    const halfHeight = heights[index] / 2
+    const halfHeight = boxes[index].height / 2
     const angle = (pose.tilt * Math.PI) / 180
     const edgeY = halfHeight * Math.cos(angle)
     const edgeZ = halfHeight * Math.sin(angle)
@@ -307,6 +339,10 @@ export function getExperiencePositions(
     const maxY =
       origin - halfHeight + Math.min(limit / topScale + edgeY, limit / bottomScale - edgeY)
     const easeRoom = Math.max(0, gap / 2 - Math.abs(pose.y - maxY))
+
+    // Once the next shell occupies the disclosure's room, the outgoing header
+    // becomes a background preview until a reverse gesture brings it back.
+    if (pose.y + boxes[index].openHeight + gap * 1.5 > nextTop) pose.interactive = false
 
     // Ease into the constraint so the wheel keeps moving smoothly in either scroll direction.
     pose.y = Math.min(pose.y, maxY) - easeRoom ** 2 / (2 * gap)

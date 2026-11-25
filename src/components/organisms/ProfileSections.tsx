@@ -1,9 +1,11 @@
 'use client'
 
 import { useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import { motion, useReducedMotion } from 'motion/react'
 import { IntroDropText } from '@/components/atoms/IntroDropText'
 import { TechnologyIcons } from '@/components/atoms/TechnologyIcon'
 import { WordEmphasis } from '@/components/atoms/WordEmphasis'
+import { useClientReady } from '@/hooks/useClientReady'
 import { aboutTitleFillPortion, clamp, getAboutParagraphProgress } from './skillsTimeline'
 import { ExperienceMotion } from './ExperienceMotion'
 import {
@@ -71,54 +73,102 @@ function ExperienceRole({
   number: number
   last: boolean
 }) {
+  const clientReady = useClientReady()
+  const reduceMotion = useReducedMotion()
+  const [open, setOpen] = useState<boolean | null>(null)
+  const body = useRef<HTMLDivElement>(null)
+  // Leave the résumé readable in the server-rendered document.
+  const expanded = open ?? !clientReady
+  const titleId = `${record.id}-title`
+  const metaId = `${record.id}-meta`
+  const panelId = `${record.id}-details`
+
+  function toggle() {
+    if (!expanded) body.current?.scrollTo({ top: 0, behavior: 'instant' })
+
+    setOpen(!expanded)
+  }
+
   return (
     <li
       className="experience-role"
       data-role={record.id}
       data-portal={last ? 'contact' : undefined}
     >
-      <span className="experience-number" aria-hidden="true">
-        {String(number).padStart(2, '0')}
-      </span>
-      <div className="experience-copy">
-        <p className="experience-meta">
-          {record.employer} <span className="experience-dates">{record.dates}</span>
-        </p>
-        <h3>{record.role}</h3>
-      </div>
-      <div className="experience-body">
-        <p className="experience-detail">{record.detail}</p>
-        {record.stats && (
-          <dl className="experience-stats">
-            {record.stats.map(({ value, label }) => (
-              <div key={label}>
-                <dt>{label}</dt>
-                <dd>{value}</dd>
+      <h3>
+        <button
+          className="experience-toggle"
+          type="button"
+          disabled={!clientReady}
+          aria-expanded={expanded}
+          aria-controls={panelId}
+          aria-labelledby={`${titleId} ${metaId}`}
+          onClick={toggle}
+        >
+          <span className="experience-meta" id={metaId}>
+            <span>{String(number).padStart(2, '0')}</span> <span>{record.employer}</span>{' '}
+            <span className="experience-dates">{record.dates}</span>
+          </span>
+          <span className="experience-title" id={titleId}>
+            {record.role}
+          </span>
+          <span className="experience-sign" aria-hidden="true">
+            {expanded ? '−' : '+'}
+          </span>
+        </button>
+      </h3>
+      <motion.div
+        className="experience-disclosure"
+        id={panelId}
+        inert={!expanded}
+        aria-hidden={!expanded}
+        initial={false}
+        animate={{ height: expanded ? 'auto' : 0 }}
+        transition={{
+          type: 'tween',
+          duration: open === null || reduceMotion ? 0 : 0.42,
+          ease: [0.36, 0.1, 0.64, 0.9],
+        }}
+      >
+        <div ref={body} className="experience-body" role="region" aria-labelledby={titleId}>
+          <div className="experience-content">
+            {record.detail && <p className="experience-detail">{record.detail}</p>}
+            {(record.keyWork.length > 0 || record.technologies.length > 0) && (
+              <div className="experience-columns">
+                {record.keyWork.length > 0 && (
+                  <div className="experience-key-work">
+                    <h4>Key Work</h4>
+                    <ul role="list">
+                      {record.keyWork.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {record.technologies.length > 0 && (
+                  <div className="experience-tech">
+                    <h4>Tech</h4>
+                    <TechnologyIcons
+                      className="experience-technologies"
+                      technologies={record.technologies}
+                    />
+                  </div>
+                )}
               </div>
-            ))}
-          </dl>
-        )}
-        {record.highlight && (
-          <p className="experience-highlight">
-            <strong>{record.highlight.value}</strong> {record.highlight.label}
-          </p>
-        )}
-        <TechnologyIcons
-          className="experience-technologies"
-          technologies={record.technologies}
-          label={record.keyWork ? 'Tech:' : undefined}
-        />
-        {record.keyWork && (
-          <div className="experience-key-work">
-            <strong>Key Work:</strong>
-            <ul role="list">
-              {record.keyWork.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
+            )}
+            {record.stats.length > 0 && (
+              <dl className="experience-stats">
+                {record.stats.map(({ value, label }) => (
+                  <div key={label}>
+                    <dt>{label}</dt>
+                    <dd>{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      </motion.div>
     </li>
   )
 }
@@ -138,6 +188,11 @@ export function ProfileSections() {
     if (!enhanced || !element || !title || !progress || !dock) return
 
     const roles = Array.from(element.querySelectorAll<HTMLElement>('.experience-role'))
+    const parts = roles.map((role) => ({
+      header: role.querySelector<HTMLButtonElement>('.experience-toggle')!,
+      body: role.querySelector<HTMLElement>('.experience-body')!,
+      content: role.querySelector<HTMLElement>('.experience-content')!,
+    }))
     const list = element.querySelector('ol')!
     const viewport = window.visualViewport
     let viewportWidth = 0
@@ -148,14 +203,14 @@ export function ProfileSections() {
     let inset = 0
     let gap = 0
     let perspective = 0
-    let boxes: { width: number; height: number; radius: number }[] = []
+    let boxes: { width: number; height: number; openHeight: number; radius: number }[] = []
     let painted: ReturnType<typeof getExperiencePositions> = []
 
     const paint = () => {
       const position = progress.get()
       const poses = getExperiencePositions(
         position,
-        boxes.map((box) => box.height),
+        boxes,
         top,
         floor,
         gap,
@@ -190,14 +245,9 @@ export function ProfileSections() {
           role.style.setProperty('--experience-depth', `${pose.depth}px`)
         if (pose.opacity !== previous?.opacity)
           role.style.setProperty('--experience-opacity', String(pose.opacity))
-        if (pose.detail !== previous?.detail) {
-          role.style.setProperty('--experience-detail', String(pose.detail))
-          if (pose.detail > 0 !== (previous?.detail ?? 0) > 0)
-            role.toggleAttribute('data-detail-visible', pose.detail > 0)
-        }
         if (pose.visible !== previous?.visible) role.dataset.visible = String(pose.visible)
 
-        role.inert = !pose.visible || (pose.entering && !pose.featured)
+        role.inert = !pose.visible || !pose.interactive
         role.toggleAttribute('data-docked', outline?.touching ?? false)
 
         if (pose.featured !== previous?.featured) {
@@ -229,16 +279,37 @@ export function ProfileSections() {
       perspective = parseFloat(wheelStyles.perspective) || Infinity
       top = title.getBoundingClientRect().bottom - y + gap
 
-      // Measure the layout box so the previous pose's tilt cannot distort the mask.
-      boxes = roles.map((role) => {
+      // The landing slot fits the open role. Measure untransformed boxes so a wheel
+      // tilt or disclosure animation cannot move the header or distort the mask.
+      const available = Math.max(0, floor - inset - gap - top)
+      const measurements = roles.map((role, index) => {
         const pillStyles = getComputedStyle(role)
+        const { header, content } = parts[index]
+        const headerHeight = parseFloat(getComputedStyle(header).height)
+        const contentHeight = parseFloat(getComputedStyle(content).height)
+        const room = Math.max(0, available - headerHeight)
 
         return {
           width: parseFloat(pillStyles.width),
           height: parseFloat(pillStyles.height),
+          openHeight: headerHeight + Math.min(room, contentHeight),
           radius: parseFloat(pillStyles.borderTopLeftRadius),
+          room,
+          overflow: contentHeight > room + 1,
         }
       })
+      boxes = measurements
+
+      for (const [index, { room, overflow }] of measurements.entries()) {
+        const { body } = parts[index]
+        const height = `${room}px`
+
+        if (body.style.getPropertyValue('--experience-body-room') !== height)
+          body.style.setProperty('--experience-body-room', height)
+
+        if (overflow && body.tabIndex !== 0) body.tabIndex = 0
+        if (!overflow && body.hasAttribute('tabindex')) body.removeAttribute('tabindex')
+      }
 
       element.style.setProperty('--experience-list-top', `${top}px`)
       element.style.setProperty('--experience-wheel-center', `${(top + floor - inset) / 2}px`)
@@ -249,6 +320,10 @@ export function ProfileSections() {
     observer.observe(element)
     observer.observe(title)
     roles.forEach((role) => observer.observe(role))
+    parts.forEach(({ header, content }) => {
+      observer.observe(header)
+      observer.observe(content)
+    })
     const stop = progress.on('change', paint)
 
     viewport?.addEventListener('resize', measure)
@@ -263,12 +338,15 @@ export function ProfileSections() {
       dock.set(null)
       element.removeAttribute('data-experience-started')
 
-      for (const role of roles) {
+      for (const [index, role] of roles.entries()) {
+        const { body } = parts[index]
+
+        body.style.removeProperty('--experience-body-room')
+        body.removeAttribute('tabindex')
         role.inert = false
         role.removeAttribute('data-visible')
         role.removeAttribute('data-docked')
         role.removeAttribute('data-receding')
-        role.removeAttribute('data-detail-visible')
         role.removeAttribute('aria-current')
       }
     }

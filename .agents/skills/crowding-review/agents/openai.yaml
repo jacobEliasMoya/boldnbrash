@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Crowding Review'
+  short_description: 'Stress-test real content and competing visual emphasis'
+  default_prompt: 'Use $crowding-review to test the densest real content across widths and identify which elements compete.'
