@@ -42,6 +42,7 @@ import {
   skillTitleFillPortion,
   skillSegments,
   skillTravel,
+  workIntroCopyTiming,
   workProjectId,
 } from './skillsTimeline'
 
@@ -52,7 +53,11 @@ type OpenProject = (project: Project, trigger: HTMLButtonElement) => void
 const workProjectsCopy =
   'See what I’ve built across client websites, design systems, and developer tools, plus a few experiments in 3D and AI.'
 
-type WheelBounds = { upperClearance: number; pillHeights: number[] }
+type WheelBounds = {
+  upperClearance: number
+  pillHeights: number[]
+  pillCenterOffsets: number[]
+}
 
 function useSkillWheelPose(
   index: number,
@@ -77,7 +82,8 @@ function useSkillWheelPose(
   })
   const opacity = useTransform(() => {
     const value = distance.get()
-    const { upperClearance, pillHeights } = bounds.get()
+    const { upperClearance, pillHeights, pillCenterOffsets } = bounds.get()
+    const clearance = upperClearance + (pillCenterOffsets[index] ?? 0)
     const halfHeight = (pillHeights[index] ?? 0) / 2
     const tilt = (rotateX.get() * Math.PI) / 180
     const top = y.get() - halfHeight * Math.cos(tilt)
@@ -85,10 +91,10 @@ function useSkillWheelPose(
 
     if (value >= 0 || baseOpacity === 0) return baseOpacity
 
-    const fadeRoom = clamp(upperClearance - halfHeight, 1, workPillClearance)
+    const fadeRoom = clamp(clearance - halfHeight, 1, workPillClearance)
 
     // Use the unprojected edge to clear the content above even if 3D transforms flatten.
-    return baseOpacity * clamp((upperClearance + top) / fadeRoom)
+    return baseOpacity * clamp((clearance + top) / fadeRoom)
   })
   const visibility = useTransform(distance, (value) =>
     value <= 0 && value > -1.75 ? 'visible' : 'hidden',
@@ -224,17 +230,21 @@ function SkillsWheelIntroCopy({ progress }: { progress?: number }) {
     )
   }
 
+  // Keep the heading's timing and overlap while giving the paragraph a longer reveal.
+  const { headingEnd, paragraphStart, end } = workIntroCopyTiming
+  const travel = progress * end
+
   return (
     <>
       <h3 aria-label={workProjectsHeading}>
         <span aria-hidden="true">
-          <ScrollIntroDropText text={workProjectsHeading} progress={clamp(progress / 0.62)} />
+          <ScrollIntroDropText text={workProjectsHeading} progress={clamp(travel / headingEnd)} />
         </span>
       </h3>
       <p>
         <WordEmphasis
           text={workProjectsCopy}
-          progress={clamp((progress - 0.42) / 0.58)}
+          progress={clamp((travel - paragraphStart) / (end - paragraphStart))}
           scrollReveal
         />
       </p>
@@ -281,6 +291,7 @@ export function SkillsScene() {
   const wheelBounds = useMotionValue<WheelBounds>({
     upperClearance: Infinity,
     pillHeights: [],
+    pillCenterOffsets: [],
   })
   const [categoryIndex, setCategoryIndex] = useState(0)
 
@@ -307,17 +318,20 @@ export function SkillsScene() {
       const stacked = sharedRows && !sharedColumns
       const pillHeights = pills.map((pill) => pill.offsetHeight * workPillScale)
       const tallest = Math.max(0, ...pillHeights)
-      const focusedHeight = pillHeights[categoryIndex] ?? tallest
-
-      // Reserve the focused pill's natural size without stretching its surface.
-      element.parentElement?.style.setProperty('--work-pill-row-height', `${focusedHeight}px`)
-
+      const pillCenterOffsets = pillHeights.map((height) => (stacked ? (height - tallest) / 2 : 0))
       const performance = element.parentElement
+
+      // Hold the stack steady through a turn. Shorter pills still start at the same top edge.
+      performance?.style.setProperty('--work-pill-row-height', `${tallest}px`)
+      pills.forEach((pill, index) => {
+        pill.style.setProperty('--work-pill-center-offset', `${pillCenterOffsets[index]}px`)
+      })
+
       if (stacked && performance && intro) {
         const gap = parseFloat(getComputedStyle(performance).rowGap) || 0
         const available = Math.max(
           0,
-          performance.clientHeight - intro.offsetHeight - focusedHeight - gap * 2,
+          performance.clientHeight - intro.offsetHeight - tallest - gap * 2,
         )
 
         // Give the card 80% of its former slot and distribute the freed room
@@ -328,7 +342,7 @@ export function SkillsScene() {
       }
 
       const anchor = pills[0]
-      const center = anchor.offsetTop
+      const center = anchor.offsetTop - pillCenterOffsets[0]
       const height = element.clientHeight
       // The final shared row contains the rotating pills.
       const orbitHeight = sharedRows ? 2 * (height - center) : height
@@ -358,7 +372,7 @@ export function SkillsScene() {
         '--work-wheel-center-x',
         sharedColumns ? `${anchor.offsetLeft + anchor.offsetWidth / 2}px` : '50%',
       )
-      wheelBounds.set({ upperClearance, pillHeights })
+      wheelBounds.set({ upperClearance, pillHeights, pillCenterOffsets })
     }
 
     measure()
@@ -371,7 +385,7 @@ export function SkillsScene() {
     pills.forEach((pill) => observer.observe(pill))
 
     return () => observer.disconnect()
-  }, [animated, categoryIndex, wheelBounds])
+  }, [animated, wheelBounds])
 
   const scene = useRef<HTMLDivElement>(null)
   const period = useRef<HTMLSpanElement>(null)

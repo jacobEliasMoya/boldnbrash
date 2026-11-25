@@ -85,6 +85,10 @@ const showcasePauseOvershoot =
 // and how far a target can lead the visible pose. Clock leads use timeline pacing units.
 const scrollLimits = {
   wheelPixels: 120,
+  wheelTickMinPixels: 12,
+  wheelTickPixels: 100,
+  wheelTickGapMs: 150,
+  experienceWheelTickGain: 0.003,
   touchMinPixels: 160,
   touchMaxPixels: 320,
   touchViewportPortion: 0.4,
@@ -389,6 +393,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     let stopSnap: (() => void) | undefined
     let snapping = false
     let snapExpectedY = 0
+    let lastWheelAt = -Infinity
     let lastWorkWheelAt = -Infinity
 
     const workOpeningRange = { start: skillTitleEnd, end: skillStart + workIntroSettle }
@@ -456,7 +461,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
 
       if (!sceneTransition && transitionLatch) {
         const gap = now - transitionLatch.lastInput
-        const freshWheelTick = Math.abs(pixels) >= 100 && gap >= 60
+        const freshWheelTick = Math.abs(pixels) >= scrollLimits.wheelTickPixels && gap >= 60
 
         if (transitionLatch.direction === direction && gap < 500 && !freshWheelTick) {
           transitionLatch.lastInput = now
@@ -642,8 +647,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
 
         const control = animate(startTime, targetTime, {
           type: 'spring',
-          stiffness: 145,
-          damping: 24.5,
+          stiffness: 100,
+          damping: 20.5,
           mass: 1,
           velocity,
           restDelta: 0.0005,
@@ -697,10 +702,16 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       return media.matches || panels.current[index]?.hasAttribute('data-intro-drop-complete')
     }
 
-    function advanceInput(pixels: number, target: Element | null, touchInput = false) {
+    function advanceInput(
+      pixels: number,
+      target: Element | null,
+      input: 'touch' | 'wheel' | 'wheel-tick',
+    ) {
       const node = track.current
 
       if (!node || media.matches || !Number.isFinite(pixels) || !pixels) return false
+
+      const touchInput = input === 'touch'
 
       // Bound dropped/coalesced events without amplifying ordinary small movements.
       const inputLimit = touchInput
@@ -910,7 +921,9 @@ export function SceneSequence({ children }: { children: ReactNode }) {
 
       inputDirection = direction
 
-      const inputGain = touchInput ? (current === 0 ? 0.005 : 0.003) : 0.0015
+      const wheelGain =
+        inExperience && input === 'wheel-tick' ? scrollLimits.experienceWheelTickGain : 0.0015
+      const inputGain = touchInput ? (current === 0 ? 0.005 : 0.003) : wheelGain
       const desired =
         base +
         direction *
@@ -955,12 +968,9 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     }
 
     function normalizeWheel(event: WheelEvent) {
-      if (
-        event.ctrlKey ||
-        event.defaultPrevented ||
-        !event.deltaY ||
-        Math.abs(event.deltaX) > Math.abs(event.deltaY)
-      )
+      const { deltaMode, deltaX, deltaY } = event
+
+      if (event.ctrlKey || event.defaultPrevented || !deltaY || Math.abs(deltaX) > Math.abs(deltaY))
         return
 
       cancelSnap()
@@ -972,10 +982,29 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       }
 
       const pixels =
-        event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1)
+        deltaY *
+        (deltaMode === WheelEvent.DOM_DELTA_LINE
+          ? 16
+          : deltaMode === WheelEvent.DOM_DELTA_PAGE
+            ? window.innerHeight
+            : 1)
+      const now = performance.now()
+      const gap = now - lastWheelAt
+
+      lastWheelAt = now
+
+      // Isolated ticks and line/page units can express intent with less travel than
+      // the reveal and Work snap expect. Keep the small packets in a smooth burst proportional.
+      const wheelTick =
+        !compact.matches &&
+        Math.abs(pixels) >= scrollLimits.wheelTickMinPixels &&
+        (deltaMode !== WheelEvent.DOM_DELTA_PIXEL || gap >= scrollLimits.wheelTickGapMs)
+      const travel = wheelTick
+        ? Math.sign(pixels) * Math.max(Math.abs(pixels), scrollLimits.wheelTickPixels)
+        : pixels
       const target = event.target instanceof Element ? event.target : null
 
-      if (advanceInput(pixels, target)) event.preventDefault()
+      if (advanceInput(travel, target, wheelTick ? 'wheel-tick' : 'wheel')) event.preventDefault()
     }
 
     let touch: {
@@ -1054,7 +1083,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
 
       touch.lastY = point.clientY
 
-      if (touch.axis === 'vertical' && advanceInput(pixels, touch.target, true))
+      if (touch.axis === 'vertical' && advanceInput(pixels, touch.target, 'touch'))
         event.preventDefault()
     }
 
@@ -1085,6 +1114,13 @@ export function SceneSequence({ children }: { children: ReactNode }) {
 
       if (next === requested && stopPlayback && !immediate && !snapping) return
 
+      // Touch input already paces the shared clock. Restarting a spring on each
+      // sample can replace it before it paints and leave the pill stuck until release.
+      const scrubExperience =
+        gesturePlayback &&
+        experienceScrollY === scrollY &&
+        next >= experienceStart &&
+        next <= experienceEnd
       requested = next
       const velocity = clamp(
         playbackClock.getVelocity(),
@@ -1094,13 +1130,15 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       stopPlayback?.()
       stopPlayback = undefined
 
-      if (immediate || snapping || media.matches) {
+      if (immediate || snapping || media.matches || scrubExperience) {
         displayed = requested
         playbackClock.jump(toPlaybackTime(displayed))
 
         if (immediate) gesturePlayback = false
 
         renderScene(displayed)
+
+        if (scrubExperience) settleFocus()
 
         return
       }
@@ -1517,7 +1555,6 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     }
 
     function resizeScene() {
-      clearExperienceInput()
       const node = track.current
 
       if (node && current === 2 && !media.matches && !sceneTransition && !stopShowcasePlayback) {
@@ -1526,12 +1563,20 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         const distance =
           node.offsetHeight - (node.firstElementChild?.clientHeight ?? window.innerHeight)
 
+        // Reproject the pending input onto the new track without dropping a drag sample.
+        if (experienceInput && distance > 0) {
+          experienceInput = { ...experienceInput, start, distance }
+
+          return
+        }
+
         window.scrollTo({
           top: start + (distance * requested) / sceneDuration,
           behavior: 'instant',
         })
       }
 
+      clearExperienceInput()
       schedule()
     }
 

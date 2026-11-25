@@ -115,6 +115,82 @@ test('the mobile liquid matches the pill corner radius throughout its entrance',
   }
 })
 
+test('Experience follows a held swipe through release, resize, and reversal', async ({ page }) => {
+  await page.goto(`${baseURL}/#about-profile`)
+  await expect(page.locator('#about')).toHaveAttribute('data-about-stage', 'profile')
+
+  const track = page.locator('.scene-track')
+  const progress = () => track.getAttribute('data-playback-progress').then(Number)
+  const start = experienceStart + 2 * experienceEntryTravel + 0.43 * experiencePillTravel
+
+  await track.evaluate(
+    (element, { start, duration }) => {
+      const trackTop = scrollY + element.getBoundingClientRect().top
+      const travel = element.clientHeight - element.firstElementChild!.clientHeight
+
+      window.scrollTo({ top: trackTop + (travel * start) / duration, behavior: 'instant' })
+    },
+    { start, duration: sceneDuration },
+  )
+  await expect.poll(progress).toBeCloseTo(start, 2)
+  await expect(page.locator('[data-role="biziq-developer-ii"]')).toHaveAttribute('data-docked', '')
+
+  const { forward, reverse, consumed, released } = await track.evaluate(async (element) => {
+    const target = document.querySelector('#about-profile')!
+    const frame = () => new Promise(requestAnimationFrame)
+    const read = () => Number(element.dataset.playbackProgress)
+    const send = (type: string, y: number) => {
+      const event = new Event(type, { bubbles: true, cancelable: true })
+
+      Object.defineProperty(event, 'touches', {
+        value: type === 'touchend' ? [] : [{ identifier: 1, clientX: 180, clientY: y, target }],
+      })
+      target.dispatchEvent(event)
+
+      return event.defaultPrevented
+    }
+
+    let y = 650
+    const forward = [read()]
+    const consumed = []
+
+    send('touchstart', y)
+    for (let step = 0; step < 12; step++) {
+      y -= 20
+      consumed.push(send('touchmove', y))
+
+      // Simulate the resize notification Safari chrome can send during a swipe.
+      if (step % 2 === 1) window.dispatchEvent(new Event('resize'))
+
+      await frame()
+      forward.push(read())
+    }
+
+    const reverse = [read()]
+
+    for (let step = 0; step < 8; step++) {
+      y += 20
+      consumed.push(send('touchmove', y))
+      await frame()
+      reverse.push(read())
+    }
+
+    send('touchend', y)
+    for (let step = 0; step < 6; step++) await frame()
+
+    return { forward, reverse, consumed, released: read() }
+  })
+
+  expect(consumed.every(Boolean)).toBe(true)
+  for (let step = 1; step < forward.length; step++) {
+    expect(forward[step] - forward[step - 1]).toBeGreaterThan(0.01)
+  }
+  for (let step = 1; step < reverse.length; step++) {
+    expect(reverse[step - 1] - reverse[step]).toBeGreaterThan(0.01)
+  }
+  expect(released).toBeCloseTo(reverse.at(-1)!, 3)
+})
+
 test('mobile Work showcase keeps the stage pinned until playback pauses', async ({ page }) => {
   await page.goto(`${baseURL}/#${projectStops[0].id}`)
   await expect(page.locator('.portfolio[data-work-projects]')).toBeVisible()
@@ -408,6 +484,8 @@ test('long and short swipes advance one project and reverse across category gaps
     const initial = skillStart + stop.position
 
     await expect.poll(async () => Math.abs((await progress()) - initial)).toBeLessThan(0.01)
+    const projectSlot = page.locator('.skills-projects')
+    const initialSlot = await projectSlot.boundingBox()
     await swipe(page, '.skills-browser', 600, index === 0 ? 170 : 480)
     await expect
       .poll(
@@ -415,6 +493,18 @@ test('long and short swipes advance one project and reverse across category gaps
         { timeout: 5000 },
       )
       .toBeLessThan(0.01)
+    expect(await projectSlot.boundingBox()).toEqual(initialSlot)
+
+    if (projectStops[index + 1].skillIndex === 1) {
+      const cms = page
+        .locator('.skills-category-pill[data-active]')
+        .filter({ hasText: 'Headless CMS' })
+
+      for (const name of ['Strapi', 'GraphQL']) {
+        await expect(cms.getByRole('img', { name }).locator('svg')).toBeVisible()
+      }
+    }
+
     await swipe(page, '.skills-browser', 480, 600)
     await expect
       .poll(async () => Math.abs((await progress()) - initial), { timeout: 5000 })

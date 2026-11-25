@@ -140,13 +140,15 @@ test('Work categories dock with the liquid and return to their project slot', as
   )
   await page.screenshot({ path: test.info().outputPath('work-project-and-pill-liquid.png') })
 
-  // Both sides settle before the reading interval begins.
+  // The wheel can settle while the card and liquid are still finishing their turn.
   await moveToBoundary(page, skillStart + skillSegments[1].start + 0.7)
   await expect(second).toHaveCSS('visibility', 'visible')
   await expect(second).not.toHaveAttribute('data-work-entering')
-  await expect(incomingCard).toHaveCSS('transform', 'none')
+  await expect(incomingCard).toHaveAttribute('data-project-entering', '')
+  await expect.poll(async () => (await readSlide(incomingCard)).x).toBeLessThan(0)
 
   await moveToBoundary(page, skillStart + to + 0.035)
+  await expect(incomingCard).toHaveCSS('transform', 'none')
   await expect(second).toHaveAttribute('data-active', '')
   await expect(second).not.toHaveAttribute('data-work-entering')
   await expect.poll(outgoingTilt).toBeGreaterThan(0.3)
@@ -262,19 +264,20 @@ test('mobile Work project enters from the left and reverses', async ({ page }) =
     target.dispatchEvent(event)
   })
 
-  const { copyStart, copyEnd, projectStart } = getWorkOpeningTiming(true)
-  const copyPhase = (phase: number) => skillStart + copyStart + (copyEnd - copyStart) * phase
+  const { copyStart, projectStart } = getWorkOpeningTiming(true)
+  const copyPosition = skillStart + copyStart
   const intro = page.locator('.skills-browser [data-wheel-static]')
   const letters = intro.locator('.intro-title-glyph')
   const words = intro.locator('.word-emphasis')
 
-  await moveToBoundary(page, copyPhase(0.23))
+  await moveToBoundary(page, copyPosition + 0.24)
   await expect(letters.first()).toHaveCSS('opacity', '1')
   await expect(letters.last()).toHaveCSS('opacity', '0')
   await expect(words.first()).toHaveCSS('opacity', '0')
   await expect(card).toBeHidden()
 
-  await moveToBoundary(page, copyPhase(0.72))
+  // The heading has settled, but the copy is still arriving past its old endpoint.
+  await moveToBoundary(page, copyPosition + 1.08)
   await expect(letters.last()).toHaveCSS('transform', 'none')
   await expect(words.first()).toHaveCSS('opacity', '1')
   await expect(words.last()).toHaveCSS('opacity', '0')
@@ -309,7 +312,7 @@ test('mobile Work project enters from the left and reverses', async ({ page }) =
   await moveToBoundary(page, entry)
   await expect.poll(async () => (await card.boundingBox())!.x).toBeCloseTo(entering.x, 0)
 
-  await moveToBoundary(page, copyPhase(0.23))
+  await moveToBoundary(page, copyPosition + 0.24)
   await expect(letters.last()).toHaveCSS('opacity', '0')
   await expect(words.first()).toHaveCSS('opacity', '0')
   await expect(card).toBeHidden()
@@ -337,6 +340,38 @@ test('project details reuse the scroll pill with their own measured range', asyn
   await expect
     .poll(() => dialog.locator('.project-detail-window').evaluate((element) => element.scrollTop))
     .toBe(0)
+})
+
+test('small wheel ticks advance Experience without amplifying a smooth wheel burst', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto(`${baseURL}/#about-profile`)
+  await expect(page.locator('#about')).toHaveAttribute('data-about-stage', 'profile')
+
+  const start = experienceStart + experienceEntryTravel + 0.3
+  const track = page.locator('.scene-track')
+  const progress = () => track.getAttribute('data-playback-progress').then(Number)
+  const profile = page.locator('#about-profile')
+
+  await moveToBoundary(page, start)
+  await profile.evaluate((target) => {
+    // A small start followed by rapid packets represents a continuous wheel gesture.
+    for (const deltaY of [4, 20, 20, 20, 20, 20, 20]) {
+      target.dispatchEvent(new WheelEvent('wheel', { deltaY, bubbles: true, cancelable: true }))
+    }
+  })
+  const afterBurst = start + 0.09
+
+  await expect.poll(progress).toBeCloseTo(afterBurst, 2)
+
+  const wheelLine = (deltaY: number) =>
+    profile.dispatchEvent('wheel', { deltaY, deltaMode: 1, bubbles: true, cancelable: true })
+
+  await wheelLine(1)
+  await expect.poll(progress).toBeCloseTo(afterBurst + 0.145, 2)
+  await wheelLine(-1)
+  await expect.poll(progress).toBeCloseTo(afterBurst, 2)
 })
 
 test('Experience keeps its pill spacing when the entrance reverses on a small screen', async ({

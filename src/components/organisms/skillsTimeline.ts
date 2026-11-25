@@ -168,11 +168,13 @@ export const skills = skillCatalog.map((skill) => ({
 }))
 
 export const workCategoryTravel = 0.95
-export const workProjectTravel = 0.8
-const workCategorySettle = workCategoryTravel + workProjectTravel
+const workCategorySettle = workCategoryTravel + 0.8
 
-const workIntroCopyTravel = 1.05
-export const workIntroPillStart = workProjectTravel + workIntroCopyTravel
+// Only the opening card needs extra travel. The later project intervals retain their spacing.
+export const workProjectTravel = 1.2
+
+export const workIntroCopyTiming = { headingEnd: 0.651, paragraphStart: 0.441, end: 1.45 }
+export const workIntroPillStart = workProjectTravel + workIntroCopyTiming.end
 export const workIntroSettle = workIntroPillStart + 0.7
 
 // Reserve time for the opening copy while keeping later project intervals intact.
@@ -191,8 +193,8 @@ export function getWorkOpeningTiming(compact: boolean) {
 
   return {
     copyStart,
-    copyEnd: copyStart + workIntroCopyTravel,
-    projectStart: compact ? workIntroCopyTravel : 0,
+    copyEnd: copyStart + workIntroCopyTiming.end,
+    projectStart: compact ? workIntroCopyTiming.end : 0,
   }
 }
 

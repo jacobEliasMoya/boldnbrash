@@ -3254,11 +3254,18 @@ ul {
   background: #000;
   color: var(--accent);
 }
-.technology-brand-mark {
+.technology-brand-mark,
+.technology-brand-glyph {
   width: 20px;
   height: 20px;
+}
+.technology-brand-mark {
   background: currentColor;
   mask: var(--technology-icon) center / var(--technology-icon-size, contain) no-repeat;
+}
+.technology-brand-glyph {
+  display: block;
+  fill: currentColor;
 }
 .technology-brand-mark[data-format='image'] {
   /* The raster marks use brightness to keep their internal details in amber. */
@@ -3566,6 +3573,7 @@ ul {
 
     .portfolio[data-enhanced] .skills-duet .skills-category-pill {
       grid-row: 3 / 4;
+      top: calc(50% + var(--work-pill-center-offset, 0px));
       pointer-events: auto;
     }
 
@@ -3635,7 +3643,7 @@ ul {
     .skills-duet .skills-technology {
       --technology-badge-size: 24px;
     }
-    .skills-duet .technology-brand-mark {
+    .skills-duet :is(.technology-brand-mark, .technology-brand-glyph) {
       width: 15px;
       height: 15px;
     }

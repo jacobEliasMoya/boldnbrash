@@ -43,7 +43,7 @@ const technologies: readonly TechnologyDefinition[] = [
   { name: 'Gutenberg', asset: 'gutenberg.svg' },
   { name: 'Gravity Forms', asset: 'gravityforms.webp', aliases: ['GravityForms'] },
   { name: 'Python', asset: 'python.svg' },
-  { name: 'Pillow', asset: 'pillow.webp' },
+  { name: 'Pillow', asset: 'pillow.svg' },
   { name: 'piexif', asset: 'file-image.svg' },
   { name: 'WebP', asset: 'webp-site-mark.png', maskSize: '114%' },
 ]

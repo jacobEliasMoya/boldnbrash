@@ -253,7 +253,12 @@ for (const viewport of [
         expect(Math.min(above, below)).toBeGreaterThan(16)
 
         const stage = (await page.locator('.skills-performance').boundingBox())!
-        const stackCenter = (heading.y + left.y + left.height) / 2
+        const reservedPillHeight = await page
+          .locator('.skills-performance')
+          .evaluate((stack) =>
+            parseFloat(getComputedStyle(stack).getPropertyValue('--work-pill-row-height')),
+          )
+        const stackCenter = (heading.y + left.y + reservedPillHeight) / 2
 
         expect(Math.abs(stackCenter - stage.y - stage.height / 2)).toBeLessThan(2)
       }
@@ -389,18 +394,20 @@ test('desktop Work commits short wheel gestures in either direction', async ({ p
   const position = async () => Number(await track.getAttribute('data-playback-progress'))
 
   await expect.poll(async () => Math.abs((await position()) - first)).toBeLessThan(0.01)
-  await page.locator('.skills-performance').hover()
+  const work = page.locator('.skills-performance')
+
+  await work.hover()
 
   // Small accidental movement stays put; an intentional short tick commits.
   await page.mouse.wheel(0, 8)
   await page.waitForTimeout(1100)
   await expect.poll(async () => Math.abs((await position()) - first)).toBeLessThan(0.01)
-  await page.mouse.wheel(0, 80)
+  await page.mouse.wheel(0, 24)
   await expect
     .poll(async () => Math.abs((await position()) - next), { timeout: 5000 })
     .toBeLessThan(0.01)
 
-  await page.mouse.wheel(0, -80)
+  await work.dispatchEvent('wheel', { deltaY: -1, deltaMode: 1, bubbles: true, cancelable: true })
   await expect
     .poll(async () => Math.abs((await position()) - first), { timeout: 5000 })
     .toBeLessThan(0.01)
