@@ -1,8 +1,9 @@
 import { expect, test, type Page } from '@playwright/test'
 import sharp from 'sharp'
 import {
-  experienceEntryTravel,
+  experienceDisclosureTiming,
   experiencePillTravel,
+  experienceRoleTravel,
 } from '../../src/components/organisms/experienceTimeline'
 import {
   getWorkOpeningTiming,
@@ -369,7 +370,7 @@ test('small wheel ticks advance Experience without amplifying a smooth wheel bur
   await page.goto(`${baseURL}/#about-profile`)
   await expect(page.locator('#about')).toHaveAttribute('data-about-stage', 'profile')
 
-  const start = experienceStart + experienceEntryTravel + 0.3
+  const start = experienceStart + experienceRoleTravel + 0.3
   const track = page.locator('.scene-track')
   const progress = () => track.getAttribute('data-playback-progress').then(Number)
   const profile = page.locator('#about-profile')
@@ -403,7 +404,7 @@ test('Experience keeps its pill spacing when the entrance reverses on a small sc
   await page.evaluate(() => document.fonts.ready)
 
   const incoming = page.locator('[data-role="biziq-developer-ii"]')
-  const start = experienceStart + 2 * experienceEntryTravel
+  const start = experienceStart + 2 * experienceRoleTravel
   const clearance = await incoming.evaluate((pill) =>
     parseFloat(getComputedStyle(pill.parentElement!).rowGap),
   )
@@ -420,27 +421,29 @@ test('Experience keeps its pill spacing when the entrance reverses on a small sc
     expect(gap).toBeGreaterThanOrEqual(clearance - 0.5)
   }
 
-  await moveToBoundary(page, start + experienceEntryTravel * 0.99)
-  const toggle = incoming.getByRole('button', { name: /Web Developer II/ })
-  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
-  await toggle.click()
-  await expect(toggle).toHaveAttribute('aria-expanded', 'true')
-  await expect(incoming.getByRole('img', { name: 'REST APIs' })).toHaveCount(1)
+  const read = (experienceDisclosureTiming.openEnd + experienceDisclosureTiming.closeStart) / 2
+  await moveToBoundary(page, start + read)
+  await expect(incoming.getByRole('img', { name: 'REST APIs' })).toBeVisible()
+  await expect(incoming.getByRole('button')).toHaveCount(0)
 
-  // A short viewport may scroll the body while the toggle remains within reach.
+  // The last metric is reachable by native scrolling while the role stays at its reading stop.
+  const body = incoming.locator('.experience-body')
+  const maxScroll = await body.evaluate((el) => el.scrollHeight - el.clientHeight)
+  expect(maxScroll).toBeGreaterThan(0)
+  await body.hover()
+  await page.mouse.wheel(0, maxScroll + 50)
+  await expect.poll(() => body.evaluate((el) => el.scrollTop)).toBeGreaterThan(maxScroll - 2)
+
   const metric = incoming.getByText('Custom Features', { exact: true })
-  await metric.scrollIntoViewIfNeeded()
   await expect(metric).toBeInViewport()
-  await expect(toggle).toBeInViewport()
-  await toggle.click()
-  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  await expect(incoming.getByRole('heading', { name: 'Web Developer II' })).toBeInViewport()
+  const clock = Number(await page.locator('.scene-track').getAttribute('data-playback-progress'))
+  expect(clock).toBeCloseTo(start + read, 2)
 
-  await moveToBoundary(page, start + experienceEntryTravel * 1.99)
+  await moveToBoundary(page, start + experienceRoleTravel + read)
   const last = page.locator('[data-role="inenvi-engineer"]')
-  await expect(last.getByRole('button', { name: /Software Engineer/ })).toHaveAttribute(
-    'aria-expanded',
-    'false',
-  )
+  await expect(last.getByRole('heading', { name: 'Software Engineer' })).toBeInViewport()
+  await expect(last.getByRole('img', { name: 'Next.js' })).toBeVisible()
   const lastBounds = (await last.boundingBox())!
   expect(lastBounds.y + lastBounds.height).toBeLessThanOrEqual(568)
 })
@@ -459,7 +462,7 @@ test('Experience docks the entering role to the viewport and reverses cleanly', 
   const nightMode = page.getByRole('button', { name: 'Night mode' })
   const second = about.locator('[data-role="biziq-developer-i"]')
   const third = about.locator('[data-role="biziq-developer-ii"]')
-  const thirdStart = experienceStart + experienceEntryTravel * 2
+  const thirdStart = experienceStart + experienceRoleTravel * 2
   const midEntry = thirdStart + experiencePillTravel * 0.43
 
   await moveToBoundary(page, thirdStart - 0.02)
@@ -467,12 +470,12 @@ test('Experience docks the entering role to the viewport and reverses cleanly', 
 
   await moveToBoundary(page, midEntry)
   await expect(third).toHaveAttribute('data-docked', '')
-  await expect(third.locator('button[aria-expanded]')).toHaveAttribute('aria-expanded', 'false')
+  await expect(third.locator('.experience-disclosure')).toHaveCSS('height', '0px')
   await expect(second).toHaveAttribute('aria-current', 'true')
   await expect(second).toHaveCSS('transform', 'none')
   await expect(third).toHaveCSS('transform', 'none')
   const docked = (await third.boundingBox())!
-  await expect(about.locator('.experience-role button[aria-expanded="false"]')).toHaveCount(4)
+  await expect(about.locator('.experience-role button')).toHaveCount(0)
 
   async function expectDockPixels(surface: number[]) {
     const { data, info } = await sharp(await page.screenshot({ scale: 'css' }))
@@ -594,35 +597,20 @@ test('Experience docks the entering role to the viewport and reverses cleanly', 
   await expect(recoil).toHaveAttribute('d', '')
   await expect(swell).toHaveAttribute('d', / Q/)
 
-  await moveToBoundary(page, thirdStart + experienceEntryTravel * 0.99)
+  const reading = (experienceDisclosureTiming.openEnd + experienceDisclosureTiming.closeStart) / 2
+  await moveToBoundary(page, thirdStart + reading)
   await expect(third).not.toHaveAttribute('data-docked')
   await expect(recoil).toHaveAttribute('d', '')
   await expect(swell).toHaveAttribute('d', '')
   await expect(third).toHaveCSS('scale', 'none')
   const settled = (await third.boundingBox())!
   expect(settled.width).toBeCloseTo(docked.width, 1)
-  expect(settled.height).toBeCloseTo(docked.height, 1)
+  expect(settled.height).toBeGreaterThan(docked.height)
   expect(settled.y + settled.height).toBeLessThan(900)
   expect(settled.y).toBeGreaterThan((await about.locator('.experience-heading').boundingBox())!.y)
   await expect(third).toHaveAttribute('aria-current', 'true')
   await expect(second).toHaveJSProperty('inert', true)
-  const toggle = third.getByRole('button', { name: /Web Developer II/ })
-  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
-  const title = third.getByText('Web Developer II', { exact: true })
-  const titleTop = (await title.boundingBox())!.y
-
-  await toggle.press('Enter')
-  await expect(toggle).toBeFocused()
-  await expect(toggle).toHaveAttribute('aria-expanded', 'true')
-  const panel = page.locator(`#${await toggle.getAttribute('aria-controls')}`)
-  await expect(panel.getByText('Custom Features', { exact: true })).toBeInViewport()
-  expect((await title.boundingBox())!.y).toBeCloseTo(titleTop, 0)
-
-  await toggle.press('Space')
-  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
-  await expect(third.getByRole('img', { name: 'REST APIs' })).toHaveCount(0)
-  await expect.poll(async () => (await third.boundingBox())!.height).toBeCloseTo(settled.height, 0)
-  expect((await title.boundingBox())!.y).toBeCloseTo(titleTop, 0)
+  await expect(third.getByRole('img', { name: 'REST APIs' })).toBeVisible()
 
   const outgoingOpacity = await second.evaluate((role) => Number(getComputedStyle(role).opacity))
   expect(outgoingOpacity).toBe(1)
@@ -650,14 +638,71 @@ test('Experience docks the entering role to the viewport and reverses cleanly', 
   const currentRole = about.locator('[data-role="inenvi-engineer"]')
   await expect(currentRole).toHaveAttribute('aria-current', 'true')
   await expect(currentRole).toHaveAttribute('data-portal', 'contact')
-  await expect(currentRole.getByRole('button', { name: /Software Engineer/ })).toHaveAttribute(
-    'aria-expanded',
-    'false',
-  )
+  await expect(currentRole.locator('.experience-disclosure')).toHaveCSS('height', '0px')
 
   await page.mouse.move(10, 400)
   await page.mouse.wheel(0, 120)
   await expect(page.locator('#contact')).toHaveAttribute('aria-hidden', 'false')
+})
+
+test('the focused Experience pill opens, holds for reading and closes before rotating', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto(`${baseURL}/#about-profile`)
+  await expect(page.locator('#about')).toHaveAttribute('data-about-stage', 'profile')
+  await page.evaluate(() => document.fonts.ready)
+
+  const role = page.locator('[data-role="biziq-developer-i"]')
+  const start = experienceStart + experienceRoleTravel
+  const { openStart, openEnd, closeStart, closeEnd } = experienceDisclosureTiming
+  const opening = (openStart + openEnd) / 2
+  const closing = (closeStart + closeEnd) / 2
+  const title = role.getByRole('heading', { name: 'Web Developer I' })
+  const panel = role.locator('.experience-disclosure')
+  const height = () => panel.evaluate((el) => el.getBoundingClientRect().height)
+  const seek = (travel: number) => moveToBoundary(page, start + travel)
+
+  await seek(openStart - 0.01)
+  await expect(panel).toHaveCSS('height', '0px')
+  await seek(opening)
+  const openingHeight = await height()
+  const headingY = (await title.boundingBox())!.y
+  expect(openingHeight).toBeGreaterThan(1)
+
+  await seek(openEnd + 0.02)
+  const fullHeight = await height()
+  expect(fullHeight).toBeGreaterThan(openingHeight + 1)
+  await expect(role.getByRole('img', { name: 'WordPress' })).toBeVisible()
+  expect((await title.boundingBox())!.y).toBeCloseTo(headingY, 0)
+
+  await seek(closeStart - 0.02)
+  expect(await height()).toBeCloseTo(fullHeight, 0)
+  await seek(closing)
+  const closingHeight = await height()
+  expect(closingHeight).toBeGreaterThan(1)
+  expect(closingHeight).toBeLessThan(fullHeight - 1)
+  await expect(role).toHaveCSS('transform', 'none')
+  expect((await title.boundingBox())!.y).toBeCloseTo(headingY, 0)
+
+  // The next entrance begins with this header still flat and fully closed.
+  await seek(closeEnd + 0.04)
+  await expect(panel).toHaveCSS('height', '0px')
+  await expect(role).toHaveCSS('transform', 'none')
+  await seek(experienceRoleTravel + experiencePillTravel * 0.86)
+  await expect(role).toHaveCSS('transform', /^matrix3d\(/)
+  await expect(panel).toHaveCSS('height', '0px')
+
+  // Reverse the same scroll path and compare its partial and settled poses.
+  await seek(closing)
+  await expect.poll(height).toBeCloseTo(closingHeight, -1)
+  await seek(closeStart - 0.02)
+  expect(await height()).toBeCloseTo(fullHeight, 0)
+  await expect(role.getByRole('img', { name: 'WordPress' })).toBeVisible()
+  await seek(opening)
+  await expect.poll(height).toBeCloseTo(openingHeight, -1)
+  await seek(openStart - 0.01)
+  await expect(panel).toHaveCSS('height', '0px')
 })
 
 for (const input of ['touch', 'wheel'] as const) {

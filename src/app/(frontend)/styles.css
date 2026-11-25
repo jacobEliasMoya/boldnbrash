@@ -4740,29 +4740,20 @@ ul {
   color: #080809;
 }
 
-.experience-toggle {
+.experience-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
   align-content: center;
-  align-items: center;
-  gap: 5px clamp(12px, 2vw, 30px);
-  width: 100%;
+  gap: 5px;
   min-height: clamp(96px, 9vw, 142px);
   padding: var(--experience-block-inset) var(--experience-inset);
-  border: 0;
-  border-radius: var(--portfolio-pill-radius);
-  background: transparent;
-  text-align: start;
 }
 
-.experience-toggle:focus-visible,
 .experience-body:focus-visible {
   outline: 2px solid var(--experience-accent);
   outline-offset: -5px;
 }
 
 .experience-meta {
-  grid-area: 1 / 1 / 2 / -1;
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -4778,27 +4769,14 @@ ul {
 }
 
 .experience-title {
-  grid-area: 2 / 1;
   font: 900 clamp(30px, 4.15vw, 66px)/1.04 var(--display);
   letter-spacing: -0.035em;
   overflow-wrap: break-word;
   text-wrap: balance;
 }
 
-.experience-sign {
-  grid-area: 2 / 2;
-  justify-self: end;
-  color: var(--experience-accent);
-  font:
-    500 clamp(25px, 2.6vw, 40px)/1 'JetBrains Mono',
-    monospace;
-}
-
-.portfolio[data-enhanced] .experience-role[inert] .experience-sign {
-  visibility: hidden;
-}
-
-.experience-disclosure {
+.portfolio[data-enhanced] .experience-disclosure {
+  height: 0;
   overflow: clip;
 }
 

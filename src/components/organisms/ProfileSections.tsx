@@ -1,11 +1,9 @@
 'use client'
 
 import { useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
-import { motion, useReducedMotion } from 'motion/react'
 import { IntroDropText } from '@/components/atoms/IntroDropText'
 import { TechnologyIcons } from '@/components/atoms/TechnologyIcon'
 import { WordEmphasis } from '@/components/atoms/WordEmphasis'
-import { useClientReady } from '@/hooks/useClientReady'
 import { aboutTitleFillPortion, clamp, getAboutParagraphProgress } from './skillsTimeline'
 import { ExperienceMotion } from './ExperienceMotion'
 import {
@@ -73,21 +71,7 @@ function ExperienceRole({
   number: number
   last: boolean
 }) {
-  const clientReady = useClientReady()
-  const reduceMotion = useReducedMotion()
-  const [open, setOpen] = useState<boolean | null>(null)
-  const body = useRef<HTMLDivElement>(null)
-  // Leave the résumé readable in the server-rendered document.
-  const expanded = open ?? !clientReady
   const titleId = `${record.id}-title`
-  const metaId = `${record.id}-meta`
-  const panelId = `${record.id}-details`
-
-  function toggle() {
-    if (!expanded) body.current?.scrollTo({ top: 0, behavior: 'instant' })
-
-    setOpen(!expanded)
-  }
 
   return (
     <li
@@ -95,42 +79,17 @@ function ExperienceRole({
       data-role={record.id}
       data-portal={last ? 'contact' : undefined}
     >
-      <h3>
-        <button
-          className="experience-toggle"
-          type="button"
-          disabled={!clientReady}
-          aria-expanded={expanded}
-          aria-controls={panelId}
-          aria-labelledby={`${titleId} ${metaId}`}
-          onClick={toggle}
-        >
-          <span className="experience-meta" id={metaId}>
-            <span>{String(number).padStart(2, '0')}</span> <span>{record.employer}</span>{' '}
-            <span className="experience-dates">{record.dates}</span>
-          </span>
-          <span className="experience-title" id={titleId}>
-            {record.role}
-          </span>
-          <span className="experience-sign" aria-hidden="true">
-            {expanded ? '−' : '+'}
-          </span>
-        </button>
-      </h3>
-      <motion.div
-        className="experience-disclosure"
-        id={panelId}
-        inert={!expanded}
-        aria-hidden={!expanded}
-        initial={false}
-        animate={{ height: expanded ? 'auto' : 0 }}
-        transition={{
-          type: 'tween',
-          duration: open === null || reduceMotion ? 0 : 0.42,
-          ease: [0.36, 0.1, 0.64, 0.9],
-        }}
-      >
-        <div ref={body} className="experience-body" role="region" aria-labelledby={titleId}>
+      <header className="experience-header">
+        <div className="experience-meta">
+          <span>{String(number).padStart(2, '0')}</span> <span>{record.employer}</span>{' '}
+          <span className="experience-dates">{record.dates}</span>
+        </div>
+        <h3 className="experience-title" id={titleId}>
+          {record.role}
+        </h3>
+      </header>
+      <div className="experience-disclosure">
+        <div className="experience-body" role="region" aria-labelledby={titleId}>
           <div className="experience-content">
             {record.detail && <p className="experience-detail">{record.detail}</p>}
             {(record.keyWork.length > 0 || record.technologies.length > 0) && (
@@ -168,7 +127,7 @@ function ExperienceRole({
             )}
           </div>
         </div>
-      </motion.div>
+      </div>
     </li>
   )
 }
@@ -189,7 +148,8 @@ export function ProfileSections() {
 
     const roles = Array.from(element.querySelectorAll<HTMLElement>('.experience-role'))
     const parts = roles.map((role) => ({
-      header: role.querySelector<HTMLButtonElement>('.experience-toggle')!,
+      header: role.querySelector<HTMLElement>('.experience-header')!,
+      disclosure: role.querySelector<HTMLElement>('.experience-disclosure')!,
       body: role.querySelector<HTMLElement>('.experience-body')!,
       content: role.querySelector<HTMLElement>('.experience-content')!,
     }))
@@ -203,7 +163,7 @@ export function ProfileSections() {
     let inset = 0
     let gap = 0
     let perspective = 0
-    let boxes: { width: number; height: number; openHeight: number; radius: number }[] = []
+    let boxes: { width: number; closedHeight: number; openHeight: number; radius: number }[] = []
     let painted: ReturnType<typeof getExperiencePositions> = []
 
     const paint = () => {
@@ -224,15 +184,29 @@ export function ProfileSections() {
         const pose = poses[index]
         const previous = painted[index]
         const box = boxes[index]
+        const { disclosure, body } = parts[index]
         const outline = pose.entering
           ? getExperienceDock(
-              { ...box, x: viewportWidth / 2, top: pose.y },
+              { ...box, height: pose.height, x: viewportWidth / 2, top: pose.y },
               floor,
               inset,
               viewportWidth,
               pose.release,
             )
           : null
+
+        // The disclosure, shell, and liquid cutout use this frame's exact pose.
+        if (pose.disclosure !== previous?.disclosure) {
+          disclosure.style.height = `${pose.height - box.closedHeight}px`
+          if (pose.disclosure === 0 && body.scrollTop > 0) body.scrollTop = 0
+        }
+
+        // A short screen's inner scroll takes over once the body is fully open.
+        const readable = pose.disclosure === 1
+        if (!previous || readable !== (previous.disclosure === 1)) {
+          disclosure.inert = !readable
+          disclosure.setAttribute('aria-hidden', String(!readable))
+        }
 
         if (pose.y !== previous?.y) role.style.setProperty('--experience-y', `${pose.y}px`)
 
@@ -291,7 +265,7 @@ export function ProfileSections() {
 
         return {
           width: parseFloat(pillStyles.width),
-          height: parseFloat(pillStyles.height),
+          closedHeight: headerHeight,
           openHeight: headerHeight + Math.min(room, contentHeight),
           radius: parseFloat(pillStyles.borderTopLeftRadius),
           room,
@@ -299,6 +273,9 @@ export function ProfileSections() {
         }
       })
       boxes = measurements
+
+      // A resize can give the same disclosure phase a different pixel height.
+      painted = []
 
       for (const [index, { room, overflow }] of measurements.entries()) {
         const { body } = parts[index]
@@ -319,7 +296,6 @@ export function ProfileSections() {
     const observer = new ResizeObserver(measure)
     observer.observe(element)
     observer.observe(title)
-    roles.forEach((role) => observer.observe(role))
     parts.forEach(({ header, content }) => {
       observer.observe(header)
       observer.observe(content)
@@ -339,8 +315,11 @@ export function ProfileSections() {
       element.removeAttribute('data-experience-started')
 
       for (const [index, role] of roles.entries()) {
-        const { body } = parts[index]
+        const { body, disclosure } = parts[index]
 
+        disclosure.style.removeProperty('height')
+        disclosure.inert = false
+        disclosure.removeAttribute('aria-hidden')
         body.style.removeProperty('--experience-body-room')
         body.removeAttribute('tabindex')
         role.inert = false

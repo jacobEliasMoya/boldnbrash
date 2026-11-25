@@ -1,7 +1,8 @@
 import { expect, test, type Page } from '@playwright/test'
 import {
-  experienceEntryTravel,
+  experienceDisclosureTiming,
   experiencePillTravel,
+  experienceRoleTravel,
 } from '../../src/components/organisms/experienceTimeline'
 import {
   experienceStart,
@@ -63,7 +64,7 @@ test('the mobile liquid matches the pill corner radius throughout its entrance',
 
   const track = page.locator('.scene-track')
   const pill = page.locator('[data-role="biziq-developer-ii"]')
-  const start = experienceStart + 2 * experienceEntryTravel
+  const start = experienceStart + 2 * experienceRoleTravel
 
   async function seek(progress: number) {
     await track.evaluate(
@@ -116,17 +117,17 @@ test('the mobile liquid matches the pill corner radius throughout its entrance',
     expect(Math.max(...widths) - Math.min(...widths)).toBeLessThan(1)
   }
 
-  // Releasing the pill leaves it collapsed until a tap requests the details.
-  await seek(start + experienceEntryTravel * 0.99)
-  const toggle = pill.getByRole('button', { name: /Web Developer II/ })
-  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
-  await toggle.tap()
-  await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  const read = (experienceDisclosureTiming.openEnd + experienceDisclosureTiming.closeStart) / 2
+  await seek(start + read)
+  await expect(pill.getByRole('button')).toHaveCount(0)
   await expect(pill.getByRole('img', { name: 'REST APIs' })).toBeVisible()
-  await toggle.tap()
-  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+
+  // Tapping the flat header leaves the open reading state intact.
+  await pill.getByRole('heading', { name: 'Web Developer II' }).tap()
+  await expect(pill.getByRole('img', { name: 'REST APIs' })).toBeVisible()
   await seek(start + 0.43 * experiencePillTravel)
   await expect(pill).toHaveAttribute('data-docked', '')
+  await expect(pill.locator('.experience-disclosure')).toHaveCSS('height', '0px')
 })
 
 test('Experience follows a held swipe through release, resize, and reversal', async ({ page }) => {
@@ -135,7 +136,7 @@ test('Experience follows a held swipe through release, resize, and reversal', as
 
   const track = page.locator('.scene-track')
   const progress = () => track.getAttribute('data-playback-progress').then(Number)
-  const start = experienceStart + 2 * experienceEntryTravel + 0.43 * experiencePillTravel
+  const start = experienceStart + 2 * experienceRoleTravel + 0.43 * experiencePillTravel
 
   await track.evaluate(
     (element, { start, duration }) => {

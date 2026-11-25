@@ -1,4 +1,4 @@
-import { spring } from 'motion'
+import { easeInOut, spring, transform } from 'motion'
 import {
   bottomLiquidContour,
   projectLiquidContour,
@@ -105,7 +105,27 @@ export const experienceRoles: readonly ExperienceRoleRecord[] = [
 
 export const experiencePillTravel = 1.04
 export const experienceEntryTravel = experiencePillTravel + 0.24
-export const experienceTravel = experienceRoles.length * experienceEntryTravel
+const liftEnd = experienceEntryTravel - 0.12
+export const experienceDisclosureTiming = {
+  openStart: liftEnd,
+  openEnd: liftEnd + 0.38,
+  closeStart: liftEnd + 1,
+  closeEnd: liftEnd + 1.34,
+}
+export const experienceRoleTravel = experienceDisclosureTiming.closeEnd
+export const experienceTravel = experienceRoles.length * experienceRoleTravel
+
+// Both directions pass through the same fully open reading window.
+const disclosureAt = transform(
+  [
+    experienceDisclosureTiming.openStart,
+    experienceDisclosureTiming.openEnd,
+    experienceDisclosureTiming.closeStart,
+    experienceDisclosureTiming.closeEnd,
+  ],
+  [0, 1, 1, 0],
+  { ease: easeInOut },
+)
 
 const clamp = (value: number) => Math.max(0, Math.min(1, value))
 const ease = (value: number) => value * value * (3 - 2 * value)
@@ -249,7 +269,7 @@ export function getPillLift(travel: number, height: number, rest: number, floor:
   const release = clamp((travel - releaseStart) / (experienceEntryTravel - releaseStart))
 
   // Spend some of the pause on the lift so the pill and the wheel turn have more room to settle.
-  const liftTravel = experienceEntryTravel - releaseStart - 0.12
+  const liftTravel = liftEnd - releaseStart
   const approachTravel = 0.1 * experiencePillTravel
   const emerging = clamp(travel / releaseStart)
   const approaching = clamp((travel - releaseStart + approachTravel) / approachTravel)
@@ -268,7 +288,7 @@ export function getPillLift(travel: number, height: number, rest: number, floor:
 
 export function getExperiencePositions(
   progress: number,
-  boxes: { height: number; openHeight: number }[],
+  boxes: { closedHeight: number; openHeight: number }[],
   top: number,
   floor: number,
   gap: number,
@@ -276,18 +296,19 @@ export function getExperiencePositions(
   compact: boolean,
   perspective: number,
 ) {
+  if (boxes.length === 0) return []
+
   const clock = clamp(progress) * boxes.length
   const current = Math.min(boxes.length - 1, Math.floor(clock))
-  const travel = (clock - current) * experienceEntryTravel
+  const travel = (clock - current) * experienceRoleTravel
   const center = (openHeight: number) =>
     top + Math.max(0, (floor - inset - gap - top - openHeight) / 2)
   const incoming = boxes[current]
   const rest = center(incoming.openHeight)
-  const lift = getPillLift(travel, incoming.height, rest, floor)
+  const lift = getPillLift(travel, incoming.closedHeight, rest, floor)
   const release = lift.release
 
-  // The actual shell leaves the floor first. By the time its header is interactive,
-  // its path allows the full disclosure to open downwards even on a paused gesture.
+  // The closed shell leaves the floor, then lands where its full contents will fit.
   const fullLift = getPillLift(travel, incoming.openHeight, rest, floor)
   const incomingY = mix(lift.y, fullLift.y, ease(clamp((release - 0.25) / 0.25)))
 
@@ -295,12 +316,15 @@ export function getExperiencePositions(
   const turn = pillWheelTurn(release)
   const featured = current - (turn < 0.5 ? 1 : 0)
 
-  const poses = boxes.map(({ height, openHeight }, index) => {
+  const poses = boxes.map(({ closedHeight, openHeight }, index) => {
     const rest = center(openHeight)
     const recede = index < current ? current - index - 1 + turn : 0
+    const disclosure = index === current ? disclosureAt(travel) : 0
+    const height = mix(closedHeight, openHeight, disclosure)
+
     // Use the outgoing half of Work's wheel, sized to fit between the heading and the focused pill.
     const distance = -recede
-    const radius = Math.SQRT2 * Math.min(height + gap, (rest - top) * 0.88)
+    const radius = Math.SQRT2 * Math.min(closedHeight + gap, (rest - top) * 0.88)
     const y =
       index < current
         ? rest + pillWheelVertical(distance, radius)
@@ -310,6 +334,8 @@ export function getExperiencePositions(
 
     return {
       y,
+      height,
+      disclosure,
       release,
       tilt: pillWheelRotation(distance, compact),
       depth: pillWheelDepth(distance, radius, compact),
@@ -327,7 +353,7 @@ export function getExperiencePositions(
   // Reserve the layout gap between the projected edges, starting with the flat incoming pill.
   for (let index = current - 1; index >= 0 && poses[index].visible; index--) {
     const pose = poses[index]
-    const halfHeight = boxes[index].height / 2
+    const halfHeight = pose.height / 2
     const angle = (pose.tilt * Math.PI) / 180
     const edgeY = halfHeight * Math.cos(angle)
     const edgeZ = halfHeight * Math.sin(angle)
@@ -339,10 +365,6 @@ export function getExperiencePositions(
     const maxY =
       origin - halfHeight + Math.min(limit / topScale + edgeY, limit / bottomScale - edgeY)
     const easeRoom = Math.max(0, gap / 2 - Math.abs(pose.y - maxY))
-
-    // Once the next shell occupies the disclosure's room, the outgoing header
-    // becomes a background preview until a reverse gesture brings it back.
-    if (pose.y + boxes[index].openHeight + gap * 1.5 > nextTop) pose.interactive = false
 
     // Ease into the constraint so the wheel keeps moving smoothly in either scroll direction.
     pose.y = Math.min(pose.y, maxY) - easeRoom ** 2 / (2 * gap)
