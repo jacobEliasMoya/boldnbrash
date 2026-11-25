@@ -5,15 +5,16 @@ import {
   experiencePillTravel,
 } from '../../src/components/organisms/experienceTimeline'
 import {
+  getWorkOpeningTiming,
   heroWalkOutEnd,
-  skillParagraphEnd,
+  skillTitleEnd,
   sceneDuration,
   sceneStops,
   skillStart,
   skillSegments,
   projectStops,
   experienceStart,
-  workIntroCopyEnd,
+  workIntroPillStart,
   workIntroSettle,
   workProjectTravel,
 } from '../../src/components/organisms/skillsTimeline'
@@ -89,7 +90,7 @@ test('Work categories dock with the liquid and return to their project slot', as
 
   await moveToBoundary(
     page,
-    skillStart + workIntroCopyEnd + (workIntroSettle - workIntroCopyEnd) * 0.43,
+    skillStart + workIntroPillStart + (workIntroSettle - workIntroPillStart) * 0.43,
   )
   await expect(first).toHaveAttribute('data-work-docked', '')
   await expect(first).toHaveCSS('visibility', 'visible')
@@ -209,6 +210,7 @@ test('desktop Work project enters from the left and reverses', async ({ page }) 
   const entry = skillStart + workProjectTravel * 0.25
   await moveToBoundary(page, entry)
   await expect(card).toHaveAttribute('data-project-entering', '')
+  await expect(page.locator('.skills-browser [data-wheel-static]')).toHaveCSS('opacity', '0')
   const measurements = await page.evaluate(async () => {
     const original = Element.prototype.getBoundingClientRect
     const cards = new Set<string>()
@@ -260,8 +262,10 @@ test('mobile Work project enters from the left and reverses', async ({ page }) =
     target.dispatchEvent(event)
   })
 
-  const entry = skillStart + workProjectTravel * 0.25
+  const entry = skillStart + getWorkOpeningTiming(true).projectStart + workProjectTravel * 0.25
   await moveToBoundary(page, entry)
+  await expect(page.locator('.skills-browser [data-wheel-static]')).toHaveCSS('opacity', '1')
+  await expect(page.locator('.skills-browser .skills-category-pill').first()).toBeHidden()
   const entering = (await card.boundingBox())!
   expect(entering.x).toBeLessThan(0)
   const liquid = page.locator('.liquid-experience-shoulders')
@@ -630,7 +634,7 @@ test('continued momentum finishes one reveal without skipping the next page', as
   await page.evaluate(() =>
     window.dispatchEvent(new CustomEvent('portfolio:select-scene', { detail: 1 })),
   )
-  await moveToBoundary(page, skillParagraphEnd - 0.01)
+  await moveToBoundary(page, skillTitleEnd - 0.01)
   await page.mouse.move(500, 400)
 
   for (let index = 0; index < 14; index++) {
@@ -646,7 +650,7 @@ test('continued momentum finishes one reveal without skipping the next page', as
   ).toBeLessThan(sceneStops[2] - 1)
 })
 
-test('a short mobile drag reveals the project, intro, and pill in order and reverses', async ({
+test('a short mobile drag reveals the intro, project, and pill in order and reverses', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
@@ -677,7 +681,7 @@ test('a short mobile drag reveals the project, intro, and pill in order and reve
       send('touchend', 450 - direction * 36)
     }, direction)
 
-  await moveToBoundary(page, skillParagraphEnd - 0.01)
+  await moveToBoundary(page, skillTitleEnd - 0.01)
   const progress = () =>
     page.locator('.scene-track').getAttribute('data-playback-progress').then(Number)
   const [order] = await Promise.all([
@@ -703,7 +707,7 @@ test('a short mobile drag reveals the project, intro, and pill in order and reve
     }, projectStops[0].id),
     drag(1),
   ])
-  expect(order).toEqual(['project', 'intro', 'category'])
+  expect(order).toEqual(['intro', 'project', 'category'])
   await expect.poll(progress).toBeCloseTo(skillStart + workIntroSettle, 2)
   const wheel = page.locator('ul.skills-browser')
   const intro = wheel.locator(':scope > li[data-wheel-static]:first-child')
@@ -723,6 +727,6 @@ test('a short mobile drag reveals the project, intro, and pill in order and reve
   await page.screenshot({ path: test.info().outputPath('work-opening-mobile.png') })
   await page.locator(`#${projectStops[0].id}`).getByRole('button').click({ trial: true })
   await drag(-1)
-  await expect.poll(progress).toBeCloseTo(skillParagraphEnd, 2)
+  await expect.poll(progress).toBeCloseTo(skillTitleEnd, 2)
   await expect(intro).toHaveCSS('opacity', '0')
 })

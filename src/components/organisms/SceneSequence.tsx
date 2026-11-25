@@ -26,12 +26,11 @@ import {
   experienceEnd,
   sectionScrollRanges,
   clamp,
-  getIntroParagraphProgress,
-  skillParagraphEndPortion,
+  getAboutParagraphProgress,
   getScrollSection,
   skillSegments,
   skillStart,
-  skillParagraphEnd,
+  skillTitleEnd,
   skillTravel,
   projectStops,
   workIntroSettle,
@@ -107,11 +106,11 @@ const origins = [
   [82, 72],
 ]
 
-function positionIntroCopy(copy: HTMLElement | null | undefined, intro: number) {
+function positionAboutCopy(copy: HTMLElement | null | undefined, intro: number) {
   if (!copy) return
 
   // Make room as the first few words arrive. Use the same scroll clock as the word reveal.
-  const paragraph = getIntroParagraphProgress(intro)
+  const paragraph = getAboutParagraphProgress(intro)
   const row = `${easeOut(clamp(paragraph / 0.25))}fr`
 
   if (copy.style.getPropertyValue('--intro-paragraph-row') !== row) {
@@ -365,7 +364,6 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     const previousScrollRestoration = history.scrollRestoration
     const media = window.matchMedia('(prefers-reduced-motion: reduce)')
     const compact = window.matchMedia('(max-width: 760px), (pointer: coarse)')
-    const workHeading = panels.current[1]?.querySelector<HTMLElement>('.skills-heading')
     const aboutHeading = panels.current[2]?.querySelector<HTMLElement>('.about-introduction')
 
     let frame = 0
@@ -389,7 +387,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     let snapExpectedY = 0
     let lastWorkWheelAt = -Infinity
 
-    const workOpeningRange = { start: skillParagraphEnd, end: skillStart + workIntroSettle }
+    const workOpeningRange = { start: skillTitleEnd, end: skillStart + workIntroSettle }
     const transitionRanges = [
       { start: heroWalkOutEnd, end: sceneStops[1] },
       workOpeningRange,
@@ -512,7 +510,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         const secondsPerUnit = workItems
           ? workOpeningItemsDuration / workIntroSettle
           : openingWork
-            ? introPeriodRevealDuration / (skillStart - skillParagraphEnd)
+            ? introPeriodRevealDuration / (skillStart - skillTitleEnd)
             : (range.end === experienceStart
                 ? introPeriodRevealDuration
                 : circleRevealTransition.duration) /
@@ -712,7 +710,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       if (target?.closest('dialog, input, textarea, select, [contenteditable="true"]')) return false
 
       const direction = Math.sign(pixels)
-      const introEnd = current === 1 ? skillParagraphEnd : current === 2 ? aboutIntroEnd : null
+      const introEnd = current === 1 ? skillTitleEnd : current === 2 ? aboutIntroEnd : null
 
       // Consume forward input during the drop instead of queuing a fill jump behind it.
       if (
@@ -1114,7 +1112,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         Math.max(displayed, requested) >= experienceStart &&
         Math.min(displayed, requested) <= experienceEnd
       const introPlayback =
-        (current === 1 && Math.min(displayed, requested) < skillParagraphEnd) ||
+        (current === 1 && Math.min(displayed, requested) < skillTitleEnd) ||
         (current === 2 && Math.min(displayed, requested) < aboutIntroEnd)
 
       if (difference < 0.000001) {
@@ -1312,8 +1310,6 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         skillIntro !== lastSkillIntro ||
         skillTextIntro !== lastSkillTextIntro
       ) {
-        if (skillTextIntro !== lastSkillTextIntro) positionIntroCopy(workHeading, skillTextIntro)
-
         lastSkillProgress = skillProgress
         lastSkillIntro = skillIntro
         lastSkillTextIntro = skillTextIntro
@@ -1330,7 +1326,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
 
       if (aboutIntro !== lastAboutIntro) {
         // Update the layout before measuring the period for the circular reveal below.
-        positionIntroCopy(aboutHeading, aboutIntro * skillParagraphEndPortion)
+        positionAboutCopy(aboutHeading, aboutIntro)
         lastAboutIntro = aboutIntro
         window.dispatchEvent(new CustomEvent('portfolio:about-intro', { detail: aboutIntro }))
       }

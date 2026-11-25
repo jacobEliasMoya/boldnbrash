@@ -4,7 +4,7 @@ import {
   heroParagraphEnd,
   heroWalkOutStart,
   heroWalkOutEnd,
-  skillParagraphEnd,
+  skillTitleEnd,
   sceneStops,
   skillSegments,
   skills,
@@ -435,7 +435,7 @@ test('the edge scroll pill seeks and carries its liquid with it', async ({ page 
   await workSlider.press('End')
   await expect(workSlider).toHaveAttribute('aria-valuetext', '100% of Work')
   await expect(page.locator('.skills-reveal')).toHaveAttribute('inert', '')
-  await scrollTimeline(page, (skillParagraphEnd + skillStart) / 2)
+  await scrollTimeline(page, (skillTitleEnd + skillStart) / 2)
   await expect(page.locator('.site-scrollbar')).toHaveAttribute('inert', '')
   await scrollTimeline(page, skillStart)
   await expect(page.getByRole('slider', { name: 'Work projects scroll position' })).toHaveAttribute(
@@ -618,6 +618,7 @@ test('section reveals remain partial until further scrolling and reverse with sc
   await expect(page.locator('.hero-letter').nth(5)).toHaveCSS('--letter-fill', '100%')
 
   const description = page.locator('.hero-description')
+  await expect(description).toHaveText('Take a scroll. See what pops.')
   const words = description.locator('.word-emphasis')
   const firstWordMiddle =
     heroFillEnd + (heroParagraphEnd - heroFillEnd) / (2 * (await words.count()))
@@ -626,11 +627,7 @@ test('section reveals remain partial until further scrolling and reverse with sc
   await expect(words.first()).not.toHaveCSS('transform', 'none')
   await expect(panel).toHaveCSS('visibility', 'hidden')
 
-  const descriptionSize = await description.evaluate(
-    (element) => getComputedStyle(element).fontSize,
-  )
-
-  await expect(page.locator('#skills .skills-intro')).toHaveCSS('font-size', descriptionSize)
+  await expect(panel.locator('.skills-heading p')).toHaveCount(0)
   await scrollToProgress(heroWalkOutEnd + 0.1)
   await expect(panel).toHaveCSS('visibility', 'visible')
   await page.waitForTimeout(1000)

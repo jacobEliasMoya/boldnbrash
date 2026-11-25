@@ -18,7 +18,6 @@ import {
 import { TechnologyIcons } from '@/components/atoms/TechnologyIcon'
 import { ProjectCover } from '@/components/atoms/ProjectCover'
 import { ProjectCTA } from '@/components/atoms/ProjectCTA'
-import { WordEmphasis } from '@/components/atoms/WordEmphasis'
 import { ProjectDialog } from './ProjectDialog'
 import { WorkPillMotion } from './ExperienceMotion'
 import {
@@ -36,15 +35,12 @@ import { getIntroPeriodGeometry, getPeriodOpening } from '@/components/atoms/per
 import { useWorkPillEntrance } from '@/hooks/useWorkPillEntrance'
 import {
   clamp,
-  getIntroParagraphProgress,
+  getWorkOpeningTiming,
   projectStops,
   skills,
-  skillParagraphEndPortion,
   skillTitleFillPortion,
   skillSegments,
   skillTravel,
-  workIntroCopyEnd,
-  workIntroCopyStart,
   workProjectId,
 } from './skillsTimeline'
 
@@ -52,7 +48,7 @@ type Project = (typeof skills)[number]['projects'][number]
 
 type OpenProject = (project: Project, trigger: HTMLButtonElement) => void
 
-const introText =
+const workProjectsCopy =
   'See what I’ve built across client websites, design systems, and developer tools, plus a few experiments in 3D and AI.'
 
 type WheelBounds = { upperClearance: number; pillHeights: number[] }
@@ -219,19 +215,20 @@ function SkillsWheelIntroCopy() {
   return (
     <>
       <h3>A Few Things I&rsquo;ve Made.</h3>
-      <p>Some for work, Some just to see if I could.</p>
+      <p>{workProjectsCopy}</p>
     </>
   )
 }
 
-function SkillsWheelIntro() {
+function SkillsWheelIntro({ compact }: { compact: boolean }) {
   const progress = useContext(WorkPillMotion)?.progress
+  const { copyStart, copyEnd } = getWorkOpeningTiming(compact)
 
   // Follow the scene opening while staying independent of the category wheel.
   const opacity = useTransform(() => {
     const travel = (progress?.get() ?? 0) * skillTravel
 
-    return easeOut(clamp((travel - workIntroCopyStart) / (workIntroCopyEnd - workIntroCopyStart)))
+    return easeOut(clamp((travel - copyStart) / (copyEnd - copyStart)))
   })
   const visibility = useTransform(opacity, (value) => (value > 0 ? 'visible' : 'hidden'))
 
@@ -354,9 +351,8 @@ export function SkillsScene() {
   const scene = useRef<HTMLDivElement>(null)
   const period = useRef<HTMLSpanElement>(null)
   const [portal, setPortal] = useState({ x: 0, y: 0, radius: 0, dot: 0, borderWidth: 12 })
-  const revealStart = skillParagraphEndPortion
+  const revealStart = skillTitleFillPortion
   const fillDuration = skillTitleFillPortion / 2
-  const paragraphProgress = getIntroParagraphProgress(selection.textIntro)
   const expansion = animated ? clamp((selection.intro - revealStart) / (1 - revealStart)) : 1
   const titleFill = (line: number) =>
     animated ? clamp(selection.textIntro / fillDuration - line) * 100 : 0
@@ -497,16 +493,6 @@ export function SkillsScene() {
             </span>
           </h2>
         </div>
-        <div className="skills-intro-slot">
-          <p className="skills-intro">
-            <WordEmphasis
-              text={introText}
-              progress={paragraphProgress}
-              enabled={animated}
-              scrollReveal
-            />
-          </p>
-        </div>
       </div>
       {animated ? (
         <div
@@ -574,7 +560,7 @@ export function SkillsScene() {
                 selectSkill(next)
               }}
             >
-              <SkillsWheelIntro />
+              <SkillsWheelIntro compact={compactWheel} />
               {skills.map((skill, index) => (
                 <SkillCategoryPill
                   key={skill.name}

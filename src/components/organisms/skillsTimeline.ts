@@ -177,30 +177,41 @@ export const skillTravel = skillSegments.reduce((sum, segment) => sum + segment.
 export const workCategoryTravel = 0.95
 export const workProjectTravel = 0.8
 
-// The opening sequence gives the first project, copy, and category separate turns.
-export const workIntroCopyStart = workProjectTravel
-export const workIntroCopyEnd = 1.05
+const workIntroCopyTravel = 0.25
+export const workIntroPillStart = workProjectTravel + workIntroCopyTravel
 export const workIntroSettle = workCategoryTravel + workProjectTravel
+
+export function getWorkOpeningTiming(compact: boolean) {
+  // In the compact layout, the heading leads into the project beneath it.
+  const copyStart = compact ? 0 : workProjectTravel
+
+  return {
+    copyStart,
+    copyEnd: copyStart + workIntroCopyTravel,
+    projectStart: compact ? workIntroCopyTravel : 0,
+  }
+}
 
 export const heroFillEnd = 1
 export const heroParagraphEnd = heroFillEnd + 1.08
 export const heroWalkOutStart = heroParagraphEnd - 0.18
 export const heroWalkOutEnd = heroParagraphEnd + 0.14
 const skillIntroStart = heroWalkOutEnd + 0.4
-const skillTitleTravel = 0.9
-const skillParagraphTravel = 1.44
+const introTitleTravel = 0.9
+const aboutParagraphTravel = 1.44
 const introPeriodTravel = 0.9
-export const skillParagraphEnd = skillIntroStart + skillTitleTravel + skillParagraphTravel
-export const skillStart = skillParagraphEnd + introPeriodTravel
+export const skillTitleEnd = skillIntroStart + introTitleTravel
+export const skillStart = skillTitleEnd + introPeriodTravel
 const aboutStart = skillStart + skillTravel + 1
-export const aboutIntroEnd = aboutStart + skillTitleTravel + skillParagraphTravel
+export const aboutTitleEnd = aboutStart + introTitleTravel
+export const aboutIntroEnd = aboutTitleEnd + aboutParagraphTravel
 export const experienceStart = aboutIntroEnd + introPeriodTravel
 export const experienceEnd = experienceStart + experienceTravel
 export const sceneStops = [0, skillIntroStart, aboutStart, experienceEnd + 1.65]
 export const sceneDuration = sceneStops[sceneStops.length - 1] + 0.65
 export const sectionScrollRanges = [
   { start: sceneStops[0], end: heroWalkOutEnd, sceneIndex: 0 },
-  { start: sceneStops[1], end: skillParagraphEnd, sceneIndex: 1 },
+  { start: sceneStops[1], end: skillTitleEnd, sceneIndex: 1 },
   { start: skillStart, end: sceneStops[2] - 1, sceneIndex: 1, label: 'Work projects' },
   { start: aboutStart, end: aboutIntroEnd, sceneIndex: 2 },
   { start: experienceStart, end: sceneStops[3] - 1, sceneIndex: 2, label: 'Experience' },
@@ -216,13 +227,13 @@ export function getScrollSection(position: number) {
 }
 
 const skillIntroTravel = skillStart - skillIntroStart
-export const skillTitleFillPortion = skillTitleTravel / skillIntroTravel
-export const skillParagraphEndPortion = (skillParagraphEnd - skillIntroStart) / skillIntroTravel
+export const skillTitleFillPortion = introTitleTravel / skillIntroTravel
+export const aboutTitleFillPortion = introTitleTravel / (aboutIntroEnd - aboutStart)
 
 export const clamp = (value: number, min = 0, max = 1) => Math.max(min, Math.min(max, value))
 
-export function getIntroParagraphProgress(intro: number) {
-  return clamp((intro - skillTitleFillPortion) / (skillParagraphEndPortion - skillTitleFillPortion))
+export function getAboutParagraphProgress(intro: number) {
+  return clamp((intro - aboutTitleFillPortion) / (1 - aboutTitleFillPortion))
 }
 
 export function getSkillPosition(progress: number) {
@@ -264,7 +275,10 @@ export function getSkillFrame(progress: number) {
   // The first category waits for the intro. Later turns use the category's lift window.
   const entrance =
     next === 0
-      ? { index: 0, phase: clamp((position - workIntroCopyEnd) / (to.position - workIntroCopyEnd)) }
+      ? {
+          index: 0,
+          phase: clamp((position - workIntroPillStart) / (to.position - workIntroPillStart)),
+        }
       : from.skillIndex !== to.skillIndex
         ? { index: to.skillIndex, phase: clamp((fraction * workIntroSettle) / workCategoryTravel) }
         : null

@@ -3,12 +3,7 @@
 import { useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { IntroDropText } from '@/components/atoms/IntroDropText'
 import { WordEmphasis } from '@/components/atoms/WordEmphasis'
-import {
-  clamp,
-  getIntroParagraphProgress,
-  skillParagraphEndPortion,
-  skillTitleFillPortion,
-} from './skillsTimeline'
+import { aboutTitleFillPortion, clamp, getAboutParagraphProgress } from './skillsTimeline'
 import { ExperienceMotion } from './ExperienceMotion'
 import {
   experienceRoles,
@@ -29,12 +24,11 @@ function AboutIntroduction({ enhanced }: { enhanced: boolean }) {
   }, [])
 
   // Fill both title lines before scroll starts revealing the paragraph.
-  const intro = progress * skillParagraphEndPortion
   const fill = (line: number) =>
     ({
-      '--title-fill': `${clamp(intro / (skillTitleFillPortion / 2) - line) * 100}%`,
+      '--title-fill': `${clamp(progress / (aboutTitleFillPortion / 2) - line) * 100}%`,
     }) as CSSProperties
-  const paragraph = getIntroParagraphProgress(intro)
+  const paragraph = getAboutParagraphProgress(progress)
 
   return (
     <div className="about-introduction skills-heading">

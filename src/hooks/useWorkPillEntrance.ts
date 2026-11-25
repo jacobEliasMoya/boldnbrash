@@ -18,6 +18,7 @@ import {
 import {
   clamp,
   getSkillFrame,
+  getWorkOpeningTiming,
   skillTravel,
   workProjectTravel,
 } from '@/components/organisms/skillsTimeline'
@@ -40,6 +41,7 @@ export function useWorkPillEntrance(
 
     if (!animated || !browser || !stage || !projectSlot || !progress || !dock) return
 
+    const { projectStart } = getWorkOpeningTiming(compact)
     const pills = Array.from(browser.querySelectorAll<HTMLElement>('.skills-category-pill'))
     const intro = browser.querySelector<HTMLElement>('[data-wheel-static]')
     const viewport = window.visualViewport
@@ -75,7 +77,7 @@ export function useWorkPillEntrance(
       // Overlap the receding card and the left entrance throughout the turn.
       const phase =
         wheelPosition === 0
-          ? clamp((position * skillTravel) / workProjectTravel)
+          ? clamp((position * skillTravel - projectStart) / workProjectTravel)
           : clamp(1 + distance)
       const project = phase > 0 ? projects[index] : undefined
 

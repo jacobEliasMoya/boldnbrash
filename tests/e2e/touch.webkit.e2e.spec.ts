@@ -343,11 +343,11 @@ test('skills introduction fill responds to mobile wheel input and vertical swipe
 
   const work = page.locator('#skills')
   const first = work.locator('.skills-title-fill').first()
-  const firstWord = work.locator('.skills-intro .word-emphasis').first()
+  const second = work.locator('.skills-title-fill').nth(1)
 
   await expect(work).toHaveAttribute('data-intro-drop-complete', '')
   await expect(first).toHaveCSS('--title-fill', '0%')
-  await expect(firstWord).toHaveCSS('opacity', '0')
+  await expect(work.locator('.skills-heading p')).toHaveCount(0)
   await first.dispatchEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true })
   await expect
     .poll(async () =>
@@ -363,14 +363,12 @@ test('skills introduction fill responds to mobile wheel input and vertical swipe
   await expect(first).toHaveCSS('--title-fill', '100%')
 
   await swipe(page, '.skills-title-fill', 620, 160)
-  await expect(firstWord).toHaveCSS('opacity', '1')
+  await expect(page.locator('.skills-reveal')).toHaveAttribute('data-revealed', '')
   await swipe(page, '.skills-title-fill', 160, 720)
   // Returning from the project reveal finishes at the full title before the
   // next gesture scrubs its fill backward.
   await expect(page.locator('.skills-reveal')).toHaveAttribute('aria-hidden', 'true')
   await swipe(page, '.skills-title-fill', 320, 620)
-
-  const second = work.locator('.skills-title-fill').nth(1)
 
   await expect
     .poll(async () =>
@@ -379,7 +377,6 @@ test('skills introduction fill responds to mobile wheel input and vertical swipe
       ),
     )
     .toBeLessThan(100)
-  await expect(firstWord).toHaveCSS('opacity', '0')
 })
 
 test('long and short swipes advance one project and reverse across category gaps', async ({

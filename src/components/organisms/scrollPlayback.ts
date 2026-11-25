@@ -5,7 +5,7 @@ import {
   experienceStart,
   heroWalkOutEnd,
   sceneStops,
-  skillParagraphEnd,
+  skillTitleEnd,
   skillStart,
   skillTravel,
 } from './skillsTimeline'
@@ -114,7 +114,7 @@ function fromPacedTime(time: number, ranges: PaceRange[]) {
 
 const inputPacing = [paceRange(experienceStart, experienceEnd, 1.45, 0.7)]
 const showcaseReading = [
-  paceRange(sceneStops[1], skillParagraphEnd, 2),
+  paceRange(sceneStops[1], skillTitleEnd, 2),
   paceRange(sceneStops[2], aboutIntroEnd, 2.5),
   paceRange(experienceStart, experienceEnd, 2, 0.7),
   paceRange(experienceEnd, sceneStops[3] - 1, 5, 0.22),
