@@ -2114,10 +2114,18 @@ export function SceneSequence({ children }: { children: ReactNode }) {
                   type="button"
                   className="showcase-toggle"
                   initial={headerEntrance.mobile ? mobileHeaderRest : { opacity: 0, y: -24 }}
-                  animate={headerEntrance.mobile ? mobileHeaderEntered : { opacity: 1, y: 0 }}
+                  animate={
+                    // Mobile keyframes replace the desktop drop even if its delay is still pending.
+                    headerEntrance.mobile
+                      ? { ...mobileHeaderEntered, y: [0, 0] }
+                      : { opacity: 1, scale: 1, y: 0 }
+                  }
                   transition={
                     headerEntrance.mobile
-                      ? getMobileHeaderPop(headerEntrance.playDelay, reduceMotion)
+                      ? {
+                          ...getMobileHeaderPop(headerEntrance.playDelay, reduceMotion),
+                          y: { duration: 0, delay: 0 },
+                        }
                       : {
                           duration: reduceMotion ? 0 : headerEntrance.duration,
                           delay: reduceMotion ? 0 : headerEntrance.playDelay,

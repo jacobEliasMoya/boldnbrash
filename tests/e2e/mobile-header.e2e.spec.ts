@@ -74,3 +74,41 @@ test('mobile header reveals logo, play, theme, then menu with overlapping entran
   await expect(page.locator('html')).toHaveAttribute('data-mobile-nav-ready', 'true')
   await expect(page.locator('.hero-description')).toHaveCSS('opacity', '1')
 })
+
+test('play stays aligned after resizing during the desktop header entrance', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto(baseURL)
+
+  const play = page.locator('.liquid-blended-control .showcase-toggle')
+  const theme = page.locator('.liquid-blended-control .theme-toggle')
+
+  // Cross the breakpoint while Play still carries its desktop entrance offset.
+  await expect(play).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, -24)', { timeout: 20000 })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(play.locator('.showcase-rounded-icon')).toBeVisible()
+
+  const firstVisible = await page.waitForFunction(() => {
+    const button = document.querySelector('.liquid-blended-control .showcase-toggle')
+
+    if (!button) return null
+
+    const { opacity, transform } = getComputedStyle(button)
+
+    return Number(opacity) > 0.01 ? { y: new DOMMatrixReadOnly(transform).m42 } : null
+  })
+  expect(await firstVisible.jsonValue()).toEqual({ y: 0 })
+
+  await expect(play).toHaveCSS('transform', 'none')
+  await expect(theme).toHaveCSS('transform', 'none')
+
+  await expect
+    .poll(async () => {
+      const playBounds = (await play.boundingBox())!
+      const themeBounds = (await theme.boundingBox())!
+      const playCenter = playBounds.y + playBounds.height / 2
+      const themeCenter = themeBounds.y + themeBounds.height / 2
+
+      return Math.abs(playCenter - themeCenter)
+    })
+    .toBeLessThan(1)
+})
