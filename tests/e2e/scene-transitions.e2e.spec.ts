@@ -269,8 +269,8 @@ test('mobile Work project enters from the left and reverses', async ({ page }) =
   const { copyStart, projectStart } = getWorkOpeningTiming(true)
   const copyPosition = skillStart + copyStart
   const intro = page.locator('.skills-browser [data-wheel-static]')
-  const heading = intro.locator('h3')
-  const paragraph = intro.locator('p')
+  const heading = intro.locator('h3').first()
+  const paragraph = intro.locator('p').first()
   const { headingEnd, paragraphStart, end } = workIntroCopyTiming
   const headingMid = copyPosition + headingEnd / 2
 

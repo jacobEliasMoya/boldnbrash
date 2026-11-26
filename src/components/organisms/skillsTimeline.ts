@@ -321,12 +321,17 @@ export function getSkillFrame(progress: number) {
   const projectPosition = previous + fraction
   const active = projectStops[Math.round(projectPosition)]
 
+  // Normalizing the scene clock can leave an exact stop a fraction short of its endpoint.
+  const reachedStop = to.position - position <= Number.EPSILON * skillTravel
+
   // The first category waits for the intro. Later turns use the category's lift window.
   const entrance =
     next === 0
       ? {
           index: 0,
-          phase: clamp((position - workIntroPillStart) / (to.position - workIntroPillStart)),
+          phase: reachedStop
+            ? 1
+            : clamp((position - workIntroPillStart) / (to.position - workIntroPillStart)),
         }
       : from.skillIndex !== to.skillIndex
         ? {

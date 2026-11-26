@@ -31,7 +31,7 @@ export function useWorkPillEntrance(
   wheel: RefObject<HTMLUListElement | null>,
   animated: boolean,
   ringPosition: MotionValue<number>,
-  radius: number,
+  radius: MotionValue<number>,
   compact: boolean,
 ) {
   const motion = useContext(WorkPillMotion)
@@ -270,14 +270,15 @@ export function useWorkPillEntrance(
       if (compact && previousBox) {
         const previousHeight = previousBox.height
         const limit = y - previousBox.centerY - workPillClearance
+        const wheelRadius = radius.get()
 
-        if (compactPillBottom(turn, previousHeight, radius) > limit) {
+        if (compactPillBottom(turn, previousHeight, wheelRadius) > limit) {
           let end = 1
 
           for (let iteration = 0; iteration < 12; iteration += 1) {
             const middle = (turn + end) / 2
 
-            if (compactPillBottom(middle, previousHeight, radius) > limit) turn = middle
+            if (compactPillBottom(middle, previousHeight, wheelRadius) > limit) turn = middle
             else end = middle
           }
 
@@ -330,6 +331,8 @@ export function useWorkPillEntrance(
     // Post-render handoffs exposed stale transforms for a frame when reversing.
     const schedulePaint = () => motionFrame.read(paint)
     const stop = progress.on('change', schedulePaint)
+    // Resizing the orbit can repaint the current turn without clearing the ready state.
+    const stopRadius = radius.on('change', schedulePaint)
 
     viewport?.addEventListener('resize', measure)
     viewport?.addEventListener('scroll', schedulePaint)
@@ -338,6 +341,7 @@ export function useWorkPillEntrance(
     return () => {
       observer.disconnect()
       stop()
+      stopRadius()
       cancelFrame(paint)
       viewport?.removeEventListener('resize', measure)
       viewport?.removeEventListener('scroll', schedulePaint)

@@ -71,6 +71,36 @@ test('Jake walks in with the particle effect disabled', async ({ page }) => {
   expect(rightEdge).toBeLessThan(308)
 })
 
+test('Hero copy fits within the section gutters on a narrow phone', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 })
+  await page.goto(baseURL)
+  await expect(page.locator('#top')).toHaveAttribute('data-period-ready', 'true', {
+    timeout: 15000,
+  })
+  await page.evaluate(() => document.fonts.ready)
+
+  const descriptionGutter = await page.locator('.hero-description').evaluate((description) => {
+    const scene = description.closest('.hero-scene')!
+    const sceneBounds = scene.getBoundingClientRect()
+    const style = getComputedStyle(scene)
+    const bounds = description.getBoundingClientRect()
+    const text = document.createRange()
+
+    text.selectNodeContents(description)
+
+    const ink = text.getBoundingClientRect()
+    const left = sceneBounds.left + parseFloat(style.paddingLeft)
+    const right = sceneBounds.right - parseFloat(style.paddingRight)
+
+    return Math.min(
+      Math.min(bounds.left, ink.left) - left,
+      right - Math.max(bounds.right, ink.right),
+    )
+  })
+
+  expect(descriptionGutter).toBeGreaterThanOrEqual(-0.5)
+})
+
 test('Jake turns toward his travel direction and keeps his gait forward when scrolling reverses', async ({
   page,
 }) => {

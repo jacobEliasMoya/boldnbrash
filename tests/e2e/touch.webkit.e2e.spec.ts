@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import sharp from 'sharp'
 import {
   experienceDisclosureTiming,
@@ -469,32 +469,7 @@ test('long and short swipes advance one project and reverse across category gaps
 }) => {
   test.setTimeout(60000)
 
-  async function expectWorkBadgePaint() {
-    const glyphs = page.locator('#skills .skills-category-pill[data-active] .skills-technology svg')
-    const marks = await glyphs.all()
-    expect(marks.length).toBeGreaterThan(0)
-
-    for (const mark of marks) {
-      // Capture the settled glyph box inside the border so it cannot count as badge paint.
-      const pixels = await sharp(await mark.screenshot({ scale: 'css' }))
-        .removeAlpha()
-        .raw()
-        .toBuffer()
-      let painted = 0
-
-      for (let pixel = 0; pixel < pixels.length; pixel += 3) {
-        if (
-          pixels[pixel] > 140 &&
-          pixels[pixel + 1] > 95 &&
-          pixels[pixel + 2] < pixels[pixel] * 0.65
-        )
-          painted++
-      }
-
-      const label = await mark.locator('..').getAttribute('aria-label')
-      expect(painted, label ?? 'Work badge').toBeGreaterThan(3)
-    }
-  }
+  const activePill = page.locator('#skills .skills-category-pill[data-active]')
 
   const boundary =
     projectStops.findIndex(
@@ -520,7 +495,7 @@ test('long and short swipes advance one project and reverse across category gaps
     const initial = skillStart + stop.position
 
     await expect.poll(async () => Math.abs((await progress()) - initial)).toBeLessThan(0.01)
-    if (index === boundary) await expectWorkBadgePaint()
+    if (index === boundary) await expectWorkBadgePaint(activePill)
     const projectSlot = page.locator('.skills-projects')
     const initialSlot = await projectSlot.boundingBox()
     await swipe(page, '.skills-browser', 600, index === 0 ? 170 : 480)
@@ -540,19 +515,124 @@ test('long and short swipes advance one project and reverse across category gaps
       for (const name of ['Strapi', 'GraphQL']) {
         await expect(cms.getByRole('img', { name }).locator('svg')).toBeVisible()
       }
-      await expectWorkBadgePaint()
+      await expectWorkBadgePaint(activePill)
     }
 
     await swipe(page, '.skills-browser', 480, 600)
     await expect
       .poll(async () => Math.abs((await progress()) - initial), { timeout: 5000 })
       .toBeLessThan(0.01)
-    if (index === boundary) await expectWorkBadgePaint()
+    if (index === boundary) await expectWorkBadgePaint(activePill)
     await swipe(page, '.skills-browser', 600, 570)
     await expect
       .poll(async () => Math.abs((await progress()) - initial), { timeout: 5000 })
       .toBeLessThan(0.01)
   }
+})
+
+async function expectWorkBadgePaint(pill: Locator) {
+  const marks = await pill.locator('.skills-technology svg').all()
+  expect(marks.length).toBeGreaterThan(0)
+
+  for (const mark of marks) {
+    // Sample the glyph inside the badge so its border cannot count as painted icon pixels.
+    const pixels = await sharp(await mark.screenshot({ scale: 'css' }))
+      .removeAlpha()
+      .raw()
+      .toBuffer()
+    let painted = 0
+
+    for (let pixel = 0; pixel < pixels.length; pixel += 3) {
+      const red = pixels[pixel]
+      const green = pixels[pixel + 1]
+      const blue = pixels[pixel + 2]
+
+      // Departing pills fade into the scene, so use the glyph's amber contrast.
+      if (red - blue > 20 && green - blue > 12 && red > green * 1.04) painted++
+    }
+
+    const label = await mark.locator('..').getAttribute('aria-label')
+    expect(painted, label ?? 'Work badge').toBeGreaterThan(3)
+  }
+}
+
+test('Work badges stay painted during a turn and viewport resize', async ({ page }) => {
+  test.setTimeout(60000)
+
+  const boundary = projectStops.findIndex((stop) => stop.skillIndex === 1)
+  const from = projectStops[boundary - 1]
+  const to = projectStops[boundary]
+  const wheel = page.locator('.skills-browser')
+  const pills = wheel.locator('.skills-category-pill')
+  const track = page.locator('.scene-track')
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(`${baseURL}/#${from.id}`)
+  await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 15000 })
+  await expect(wheel).toHaveAttribute('data-work-ready', '')
+  await wheel.evaluate((element) => {
+    const hold = new Event('touchstart', { bubbles: true })
+    Object.defineProperty(hold, 'touches', { value: [{ clientX: 180, clientY: 480 }] })
+    element.dispatchEvent(hold)
+  })
+
+  const seek = async (phase: number) => {
+    const position = skillStart + from.position + (to.position - from.position) * phase
+
+    await track.evaluate(
+      (element, { position, duration }) => {
+        const top = scrollY + element.getBoundingClientRect().top
+        const travel = element.clientHeight - element.firstElementChild!.clientHeight
+        window.scrollTo({ top: top + (travel * position) / duration, behavior: 'instant' })
+      },
+      { position, duration: sceneDuration },
+    )
+    await expect
+      .poll(async () =>
+        Math.abs(Number(await track.getAttribute('data-playback-progress')) - position),
+      )
+      .toBeLessThan(0.008)
+  }
+
+  await seek(0.28)
+  await expect(pills.nth(1)).toHaveAttribute('data-work-entering', '')
+  await expectWorkBadgePaint(pills.nth(0))
+  await expectWorkBadgePaint(pills.nth(1))
+
+  const readiness = await wheel.evaluateHandle((element) => {
+    let removals = 0
+    const observer = new MutationObserver((mutations) => {
+      removals += mutations.filter((mutation) => mutation.oldValue !== null).length
+    })
+
+    observer.observe(element, {
+      attributes: true,
+      attributeOldValue: true,
+      attributeFilter: ['data-work-ready'],
+    })
+
+    return () => {
+      observer.disconnect()
+      return removals
+    }
+  })
+
+  const viewport = page.viewportSize()!
+
+  for (const size of [{ width: 320, height: 568 }, viewport]) {
+    await page.setViewportSize(size)
+    await wheel.evaluate(async () => {
+      for (let frame = 0; frame < 4; frame++) await new Promise(requestAnimationFrame)
+    })
+  }
+
+  expect(await readiness.evaluate((countRemovals) => countRemovals())).toBe(0)
+
+  await seek(1)
+  await expectWorkBadgePaint(pills.nth(1))
+  await seek(0.28)
+  await expectWorkBadgePaint(pills.nth(0))
+  await expectWorkBadgePaint(pills.nth(1))
 })
 
 test('a forward drag leaves the final Skills project without snapping back', async ({ page }) => {

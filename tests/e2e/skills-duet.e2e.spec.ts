@@ -223,7 +223,9 @@ for (const viewport of [
       await expect(intro).toHaveAttribute('aria-hidden', 'true')
       const categoryCopy = work.locator('.skills-wheel-intro')
       await expect(categoryCopy.getByRole('heading')).toHaveText(skills[0].copy.title)
-      await expect(categoryCopy.locator('p')).toHaveText(skills[0].copy.description)
+      await expect(categoryCopy.locator('p[aria-hidden=false]')).toHaveText(
+        skills[0].copy.description,
+      )
       const projectSlot = (await work.locator('.skills-projects').boundingBox())!
 
       const currentSkill = page.locator('.skills-category-pill[data-active]')
@@ -241,8 +243,25 @@ for (const viewport of [
       const left = (await currentSkill.boundingBox())!
       const right = (await firstProject.boundingBox())!
 
-      if (viewport.width > 900) expect(left.x).toBeGreaterThan(right.x + right.width)
-      else {
+      if (viewport.width > 900) {
+        expect(left.x).toBeGreaterThan(right.x + right.width)
+
+        // Inactive copy can reserve height without widening the gap above the pill.
+        const descriptionToPill = await categoryCopy
+          .locator('p[aria-hidden=false]')
+          .evaluate((description) => {
+            const browser = description.closest('.skills-browser')!
+            const pill = browser.querySelector('.skills-category-pill[data-active]')!
+            const gap = parseFloat(getComputedStyle(browser).rowGap)
+
+            return (
+              pill.getBoundingClientRect().top - description.getBoundingClientRect().bottom - gap
+            )
+          })
+
+        expect(descriptionToPill).toBeGreaterThanOrEqual(-1)
+        expect(descriptionToPill).toBeLessThan(6)
+      } else {
         expect(left.y).toBeGreaterThan(right.y + right.height)
 
         const heading = (await page.locator('.skills-wheel-intro').first().boundingBox())!
@@ -307,7 +326,9 @@ for (const viewport of [
       await scrollToPhase(page, nextStop)
       await expect(currentSkill).toContainText(skills[1].name)
       await expect(categoryCopy.getByRole('heading')).toHaveText(skills[1].copy.title)
-      await expect(categoryCopy.locator('p')).toHaveText(skills[1].copy.description)
+      await expect(categoryCopy.locator('p[aria-hidden=false]')).toHaveText(
+        skills[1].copy.description,
+      )
       const newProjectSlot = (await work.locator('.skills-projects').boundingBox())!
       expect(newProjectSlot.height).toBeCloseTo(projectSlot.height, 1)
       expect(newProjectSlot.y).toBeCloseTo(projectSlot.y, 1)
@@ -396,7 +417,7 @@ test('period opening follows changes to the heading', async ({ page }) => {
     .toBeLessThan(0.5)
 })
 
-test('Work fills the departing pill and swaps the heading before the paragraph', async ({
+test('Work fills the departing pill and moves the title and description together', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
@@ -433,71 +454,81 @@ test('Work fills the departing pill and swaps the heading before the paragraph',
   }
 
   const copy = page.locator('.skills-browser .skills-wheel-intro')
+  const activeTitle = copy.locator('h3[aria-hidden="false"]')
+  const activeDescription = copy.locator('p[aria-hidden="false"]')
 
-  for (const stop of [projectStops[1], projectStops[0]]) {
-    const previous = skills[stop.skillIndex === 1 ? 0 : 1].copy
-    await expect(copy.getByRole('heading', { name: previous.title })).toBeVisible()
-    await expect(copy.locator('h3')).toHaveCSS('opacity', '1')
-    await expect(copy.locator('p')).toHaveText(previous.description)
-    await expect(copy.locator('p')).toHaveCSS('opacity', '1')
+  const readCopy = () =>
+    copy.evaluate(async (intro) => {
+      await new Promise(requestAnimationFrame)
+      await new Promise(requestAnimationFrame)
 
-    const nextCopy = skills[stop.skillIndex].copy
+      function read(element: HTMLElement) {
+        const style = getComputedStyle(element)
 
-    const swap = await copy.evaluate(
-      async (intro, { detail, nextCopy }) => {
-        const heading = intro.querySelector('h3')!
-        const paragraph = intro.querySelector('p')!
-        const oldDescription = paragraph.textContent
-        const height = intro.getBoundingClientRect().height
-        let headingFaded = false
-        let paragraphFaded = false
-        let headingSettledFirst = true
-        let layoutStayedStill = true
-
-        window.dispatchEvent(
-          new CustomEvent('portfolio:select-skill', { detail, cancelable: true }),
-        )
-
-        const deadline = performance.now() + 3500
-        while (performance.now() < deadline) {
-          await new Promise(requestAnimationFrame)
-          const headingAlpha = Number(getComputedStyle(heading).opacity)
-          const paragraphAlpha = Number(getComputedStyle(paragraph).opacity)
-          const titleIsCurrent = heading.getAttribute('aria-label') === nextCopy.title
-          const descriptionIsCurrent = paragraph.textContent === nextCopy.description
-
-          headingFaded ||= headingAlpha > 0 && headingAlpha < 1
-          paragraphFaded ||= paragraphAlpha > 0 && paragraphAlpha < 1
-          layoutStayedStill &&= intro.getBoundingClientRect().height === height
-
-          if (paragraphAlpha < 1 || paragraph.textContent !== oldDescription) {
-            headingSettledFirst &&= titleIsCurrent && headingAlpha === 1
-          }
-
-          if (descriptionIsCurrent && paragraphAlpha === 1) break
+        return {
+          alpha: Number(style.opacity),
+          y: new DOMMatrixReadOnly(style.transform).m42,
         }
+      }
 
-        return { headingFaded, paragraphFaded, headingSettledFirst, layoutStayedStill }
-      },
-      {
-        detail: {
-          index: stop.skillIndex,
-          offset: stop.position - skillSegments[stop.skillIndex].start,
-        },
-        nextCopy,
-      },
-    )
-
-    await expect(copy.getByRole('heading')).toHaveText(nextCopy.title)
-    await expect(copy.locator('p')).toHaveText(nextCopy.description)
-    await expect(copy.locator('p')).toHaveCSS('opacity', '1')
-    expect(swap).toEqual({
-      headingFaded: true,
-      paragraphFaded: true,
-      headingSettledFirst: true,
-      layoutStayedStill: true,
+      return {
+        height: intro.getBoundingClientRect().height,
+        titles: Array.from(intro.querySelectorAll('h3')).slice(0, 2).map(read),
+        paragraphs: Array.from(intro.querySelectorAll('p')).slice(0, 2).map(read),
+        pillTilt: new DOMMatrixReadOnly(
+          getComputedStyle(document.querySelector('.skills-category-pill')!).transform,
+        ).m23,
+      }
     })
+
+  await scrollToPhase(page, first)
+  await expect(activeTitle).toHaveText(skills[0].copy.title)
+  await expect(activeDescription).toHaveText(skills[0].copy.description)
+  const opening = await readCopy()
+  const turns = [0.32, 0.34, 0.36, 0.38, 0.4, 0.42, 0.44, 0.46].map(
+    (fraction) => first + (next - first) * fraction,
+  )
+  const forward = []
+
+  for (const position of turns) {
+    await scrollToPhase(page, position)
+    const pose = await readCopy()
+    expect(pose.height).toBe(opening.height)
+    expect(pose.titles).toEqual(pose.paragraphs)
+    forward.push(pose)
   }
+
+  expect(
+    forward.some(
+      ({ titles, pillTilt }) =>
+        pillTilt > 0 && titles[0].alpha > 0.02 && titles[0].alpha < 0.98 && titles[0].y < -0.1,
+    ),
+  ).toBe(true)
+  expect(
+    forward.some(
+      ({ titles }) => titles[1].alpha > 0.02 && titles[1].alpha < 0.98 && titles[1].y > 0.1,
+    ),
+  ).toBe(true)
+
+  await scrollToPhase(page, next)
+  await expect(activeTitle).toHaveText(skills[1].copy.title)
+  await expect(activeDescription).toHaveText(skills[1].copy.description)
+  await expect(activeDescription).toHaveCSS('opacity', '1')
+
+  for (const [index, position] of [...turns.entries()].reverse()) {
+    await scrollToPhase(page, position)
+    const pose = await readCopy()
+    expect(pose.titles).toEqual(pose.paragraphs)
+    for (const [category, title] of pose.titles.entries()) {
+      expect(title.alpha).toBeCloseTo(forward[index].titles[category].alpha, 2)
+      expect(title.y).toBeCloseTo(forward[index].titles[category].y, 1)
+    }
+  }
+
+  await scrollToPhase(page, first)
+  await expect(activeTitle).toHaveText(skills[0].copy.title)
+  await expect(activeDescription).toHaveText(skills[0].copy.description)
+  await expect(activeDescription).toHaveCSS('opacity', '1')
 })
 
 test('desktop Work commits short wheel gestures in either direction', async ({ page }) => {

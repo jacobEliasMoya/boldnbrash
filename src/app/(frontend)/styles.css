@@ -413,6 +413,7 @@ ul {
 }
 .hero-copy {
   z-index: 2;
+  min-width: 0;
   padding-bottom: 22px;
 }
 .hero-copy .eyebrow {
@@ -1692,16 +1693,9 @@ ul {
 
 .hero-copy .hero-description {
   font-size: clamp(16px, 1.5vw, 22px);
+  /* Keep the intended measure in the desktop grid and cap it in narrow columns. */
   width: 40.5ch;
-}
-@media (max-width: 760px) and (orientation: portrait) {
-  .hero-copy .hero-description {
-    max-width: calc(100vw - 2 * var(--frame-inset));
-    margin-inline-start: min(
-      0px,
-      calc(100vw - var(--frame-inset) - 4px - clamp(32px, 9vw, 42px) - 40.5ch)
-    );
-  }
+  max-width: 100%;
 }
 
 .scene-skills .eyebrow > span {
@@ -3009,7 +3003,6 @@ ul {
   }
   .portfolio[data-enhanced] .hero-copy {
     padding-bottom: 0;
-    min-width: 0;
     width: 100%;
     container-type: inline-size;
   }
@@ -3069,7 +3062,6 @@ ul {
   .portfolio[data-enhanced] .hero-copy .hero-description {
     line-height: 1.5;
     margin-top: 10px;
-    max-width: 100%;
   }
 }
 
@@ -3154,26 +3146,29 @@ ul {
   align-items: center;
 }
 .skills-wheel-intro {
+  --work-copy-gap: 8px;
   color: var(--ink);
 }
 .skills-browser > [data-wheel-static] {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-row: 1;
+  row-gap: var(--work-copy-gap);
   min-width: 0;
   width: 94%;
   justify-self: center;
 }
-.skills-browser > [data-wheel-static] > .skills-wheel-title {
+.skills-wheel-copy {
+  display: contents;
+}
+.skills-wheel-copy > .skills-wheel-title {
   grid-area: 1 / 1;
   align-self: end;
 }
-.skills-browser > [data-wheel-static] > .skills-wheel-description {
+.skills-wheel-copy > .skills-wheel-description {
   grid-area: 2 / 1;
   align-self: start;
-}
-.skills-wheel-intro > span[aria-hidden='true'] {
-  visibility: hidden;
+  margin: 0;
 }
 .skills-wheel-title {
   display: block;
@@ -3185,7 +3180,7 @@ ul {
 .skills-wheel-description {
   display: block;
   max-width: 100%;
-  margin: 8px 0 0;
+  margin: var(--work-copy-gap) 0 0;
   font: clamp(0.9375rem, 0.8rem + 0.65vw, 1.25rem) / 1.45 var(--mono);
   text-wrap: pretty;
 }
@@ -3294,7 +3289,7 @@ ul {
   /* Match the centered category pill's 94% width. */
   width: 94%;
   justify-self: center;
-  height: min(100%, 610px);
+  height: calc(min(100%, 610px) * var(--work-project-height-scale, 1));
   isolation: isolate;
 }
 .skills-projects .skills-project-deck {
@@ -3348,6 +3343,13 @@ ul {
   opacity: 1;
   transform: none;
 }
+
+@media (900px < width <= 1600px) and (560px < height <= 820px) {
+  .skills-projects {
+    --work-project-height-scale: 0.9;
+  }
+}
+
 @media (max-width: 900px) {
   :root {
     --portfolio-pill-radius: 40px;
@@ -3367,8 +3369,8 @@ ul {
   .skills-wheel-title {
     font-size: clamp(1.5rem, 6.8vw, 2.25rem);
   }
-  .skills-wheel-description {
-    margin-top: 4px;
+  .skills-wheel-intro {
+    --work-copy-gap: clamp(8px, 1.45dvh, 12px);
   }
   .portfolio[data-enhanced] .skills-duet .skills-browser {
     grid-column: 1;
@@ -3377,6 +3379,15 @@ ul {
     width: 100%;
     overflow: visible;
     perspective: 480px;
+  }
+  .portfolio[data-enhanced] .skills-duet .skills-category-pill {
+    /* The tilt stops short of 90 degrees. Keep the front face painted during the turn. */
+    backface-visibility: visible;
+  }
+  .portfolio[data-enhanced] .skills-duet .skills-technologies {
+    /* Paint the inline badges with the pill face instead of a raised layer. */
+    position: static;
+    z-index: auto;
   }
   .skills-duet .skills-category-pill {
     padding: 16px clamp(10px, 20vw - 54px, 22px);
@@ -3458,7 +3469,6 @@ ul {
     font-size: clamp(1.375rem, 3.7vw, 2.375rem);
   }
   .skills-wheel-description {
-    margin-top: 4px;
     font-size: clamp(0.875rem, 0.75rem + 0.45vw, 1rem);
   }
   .portfolio[data-enhanced] .skills-duet .skills-browser {
@@ -3608,12 +3618,11 @@ ul {
       grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
       column-gap: 16px;
     }
-    .skills-browser > [data-wheel-static] > .skills-wheel-title {
+    .skills-wheel-copy > .skills-wheel-title {
       align-self: start;
     }
-    .skills-browser > [data-wheel-static] > .skills-wheel-description {
+    .skills-wheel-copy > .skills-wheel-description {
       grid-area: 1 / 2;
-      margin-top: 0;
     }
     .skills-duet .skills-category-pill {
       padding: 8px 12px;
@@ -3636,6 +3645,49 @@ ul {
       width: 15px;
       height: 15px;
     }
+  }
+}
+
+@media (min-width: 901px), (560px <= width <= 900px) and (380px <= height <= 560px) {
+  .portfolio[data-enhanced] .skills-duet .skills-browser {
+    /* Center the copy and the reserved pill row together beside the project. */
+    grid-template: auto var(--work-pill-row-height, 128px) / minmax(0, 1fr);
+    align-content: safe center;
+    row-gap: clamp(12px, 3svh, 18px);
+  }
+
+  .skills-wheel-copy {
+    /* Share a cell and align each full pair to the gap above the pill. */
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-area: 1 / 1;
+    align-self: end;
+    row-gap: var(--work-copy-gap);
+  }
+}
+
+@media (560px <= width <= 900px) and (380px <= height <= 560px) {
+  .skills-performance {
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .portfolio[data-enhanced] .skills-duet .skills-browser {
+    grid-area: 1 / 2;
+    align-self: center;
+    height: 100%;
+  }
+
+  .skills-browser > [data-wheel-static] {
+    grid-column: 1;
+  }
+
+  .portfolio[data-enhanced] .skills-duet .skills-category-pill {
+    grid-area: 2 / 1 / 3 / 2;
+  }
+
+  .skills-projects {
+    grid-row: 1;
+    height: 65%;
   }
 }
 
@@ -3731,6 +3783,33 @@ ul {
 ) {
   font-size: var(--body-copy-size);
 }
+@media (900px < width <= 1600px) and (height > 560px) {
+  /* Short desktop viewports share the desktop layout with less room for display type. */
+  .hero-copy h1 {
+    font-size: clamp(72px, min(8.2vw, 14.5svh), 144px);
+  }
+
+  .skills-duet .skills-heading {
+    --intro-heading-fit: min(152px, 17.5svh);
+  }
+
+  .about-pages .skills-heading {
+    --intro-heading-fit: min(152px, 16svh);
+  }
+
+  :is(.portfolio .hero-copy .hero-description, .portfolio .about-introduction .skills-intro) {
+    font-size: min(var(--body-copy-size), max(18px, 2.6svh));
+  }
+
+  .skills-wheel-title {
+    font-size: clamp(2rem, min(4vw, 7svh), 4rem);
+  }
+
+  .skills-wheel-description {
+    font-size: clamp(1rem, min(0.8rem + 0.65vw, 2.85svh), 1.25rem);
+  }
+}
+
 @media (max-width: 760px), (pointer: coarse) and (max-height: 560px) {
   :root {
     --body-copy-size: clamp(12px, 3.6vw, 16px);

@@ -2,17 +2,8 @@
 
 import { IntroDropText } from '@/components/atoms/IntroDropText'
 
+import { useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import {
-  Fragment,
-  useContext,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-} from 'react'
-import {
-  animate,
   cancelFrame,
   cubicBezier,
   easeOut,
@@ -75,7 +66,7 @@ type WheelBounds = {
 function useSkillWheelPose(
   index: number,
   ringPosition: MotionValue<number>,
-  radius: number,
+  radius: MotionValue<number>,
   compact: boolean,
   bounds: MotionValue<WheelBounds>,
 ) {
@@ -83,9 +74,9 @@ function useSkillWheelPose(
   const rotateX = useTransform(distance, (value) =>
     pillWheelRotation(value, compact, workCompactPitch),
   )
-  const y = useTransform(distance, (value) => pillWheelVertical(value, radius))
-  const z = useTransform(distance, (value) =>
-    pillWheelDepth(value, radius, compact, workCompactDepth),
+  const y = useTransform(() => pillWheelVertical(distance.get(), radius.get()))
+  const z = useTransform(() =>
+    pillWheelDepth(distance.get(), radius.get(), compact, workCompactDepth),
   )
   // Tuck the outgoing pill into the wheel as it tilts, using the same scroll clock.
   const scale = useTransform(distance, (value) => {
@@ -133,7 +124,7 @@ function SkillCategoryPill({
   animated: boolean
   ringPosition: MotionValue<number>
   categoryTitleSweep: MotionValue<CategoryTitleSweep>
-  radius: number
+  radius: MotionValue<number>
   compact?: boolean
   bounds: MotionValue<WheelBounds>
   onSelect: (index: number) => void
@@ -258,118 +249,90 @@ function SkillProject({
   )
 }
 
-function SkillsWheelIntro({ compact, categoryIndex }: { compact: boolean; categoryIndex: number }) {
+function SkillsWheelCopy({
+  index,
+  active,
+  ringPosition,
+  openingTitle,
+  openingDescription,
+}: {
+  index: number
+  active: boolean
+  ringPosition: MotionValue<number>
+  openingTitle: MotionValue<number>
+  openingDescription: MotionValue<number>
+}) {
+  const { title, description } = skills[index].copy
+
+  // The copy leaves with its pill and swaps at the midpoint of the same turn.
+  const { opacity, y } = useTransform(ringPosition, [index - 0.5, index, index + 0.5], {
+    opacity: [0, 1, 0],
+    y: [18, 0, -18],
+  })
+  const visibility = useTransform(opacity, (value) => (value > 0 ? 'visible' : 'hidden'))
+  const titleAlpha = useTransform(() => opacity.get() * openingTitle.get())
+  const descriptionAlpha = useTransform(() => opacity.get() * openingDescription.get())
+  const titleY = useTransform(() => y.get() + 4 * (1 - openingTitle.get()))
+
+  return (
+    <div className="skills-wheel-copy">
+      <motion.h3
+        className="skills-wheel-title"
+        aria-hidden={!active}
+        style={{ opacity: titleAlpha, y: titleY, visibility }}
+      >
+        {title}
+      </motion.h3>
+      <motion.p
+        className="skills-wheel-description"
+        aria-hidden={!active}
+        style={{ opacity: descriptionAlpha, y, visibility }}
+      >
+        {description}
+      </motion.p>
+    </div>
+  )
+}
+
+function SkillsWheelIntro({
+  compact,
+  categoryIndex,
+  ringPosition,
+}: {
+  compact: boolean
+  categoryIndex: number
+  ringPosition: MotionValue<number>
+}) {
   const progress = useContext(WorkPillMotion)?.progress
   const { copyStart } = getWorkOpeningTiming(compact)
   const { headingEnd, paragraphStart, end } = workIntroCopyTiming
 
-  // Scrubbing back through the opening retraces the same two fades.
+  // The initial opening still gives the title and then the description their own beat.
   const copy = useTransform(() => {
     const travel = (progress?.get() ?? 0) * skillTravel
 
     return clamp(travel - copyStart, 0, end)
   })
-  const [opened, setOpened] = useState(() => copy.get() === end)
-  const [visibleTitle, setVisibleTitle] = useState(categoryIndex)
-  const [visibleDescription, setVisibleDescription] = useState(categoryIndex)
-  const titleOpacity = useMotionValue(1)
-  const descriptionOpacity = useMotionValue(1)
-  const titleAlpha = useTransform(
-    () => copyEase(clamp(copy.get() / headingEnd)) * titleOpacity.get(),
+  const openingTitle = useTransform(copy, (travel) => copyEase(clamp(travel / headingEnd)))
+  const openingDescription = useTransform(copy, (travel) =>
+    copyEase(clamp((travel - paragraphStart) / (end - paragraphStart))),
   )
-  const descriptionAlpha = useTransform(() => {
-    const reveal = clamp((copy.get() - paragraphStart) / (end - paragraphStart))
-
-    return copyEase(reveal) * descriptionOpacity.get()
-  })
-  const titleY = useTransform(titleAlpha, [0, 1], [4, 0])
-
-  useMotionValueEvent(copy, 'change', (value) => {
-    if (value === end) {
-      setVisibleTitle(categoryIndex)
-      setVisibleDescription(categoryIndex)
-      setOpened(true)
-      return
-    }
-
-    if (copy.getPrevious() !== end) return
-
-    setOpened(false)
-    titleOpacity.jump(1)
-    descriptionOpacity.jump(1)
-  })
-
-  useLayoutEffect(() => {
-    if (!opened) return
-
-    let control: ReturnType<typeof animate> | undefined
-
-    function swapCopy(
-      visible: number,
-      opacity: MotionValue<number>,
-      replace: (index: number) => void,
-      onShown?: () => void,
-    ) {
-      const isCurrent = visible === categoryIndex
-      const target = isCurrent ? 1 : 0
-      const distance = Math.abs(opacity.get() - target)
-
-      if (isCurrent && distance === 0) {
-        onShown?.()
-        return
-      }
-
-      // Hold the outgoing sentence briefly after the new title settles.
-      const holdSentence = opacity === descriptionOpacity && !isCurrent && distance === 1
-
-      // Commit the text while it's hidden. The next render brings it back in.
-      control = animate(opacity, target, {
-        type: 'tween',
-        duration: distance * (isCurrent ? 0.74 : 0.36),
-        delay: holdSentence ? 0.18 : 0,
-        ease: copyEase,
-        onComplete: () => {
-          if (isCurrent) onShown?.()
-          else replace(categoryIndex)
-        },
-      })
-    }
-
-    swapCopy(visibleTitle, titleOpacity, setVisibleTitle, () => {
-      swapCopy(visibleDescription, descriptionOpacity, setVisibleDescription)
-    })
-
-    return () => control?.stop()
-  }, [categoryIndex, descriptionOpacity, opened, titleOpacity, visibleDescription, visibleTitle])
-
   const opacity = useTransform(copy, (value) => (value > 0 ? 1 : 0))
   const visibility = useTransform(copy, (value) => (value > 0 ? 'visible' : 'hidden'))
-  const title = skills[opened ? visibleTitle : categoryIndex].copy.title
-  const description = skills[opened ? visibleDescription : categoryIndex].copy.description
 
   return (
     <motion.li className="skills-wheel-intro" data-wheel-static style={{ opacity, visibility }}>
-      {/* Each row reserves room for its longest text, including during the swap. */}
-      {skills.map(({ name, copy }) => (
-        <Fragment key={name}>
-          <span className="skills-wheel-title" aria-hidden="true">
-            {copy.title}
-          </span>
-          <span className="skills-wheel-description" aria-hidden="true">
-            {copy.description}
-          </span>
-        </Fragment>
+      {/* Reserve space for every category so the pill stays anchored during the turn. */}
+      {skills.map(({ name }, index) => (
+        <SkillsWheelCopy
+          key={name}
+          index={index}
+          active={categoryIndex === index}
+          ringPosition={ringPosition}
+          openingTitle={openingTitle}
+          openingDescription={openingDescription}
+        />
       ))}
-      <motion.h3
-        className="skills-wheel-title"
-        aria-label={title}
-        style={{ opacity: titleAlpha, y: titleY }}
-      >
-        {title}
-      </motion.h3>
-      <motion.p className="skills-wheel-description" style={{ opacity: descriptionAlpha }}>
-        {description}
-      </motion.p>
     </motion.li>
   )
 }
@@ -385,7 +348,7 @@ export function SkillsScene() {
   const wheel = useRef<HTMLUListElement>(null)
   const projects = useRef<HTMLDivElement>(null)
   const pendingCategoryFocus = useRef<number | null>(null)
-  const [radius, setRadius] = useState(340)
+  const radius = useMotionValue(340)
   const [compactWheel, setCompactWheel] = useState(false)
   const ringPosition = useMotionValue(0)
   const workProgress = useContext(WorkPillMotion)?.progress
@@ -506,7 +469,7 @@ export function SkillsScene() {
       }
 
       setCompactWheel(compact)
-      setRadius(compact ? compactRadius : Math.max(130, height * 0.46))
+      radius.set(compact ? compactRadius : Math.max(130, height * 0.46))
       element.style.setProperty('--work-wheel-center', `${center}px`)
       element.style.setProperty(
         '--work-wheel-center-x',
@@ -525,7 +488,7 @@ export function SkillsScene() {
     pills.forEach((pill) => observer.observe(pill))
 
     return () => observer.disconnect()
-  }, [animated, wheelBounds])
+  }, [animated, radius, wheelBounds])
 
   const scene = useRef<HTMLDivElement>(null)
   const period = useRef<HTMLSpanElement>(null)
@@ -729,7 +692,11 @@ export function SkillsScene() {
                 selectSkill(next)
               }}
             >
-              <SkillsWheelIntro compact={compactWheel} categoryIndex={categoryIndex} />
+              <SkillsWheelIntro
+                compact={compactWheel}
+                categoryIndex={categoryIndex}
+                ringPosition={ringPosition}
+              />
               {skills.map((skill, index) => (
                 <SkillCategoryPill
                   key={skill.name}
