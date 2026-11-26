@@ -11,6 +11,7 @@ import {
   sceneDuration,
   skillStart,
   skillSegments,
+  skills,
 } from '../../src/components/organisms/skillsTimeline'
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000'
@@ -476,8 +477,12 @@ test('long and short swipes advance one project and reverse across category gaps
       (stop, index) => index > 0 && stop.skillIndex !== projectStops[index - 1].skillIndex,
     ) - 1
 
-  for (const index of [0, boundary]) {
+  for (const [index, travel] of [
+    [0, 430],
+    [boundary, 54],
+  ]) {
     const stop = projectStops[index]
+    const next = projectStops[index + 1]
 
     await page.evaluate(
       ({ index, offset }) =>
@@ -498,16 +503,22 @@ test('long and short swipes advance one project and reverse across category gaps
     if (index === boundary) await expectWorkBadgePaint(activePill)
     const projectSlot = page.locator('.skills-projects')
     const initialSlot = await projectSlot.boundingBox()
-    await swipe(page, '.skills-browser', 600, index === 0 ? 170 : 480)
+    await swipe(page, `#${stop.id} .skill-project-band`, 570, 570 - travel)
     await expect
-      .poll(
-        async () => Math.abs((await progress()) - (skillStart + projectStops[index + 1].position)),
-        { timeout: 5000 },
-      )
+      .poll(async () => Math.abs((await progress()) - (skillStart + next.position)), {
+        timeout: 5000,
+      })
       .toBeLessThan(0.01)
     expect(await projectSlot.boundingBox()).toEqual(initialSlot)
+    await expect(
+      page.locator('.skills-project-deck[data-project-visible] article'),
+    ).toHaveAttribute('id', next.id)
+    await expect(page.locator('.skills-wheel-title[aria-hidden=false]')).toHaveText(
+      skills[next.skillIndex].copy.title,
+    )
+    await expect(activePill).toContainText(skills[next.skillIndex].name)
 
-    if (projectStops[index + 1].skillIndex === 1) {
+    if (next.skillIndex === 1) {
       const cms = page
         .locator('.skills-category-pill[data-active]')
         .filter({ hasText: 'Headless CMS' })
@@ -518,7 +529,7 @@ test('long and short swipes advance one project and reverse across category gaps
       await expectWorkBadgePaint(activePill)
     }
 
-    await swipe(page, '.skills-browser', 480, 600)
+    await swipe(page, `#${next.id} .skill-project-band`, 480, 536)
     await expect
       .poll(async () => Math.abs((await progress()) - initial), { timeout: 5000 })
       .toBeLessThan(0.01)

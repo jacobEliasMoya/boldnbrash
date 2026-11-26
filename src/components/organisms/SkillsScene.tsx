@@ -22,6 +22,11 @@ import { ProjectCTA } from '@/components/atoms/ProjectCTA'
 import { ProjectDialog } from './ProjectDialog'
 import { WorkPillMotion } from './ExperienceMotion'
 import {
+  WorkCopyMotionPreview,
+  WorkCopyPreviewText,
+  type WorkCopyPreset,
+} from './WorkCopyMotionPreview'
+import {
   pillWheelDepth,
   pillWheelOpacity,
   pillWheelRotation,
@@ -256,12 +261,14 @@ function SkillsWheelCopy({
   copyPosition,
   openingTitle,
   openingDescription,
+  preset,
 }: {
   index: number
   active: boolean
   copyPosition: MotionValue<number>
   openingTitle: MotionValue<number>
   openingDescription: MotionValue<number>
+  preset: WorkCopyPreset
 }) {
   const { title, description } = skills[index].copy
 
@@ -275,6 +282,29 @@ function SkillsWheelCopy({
   const clipPath = useTransform(coverage, (value) =>
     value === 1 ? 'none' : `inset(${(1 - value) * 100}% 0 0)`,
   )
+  const heading =
+    index === 0 ? <ScrollDropText text={title} progress={openingTitle} by="letter" /> : title
+  const summary =
+    index === 0 ? (
+      <ScrollDropText text={description} progress={openingDescription} by="word" />
+    ) : (
+      description
+    )
+
+  if (preset !== 'current') {
+    const preview = { active, index, position: copyPosition, preset }
+
+    return (
+      <div className="skills-wheel-copy">
+        <WorkCopyPreviewText as="h3" label={title} {...preview}>
+          {heading}
+        </WorkCopyPreviewText>
+        <WorkCopyPreviewText as="p" {...preview}>
+          {summary}
+        </WorkCopyPreviewText>
+      </div>
+    )
+  }
 
   return (
     <div className="skills-wheel-copy">
@@ -284,14 +314,10 @@ function SkillsWheelCopy({
         aria-label={title}
         style={{ clipPath, y }}
       >
-        {index === 0 ? <ScrollDropText text={title} progress={openingTitle} by="letter" /> : title}
+        {heading}
       </motion.h3>
       <motion.p className="skills-wheel-description" aria-hidden={!active} style={{ clipPath, y }}>
-        {index === 0 ? (
-          <ScrollDropText text={description} progress={openingDescription} by="word" />
-        ) : (
-          description
-        )}
+        {summary}
       </motion.p>
     </div>
   )
@@ -300,9 +326,11 @@ function SkillsWheelCopy({
 function SkillsWheelIntro({
   compact,
   copyPosition,
+  preset,
 }: {
   compact: boolean
   copyPosition: MotionValue<number>
+  preset: WorkCopyPreset
 }) {
   const progress = useContext(WorkPillMotion)?.progress
   const { copyStart } = getWorkOpeningTiming(compact)
@@ -334,6 +362,7 @@ function SkillsWheelIntro({
           copyPosition={copyPosition}
           openingTitle={openingTitle}
           openingDescription={openingDescription}
+          preset={preset}
         />
       ))}
     </motion.li>
@@ -348,6 +377,11 @@ export function SkillsScene() {
   const trigger = useRef<HTMLButtonElement | null>(null)
   const reduceMotion = useReducedMotion()
   const animated = pinned && !reduceMotion
+  const [copyPreset, setCopyPreset] = useState<WorkCopyPreset>('current')
+  const previewCopy =
+    process.env.NODE_ENV === 'development' &&
+    animated &&
+    new URLSearchParams(window.location.search).has('work-copy-preview')
   const wheel = useRef<HTMLUListElement>(null)
   const projects = useRef<HTMLDivElement>(null)
   const pendingCategoryFocus = useRef<number | null>(null)
@@ -702,7 +736,11 @@ export function SkillsScene() {
                 selectSkill(next)
               }}
             >
-              <SkillsWheelIntro compact={compactWheel} copyPosition={copyPosition} />
+              <SkillsWheelIntro
+                compact={compactWheel}
+                copyPosition={copyPosition}
+                preset={previewCopy ? copyPreset : 'current'}
+              />
               {skills.map((skill, index) => (
                 <SkillCategoryPill
                   key={skill.name}
@@ -746,6 +784,7 @@ export function SkillsScene() {
       {categoryIndex !== skills.length - 1 && (
         <span className="skills-index-portal" data-portal="about" aria-hidden="true" />
       )}
+      {previewCopy && <WorkCopyMotionPreview preset={copyPreset} onChange={setCopyPreset} />}
       <ProjectDialog
         project={openedProject}
         origin={projectOrigin}

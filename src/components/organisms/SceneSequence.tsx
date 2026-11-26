@@ -95,6 +95,7 @@ const scrollLimits = {
   touchMaxPixels: 320,
   touchViewportPortion: 0.4,
   touchClockLead: 2.5,
+  workSwipeCommitPixels: 44,
   wheelClockLead: 0.5,
   workLead: 0.45,
   desktopWorkLead: 1,
@@ -590,101 +591,122 @@ export function SceneSequence({ children }: { children: ReactNode }) {
 
       if (snapping || sceneTransition || media.matches) return
 
-      snapTimer = window.setTimeout(() => {
-        const node = track.current
+      snapTimer = window.setTimeout(snapWork, 420)
+    }
 
-        if (
-          !node ||
-          touch ||
-          document.hidden ||
-          document.querySelector('dialog[open]') ||
-          node.closest('[data-menu-open]')
-        )
-          return
+    function snapWork(destination?: number) {
+      const node = track.current
 
-        // The reveal's final scroll position can round up by a fraction of a pixel.
-        // Leave the first card at the reveal boundary until the visitor scrolls again.
-        if (
-          requested <= skillStart + 0.01 ||
-          requested > skillStart + projectStops[projectStops.length - 1].position + 0.01
-        )
-          return
+      if (
+        !node ||
+        snapping ||
+        sceneTransition ||
+        media.matches ||
+        touch ||
+        document.hidden ||
+        document.querySelector('dialog[open]') ||
+        node.closest('[data-menu-open]')
+      )
+        return
 
-        const nearest = projectStops.reduce((best, stop) =>
-          Math.abs(skillStart + stop.position - requested) <
-          Math.abs(skillStart + best.position - requested)
-            ? stop
-            : best,
-        )
-        let target = skillStart + nearest.position
+      // The reveal's final scroll position can round up by a fraction of a pixel.
+      // Leave the first card at the reveal boundary until the visitor scrolls again.
+      if (
+        requested <= skillStart + 0.01 ||
+        requested > skillStart + projectStops[projectStops.length - 1].position + 0.01
+      )
+        return
 
-        // Commit early in the visitor's direction instead of repeatedly pulling
-        // short desktop gestures back across the halfway point.
-        if (!compact.matches && performance.now() - lastWorkWheelAt < 1200) {
-          const position = requested - skillStart
-          const upperIndex = projectStops.findIndex((stop) => stop.position > position + 0.003)
-          const lower = projectStops[Math.max(0, upperIndex - 1)]
-          const upper = projectStops[upperIndex]
+      const nearest = projectStops.reduce((best, stop) =>
+        Math.abs(skillStart + stop.position - requested) <
+        Math.abs(skillStart + best.position - requested)
+          ? stop
+          : best,
+      )
+      let target = destination ?? skillStart + nearest.position
 
-          if (upper && position > lower.position + 0.003) {
-            const fraction = (position - lower.position) / (upper.position - lower.position)
-            const commit = scrollLimits.desktopWorkCommitPortion
-            target =
-              skillStart +
-              (inputDirection > 0
-                ? fraction >= commit
-                  ? upper.position
-                  : lower.position
-                : fraction <= 1 - commit
-                  ? lower.position
-                  : upper.position)
-          }
+      // Commit early in the visitor's direction instead of repeatedly pulling
+      // short desktop gestures back across the halfway point.
+      if (
+        destination === undefined &&
+        !compact.matches &&
+        performance.now() - lastWorkWheelAt < 1200
+      ) {
+        const position = requested - skillStart
+        const upperIndex = projectStops.findIndex((stop) => stop.position > position + 0.003)
+        const lower = projectStops[Math.max(0, upperIndex - 1)]
+        const upper = projectStops[upperIndex]
+
+        if (upper && position > lower.position + 0.003) {
+          const fraction = (position - lower.position) / (upper.position - lower.position)
+          const commit = scrollLimits.desktopWorkCommitPortion
+          target =
+            skillStart +
+            (inputDirection > 0
+              ? fraction >= commit
+                ? upper.position
+                : lower.position
+              : fraction <= 1 - commit
+                ? lower.position
+                : upper.position)
         }
+      }
 
-        // Every pause lands on a complete project, including between skill categories.
-        if (Math.abs(target - displayed) < 0.003) return
+      // Every pause lands on a complete project, including between skill categories.
+      if (Math.abs(target - displayed) < 0.003) return
 
-        const trackTop = scrollY + node.getBoundingClientRect().top
-        const distance = node.offsetHeight - (node.firstElementChild?.clientHeight ?? innerHeight)
-        const startTime = toPlaybackTime(displayed)
-        const targetTime = toPlaybackTime(target)
-        const velocity = clamp(
-          playbackClock.getVelocity(),
-          -scrollLimits.springVelocity,
-          scrollLimits.springVelocity,
-        )
+      const trackTop = scrollY + node.getBoundingClientRect().top
+      const distance = node.offsetHeight - (node.firstElementChild?.clientHeight ?? innerHeight)
+      const startTime = toPlaybackTime(displayed)
+      const targetTime = toPlaybackTime(target)
+      const velocity = clamp(
+        playbackClock.getVelocity(),
+        -scrollLimits.springVelocity,
+        scrollLimits.springVelocity,
+      )
 
-        // Continue the visible pose and velocity on the shared clock. Animating
-        // the document from its queued target caused a second acceleration/jump.
-        stopPlayback?.()
-        stopPlayback = undefined
-        snapping = true
-        node.dataset.snapping = 'true'
+      // Continue the visible pose and velocity on the shared clock. Animating
+      // the document from its queued target caused a second acceleration/jump.
+      stopPlayback?.()
+      stopPlayback = undefined
+      snapping = true
+      snapExpectedY = scrollY
+      node.dataset.snapping = 'true'
 
-        const control = animate(startTime, targetTime, {
-          type: 'spring',
-          ...workSnapSpring,
-          velocity,
-          restDelta: 0.0005,
-          restSpeed: 0.005,
-          onUpdate: (time) => {
-            const position = fromPlaybackTime(time)
-            window.scrollTo({
-              top: trackTop + (distance * position) / sceneDuration,
-              behavior: 'instant',
-            })
-            snapExpectedY = window.scrollY
-            update()
-          },
-          onComplete: () => {
-            snapping = false
-            stopSnap = undefined
-            node.removeAttribute('data-snapping')
-          },
-        })
+      const control = animate(startTime, targetTime, {
+        type: 'spring',
+        ...workSnapSpring,
+        velocity,
+        restDelta: 0.0005,
+        restSpeed: 0.005,
+        onUpdate: (time) => {
+          const position = fromPlaybackTime(time)
+          window.scrollTo({
+            top: trackTop + (distance * position) / sceneDuration,
+            behavior: 'instant',
+          })
+          snapExpectedY = window.scrollY
+          update()
+        },
+        onComplete: () => {
+          snapping = false
+          stopSnap = undefined
+          node.removeAttribute('data-snapping')
+        },
+      })
 
-        stopSnap = () => control.stop()
-      }, 420)
+      stopSnap = () => control.stop()
+    }
+
+    function adjacentWorkStop(position: number, direction: number) {
+      const localPosition = position - skillStart
+
+      return direction > 0
+        ? projectStops.findIndex((stop) => stop.position > localPosition + 0.01)
+        : projectStops.reduce(
+            (last, stop, index) => (stop.position < localPosition - 0.01 ? index : last),
+            -1,
+          )
     }
 
     function clearExperienceInput() {
@@ -830,15 +852,15 @@ export function SceneSequence({ children }: { children: ReactNode }) {
           displayed >= skillStart &&
           displayed <= skillStart + skillTravel
         ) {
+          const first = skillStart + projectStops[0].position
+          const last = skillStart + projectStops[projectStops.length - 1].position
+
+          if (!touch.workOrigin && requested >= first - 0.01 && requested <= last + 0.01) {
+            touch.workOrigin = { position: requested, y: touch.lastY + pixels }
+          }
+
           if (touch.projectSwipe?.direction !== direction) {
-            const position = requested - skillStart
-            const next =
-              direction > 0
-                ? projectStops.findIndex((stop) => stop.position > position + 0.01)
-                : projectStops.reduce(
-                    (last, stop, index) => (stop.position < position - 0.01 ? index : last),
-                    -1,
-                  )
+            const next = adjacentWorkStop(requested, direction)
             const destination = projectStops[next]
 
             if (destination) {
@@ -864,12 +886,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
 
             travel = direction * Math.min(Math.abs(pixels) * touch.projectSwipe.gain, remaining)
 
-            // Let the same drag leave Work after its final project has settled.
-            const last = skillStart + projectStops[projectStops.length - 1].position
-            if (!travel && direction > 0 && requested >= last - 0.01) {
-              touch.projectSwipe = null
-              travel = pixels * 1.25
-            } else if (!travel) return true
+            // Stop at the adjacent card. A new swipe from the last card can leave Work.
+            if (!travel) return true
           }
         }
 
@@ -1029,6 +1047,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       axis: 'vertical' | 'horizontal' | null
       target: Element | null
       projectSwipe: { direction: number; gain: number; limit: number } | null
+      workOrigin: { position: number; y: number } | null
       transitionDirection: number
     } | null = null
 
@@ -1055,6 +1074,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         axis: null,
         target,
         projectSwipe: null,
+        workOrigin: null,
         transitionDirection: 0,
       }
     }
@@ -1112,10 +1132,26 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       if (document.hidden) cancelTouch()
     }
 
-    function endTouch() {
+    function endTouch(event: TouchEvent) {
       if (!touch) return
 
+      const { id, lastY, workOrigin } = touch
+      const end = Array.from(event.changedTouches ?? []).find((point) => point.identifier === id)
+
       touch = null
+
+      if (workOrigin && current === 1) {
+        // Use net travel so a small correction near release doesn't undo the gesture.
+        const travel = workOrigin.y - (end?.clientY ?? lastY)
+        const destination = projectStops[adjacentWorkStop(workOrigin.position, Math.sign(travel))]
+
+        if (destination && Math.abs(travel) >= scrollLimits.workSwipeCommitPixels) {
+          snapWork(skillStart + destination.position)
+
+          return
+        }
+      }
+
       armSnap()
     }
 

@@ -3184,6 +3184,51 @@ ul {
   font: clamp(0.9375rem, 0.8rem + 0.65vw, 1.25rem) / 1.45 var(--mono);
   text-wrap: pretty;
 }
+.work-copy-motion-preview {
+  position: fixed;
+  z-index: 2000;
+  inset: auto 0 calc(env(safe-area-inset-bottom) + 20px);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  margin-inline: auto;
+  padding: 5px;
+  border: 1px solid var(--ink);
+  border-radius: 12px;
+  background: var(--canvas);
+  color: var(--ink);
+  font: 600 12px / 1.2 var(--mono);
+}
+.work-copy-motion-preview output {
+  padding-inline: 6px;
+}
+.work-copy-motion-preview button {
+  min-height: 32px;
+  padding-inline: 8px;
+  border: 1px solid currentColor;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+@media (max-width: 900px) {
+  .work-copy-motion-preview {
+    inset-block: calc(env(safe-area-inset-top) + 72px) auto;
+    gap: 4px;
+    font-size: 11px;
+  }
+  .work-copy-motion-preview output {
+    padding-inline: 3px;
+  }
+  .work-copy-motion-preview button {
+    padding-inline: 5px;
+  }
+}
 .portfolio[data-enhanced] .skills-duet .skills-browser {
   grid-column: 2;
   grid-row: 1;
