@@ -104,7 +104,7 @@ const scrollLimits = {
 } as const
 
 const heroRevealTravel = sceneStops[1] - heroWalkOutEnd
-const workOpeningSecondsPerUnit = 0.8
+const workOpeningSecondsPerUnit = 0.72
 const wordmarkDropStart = -100
 
 const sceneScrollSpring = { stiffness: 145, damping: 24.5, mass: 1 }

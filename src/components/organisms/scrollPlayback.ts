@@ -11,7 +11,7 @@ import {
   skillTravel,
 } from './skillsTimeline'
 
-export const workHandoffDurationScale = 1.4
+export const workHandoffDurationScale = 1.18
 
 // Base timing for the scene before input and reading pacing are applied.
 const heroUnitsPerSecond = heroEntranceTravel / (heroEntranceDuration / 1000)

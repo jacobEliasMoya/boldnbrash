@@ -467,6 +467,7 @@ test('Work fills the departing pill and moves the title and description together
 
         return {
           alpha: Number(style.opacity),
+          cropped: style.clipPath === 'none' ? 0 : parseFloat(style.clipPath.slice(6)),
           y: new DOMMatrixReadOnly(style.transform).m42,
         }
       }
@@ -485,7 +486,17 @@ test('Work fills the departing pill and moves the title and description together
   await expect(activeTitle).toHaveText(skills[0].copy.title)
   await expect(activeDescription).toHaveText(skills[0].copy.description)
   const opening = await readCopy()
-  const turns = [0.32, 0.34, 0.36, 0.38, 0.4, 0.42, 0.44, 0.46].map(
+
+  // The copy already eases out during the lift, before the wheel turns sharply.
+  await scrollToPhase(page, first + (next - first) * 0.22)
+  const early = await readCopy()
+  expect(early.height).toBe(opening.height)
+  expect(early.titles).toEqual(early.paragraphs)
+  expect(early.titles[0].alpha).toBe(1)
+  expect(early.titles[0].cropped).toBeGreaterThan(20)
+  expect(early.titles[0].cropped).toBeLessThan(80)
+
+  const turns = [0.24, 0.28, 0.3, 0.31, 0.32, 0.34, 0.38, 0.42, 0.46].map(
     (fraction) => first + (next - first) * fraction,
   )
   const forward = []
@@ -501,12 +512,12 @@ test('Work fills the departing pill and moves the title and description together
   expect(
     forward.some(
       ({ titles, pillTilt }) =>
-        pillTilt > 0 && titles[0].alpha > 0.02 && titles[0].alpha < 0.98 && titles[0].y < -0.1,
+        pillTilt > 0 && titles[0].cropped > 2 && titles[0].cropped < 98 && titles[0].y < -0.1,
     ),
   ).toBe(true)
   expect(
     forward.some(
-      ({ titles }) => titles[1].alpha > 0.02 && titles[1].alpha < 0.98 && titles[1].y > 0.1,
+      ({ titles }) => titles[1].cropped > 2 && titles[1].cropped < 98 && titles[1].y < -0.1,
     ),
   ).toBe(true)
 
@@ -521,6 +532,7 @@ test('Work fills the departing pill and moves the title and description together
     expect(pose.titles).toEqual(pose.paragraphs)
     for (const [category, title] of pose.titles.entries()) {
       expect(title.alpha).toBeCloseTo(forward[index].titles[category].alpha, 2)
+      expect(title.cropped).toBeCloseTo(forward[index].titles[category].cropped, 0)
       expect(title.y).toBeCloseTo(forward[index].titles[category].y, 1)
     }
   }

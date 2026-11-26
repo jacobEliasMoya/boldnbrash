@@ -1,6 +1,6 @@
 'use client'
 
-import { IntroDropText } from '@/components/atoms/IntroDropText'
+import { IntroDropText, ScrollDropText } from '@/components/atoms/IntroDropText'
 
 import { useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import {
@@ -56,6 +56,7 @@ const titleSweepPeak = 0.2
 const titleSweepEnd = 0.3
 const workStopTolerance = 0.003
 const copyEase = cubicBezier(0.36, 0.1, 0.64, 0.9)
+const copyTurnStart = 0.22
 
 type WheelBounds = {
   upperClearance: number
@@ -252,43 +253,45 @@ function SkillProject({
 function SkillsWheelCopy({
   index,
   active,
-  ringPosition,
+  copyPosition,
   openingTitle,
   openingDescription,
 }: {
   index: number
   active: boolean
-  ringPosition: MotionValue<number>
+  copyPosition: MotionValue<number>
   openingTitle: MotionValue<number>
   openingDescription: MotionValue<number>
 }) {
   const { title, description } = skills[index].copy
 
-  // The copy leaves with its pill and swaps at the midpoint of the same turn.
-  const { opacity, y } = useTransform(ringPosition, [index - 0.5, index, index + 0.5], {
-    opacity: [0, 1, 0],
-    y: [18, 0, -18],
-  })
-  const visibility = useTransform(opacity, (value) => (value > 0 ? 'visible' : 'hidden'))
-  const titleAlpha = useTransform(() => opacity.get() * openingTitle.get())
-  const descriptionAlpha = useTransform(() => opacity.get() * openingDescription.get())
-  const titleY = useTransform(() => y.get() + 4 * (1 - openingTitle.get()))
+  const { coverage, y } = useTransform(
+    copyPosition,
+    [index - 0.5, index, index + 0.5],
+    { coverage: [0, 1, 0], y: [-12, 0, -12] },
+    { ease: copyEase },
+  )
+  // The pill handoff uses a hard edge so the title and description retain solid ink.
+  const clipPath = useTransform(coverage, (value) =>
+    value === 1 ? 'none' : `inset(${(1 - value) * 100}% 0 0)`,
+  )
 
   return (
     <div className="skills-wheel-copy">
       <motion.h3
         className="skills-wheel-title"
         aria-hidden={!active}
-        style={{ opacity: titleAlpha, y: titleY, visibility }}
+        aria-label={title}
+        style={{ clipPath, y }}
       >
-        {title}
+        {index === 0 ? <ScrollDropText text={title} progress={openingTitle} by="letter" /> : title}
       </motion.h3>
-      <motion.p
-        className="skills-wheel-description"
-        aria-hidden={!active}
-        style={{ opacity: descriptionAlpha, y, visibility }}
-      >
-        {description}
+      <motion.p className="skills-wheel-description" aria-hidden={!active} style={{ clipPath, y }}>
+        {index === 0 ? (
+          <ScrollDropText text={description} progress={openingDescription} by="word" />
+        ) : (
+          description
+        )}
       </motion.p>
     </div>
   )
@@ -296,16 +299,17 @@ function SkillsWheelCopy({
 
 function SkillsWheelIntro({
   compact,
-  categoryIndex,
-  ringPosition,
+  copyPosition,
 }: {
   compact: boolean
-  categoryIndex: number
-  ringPosition: MotionValue<number>
+  copyPosition: MotionValue<number>
 }) {
   const progress = useContext(WorkPillMotion)?.progress
   const { copyStart } = getWorkOpeningTiming(compact)
   const { headingEnd, paragraphStart, end } = workIntroCopyTiming
+  const [copyIndex, setCopyIndex] = useState(() => Math.round(copyPosition.get()))
+
+  useMotionValueEvent(copyPosition, 'change', (position) => setCopyIndex(Math.round(position)))
 
   // The initial opening still gives the title and then the description their own beat.
   const copy = useTransform(() => {
@@ -313,22 +317,21 @@ function SkillsWheelIntro({
 
     return clamp(travel - copyStart, 0, end)
   })
-  const openingTitle = useTransform(copy, (travel) => copyEase(clamp(travel / headingEnd)))
+  const openingTitle = useTransform(copy, (travel) => clamp(travel / headingEnd))
   const openingDescription = useTransform(copy, (travel) =>
-    copyEase(clamp((travel - paragraphStart) / (end - paragraphStart))),
+    clamp((travel - paragraphStart) / (end - paragraphStart)),
   )
-  const opacity = useTransform(copy, (value) => (value > 0 ? 1 : 0))
   const visibility = useTransform(copy, (value) => (value > 0 ? 'visible' : 'hidden'))
 
   return (
-    <motion.li className="skills-wheel-intro" data-wheel-static style={{ opacity, visibility }}>
+    <motion.li className="skills-wheel-intro" data-wheel-static style={{ visibility }}>
       {/* Reserve space for every category so the pill stays anchored during the turn. */}
       {skills.map(({ name }, index) => (
         <SkillsWheelCopy
           key={name}
           index={index}
-          active={categoryIndex === index}
-          ringPosition={ringPosition}
+          active={copyIndex === index}
+          copyPosition={copyPosition}
           openingTitle={openingTitle}
           openingDescription={openingDescription}
         />
@@ -352,9 +355,16 @@ export function SkillsScene() {
   const [compactWheel, setCompactWheel] = useState(false)
   const ringPosition = useMotionValue(0)
   const workProgress = useContext(WorkPillMotion)?.progress
-  const projectPosition = useTransform(
-    () => getSkillFrame(workProgress?.get() ?? 0).projectPosition,
-  )
+  const skillFrame = useTransform(() => getSkillFrame(workProgress?.get() ?? 0))
+  const projectPosition = useTransform(skillFrame, (frame) => frame.projectPosition)
+  const copyPosition = useTransform(skillFrame, ({ entrance, ringPosition }) => {
+    if (!entrance || entrance.index === 0) return ringPosition
+
+    // Use the lift's scene phase so a wheel angle correction cannot rush the text.
+    const turn = clamp((entrance.phase - copyTurnStart) / (1 - copyTurnStart))
+
+    return entrance.index - 1 + turn
+  })
   const categoryTitleSweep = useMotionValue<CategoryTitleSweep>({
     stop: 0,
     fill: 0,
@@ -692,11 +702,7 @@ export function SkillsScene() {
                 selectSkill(next)
               }}
             >
-              <SkillsWheelIntro
-                compact={compactWheel}
-                categoryIndex={categoryIndex}
-                ringPosition={ringPosition}
-              />
+              <SkillsWheelIntro compact={compactWheel} copyPosition={copyPosition} />
               {skills.map((skill, index) => (
                 <SkillCategoryPill
                   key={skill.name}

@@ -3543,7 +3543,7 @@ ul {
     }
 
     .skills-performance {
-      --work-stack-gap: clamp(12px, 2.4dvh, 20px);
+      --work-stack-gap: clamp(14px, 2.6dvh, 22px);
       /* Shrink the project allocation, then center all three rows as one group. */
       grid-template-rows:
         auto minmax(0, var(--work-project-row-height, 1fr))
@@ -3648,21 +3648,29 @@ ul {
   }
 }
 
-@media (min-width: 901px), (560px <= width <= 900px) and (380px <= height <= 560px) {
-  .portfolio[data-enhanced] .skills-duet .skills-browser {
-    /* Center the copy and the reserved pill row together beside the project. */
-    grid-template: auto var(--work-pill-row-height, 128px) / minmax(0, 1fr);
-    align-content: safe center;
-    row-gap: clamp(12px, 3svh, 18px);
-  }
-
+@media (min-width: 901px),
+  (orientation: portrait),
+  (560px <= width <= 900px) and (380px <= height <= 560px) {
   .skills-wheel-copy {
-    /* Share a cell and align each full pair to the gap above the pill. */
+    /* Keep each pair together against the shared gap below the copy. */
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     grid-area: 1 / 1;
     align-self: end;
     row-gap: var(--work-copy-gap);
+  }
+}
+
+@media (min-width: 901px), (560px <= width <= 900px) and (380px <= height <= 560px) {
+  .portfolio[data-enhanced] .skills-duet .skills-browser {
+    /* Center the copy and the reserved pill row together beside the project. */
+    grid-template: auto var(--work-pill-row-height, 128px) / minmax(0, 1fr);
+    align-content: safe center;
+    row-gap: clamp(1.125em, calc(11svh - 1.5em), 3em);
+  }
+
+  .skills-wheel-intro {
+    --work-copy-gap: clamp(8px, 1.55svh, 14px);
   }
 }
 
@@ -5147,6 +5155,8 @@ ul {
 }
 
 [data-intro-drop],
+.intro-drop-word,
+[data-scroll-drop],
 .intro-title-glyph {
   display: inline-block;
 }

@@ -213,9 +213,9 @@ const workCategorySettle = workCategoryTravel + 0.8
 export const workProjectTravel = 1.2
 
 // Reserve a reading beat between the heading and sentence on the opening scroll clock.
-export const workIntroCopyTiming = { headingEnd: 1.12, paragraphStart: 1.42, end: 2.65 }
+export const workIntroCopyTiming = { headingEnd: 0.72, paragraphStart: 0.8, end: 1.6 }
 export const workIntroPillStart = workProjectTravel + workIntroCopyTiming.end
-export const workIntroSettle = workIntroPillStart + 0.7
+export const workIntroSettle = workIntroPillStart + 0.65
 
 // Reserve time for the opening copy while keeping later project intervals intact.
 const workOpeningExtraTravel = workIntroSettle - workCategorySettle

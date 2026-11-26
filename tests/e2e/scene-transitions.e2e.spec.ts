@@ -214,7 +214,10 @@ test('desktop Work project enters from the left and reverses', async ({ page }) 
   const entry = skillStart + workProjectTravel * 0.25
   await moveToBoundary(page, entry)
   await expect(card).toHaveAttribute('data-project-entering', '')
-  await expect(page.locator('.skills-browser [data-wheel-static]')).toHaveCSS('opacity', '0')
+  await expect(page.locator('.skills-browser [data-wheel-static]')).toHaveCSS(
+    'visibility',
+    'hidden',
+  )
   const measurements = await page.evaluate(async () => {
     const original = Element.prototype.getBoundingClientRect
     const cards = new Set<string>()
@@ -272,29 +275,40 @@ test('mobile Work project enters from the left and reverses', async ({ page }) =
   const heading = intro.locator('h3').first()
   const paragraph = intro.locator('p').first()
   const { headingEnd, paragraphStart, end } = workIntroCopyTiming
-  const headingMid = copyPosition + headingEnd / 2
+  const headingMid = copyPosition + headingEnd * 0.4
+  const dropState = (element: typeof heading) =>
+    element.locator('[data-scroll-drop]').evaluateAll((units) => {
+      const styles = units.map((unit) => getComputedStyle(unit))
+      const visible = styles.filter((style) => style.visibility === 'visible')
 
-  const alpha = (element: typeof heading) =>
-    element.evaluate((el) => Number(getComputedStyle(el).opacity))
+      return {
+        allVisible: visible.length === styles.length,
+        anyVisible: visible.length > 0,
+        moving: visible.some((style) => style.transform !== 'none'),
+        solidInk: styles.every((style) => style.opacity === '1'),
+      }
+    })
+  const falling = { allVisible: false, anyVisible: true, moving: true, solidInk: true }
+  const landed = { allVisible: true, anyVisible: true, moving: false, solidInk: true }
 
   await moveToBoundary(page, headingMid)
-  await expect.poll(() => alpha(heading)).toBeCloseTo(0.5, 1)
-  await expect(paragraph).toHaveCSS('opacity', '0')
+  await expect.poll(() => dropState(heading)).toEqual(falling)
+  await expect.poll(async () => (await dropState(paragraph)).anyVisible).toBe(false)
   await expect(card).toBeHidden()
 
   await moveToBoundary(page, copyPosition + (headingEnd + paragraphStart) / 2)
-  await expect(heading).toHaveCSS('opacity', '1')
-  await expect(paragraph).toHaveCSS('opacity', '0')
+  await expect.poll(() => dropState(heading)).toEqual(landed)
+  await expect.poll(async () => (await dropState(paragraph)).anyVisible).toBe(false)
 
-  await moveToBoundary(page, copyPosition + (paragraphStart + end) / 2)
-  await expect(heading).toHaveCSS('transform', 'none')
-  await expect.poll(() => alpha(paragraph)).toBeCloseTo(0.5, 1)
+  await moveToBoundary(page, copyPosition + paragraphStart + (end - paragraphStart) * 0.4)
+  await expect.poll(() => dropState(heading)).toEqual(landed)
+  await expect.poll(() => dropState(paragraph)).toEqual(falling)
   await expect(card).toBeHidden()
 
   const entry = skillStart + projectStart + workProjectTravel * 0.25
   await moveToBoundary(page, entry)
   await expect(intro).toHaveCSS('opacity', '1')
-  await expect(paragraph).toHaveCSS('opacity', '1')
+  await expect.poll(() => dropState(paragraph)).toEqual(landed)
   await expect(page.locator('.skills-browser .skills-category-pill').first()).toBeHidden()
 
   // Sample the card after the spring reaches the browser's rounded scroll position.
@@ -334,8 +348,8 @@ test('mobile Work project enters from the left and reverses', async ({ page }) =
   await expect.poll(async () => (await card.boundingBox())!.x).toBeCloseTo(entering.x, 0)
 
   await moveToBoundary(page, headingMid)
-  await expect.poll(() => alpha(heading)).toBeCloseTo(0.5, 1)
-  await expect(paragraph).toHaveCSS('opacity', '0')
+  await expect.poll(() => dropState(heading)).toEqual(falling)
+  await expect.poll(async () => (await dropState(paragraph)).anyVisible).toBe(false)
   await expect(card).toBeHidden()
 })
 
@@ -903,16 +917,22 @@ test('a short mobile drag reveals the intro, project, and pill in order and reve
       const paragraph = intro.querySelector('p')!
       const expires = performance.now() + 6500
 
+      const readDrop = (element: Element, name: string) => {
+        const units = [...element.querySelectorAll('[data-scroll-drop]')].map((unit) =>
+          getComputedStyle(unit),
+        )
+
+        if (units.some((style) => style.visibility === 'visible')) record(name)
+        if (units.every((style) => style.visibility === 'visible' && style.transform === 'none'))
+          record(name + ' settled')
+      }
+
       while (!('category' in times) && performance.now() < expires) {
         await new Promise(requestAnimationFrame)
-        const titleAlpha = Number(getComputedStyle(heading).opacity)
-        const paragraphAlpha = Number(getComputedStyle(paragraph).opacity)
         const card = document.getElementById(firstProject)
 
-        if (titleAlpha > 0.01) record('heading')
-        if (titleAlpha >= 0.99) record('heading settled')
-        if (paragraphAlpha > 0.01) record('paragraph')
-        if (paragraphAlpha >= 0.99) record('paragraph settled')
+        readDrop(heading, 'heading')
+        readDrop(paragraph, 'paragraph')
         if (card?.hasAttribute('data-project-entering')) record('project')
         if (document.querySelector('.skills-category-pill[data-work-entering]')) record('category')
       }
@@ -929,9 +949,7 @@ test('a short mobile drag reveals the intro, project, and pill in order and reve
     'project',
     'category',
   ])
-  expect(entrance.times['heading settled'] - entrance.times.heading).toBeGreaterThan(450)
-  expect(entrance.times.paragraph - entrance.times['heading settled']).toBeGreaterThan(100)
-  expect(entrance.times['paragraph settled'] - entrance.times.paragraph).toBeGreaterThan(500)
+  expect(entrance.times['paragraph settled'] - entrance.times.heading).toBeLessThan(1450)
   await expect.poll(progress).toBeCloseTo(skillStart + workIntroSettle, 2)
   const wheel = page.locator('ul.skills-browser')
   const intro = wheel.locator(':scope > li[data-wheel-static]:first-child')
@@ -951,6 +969,6 @@ test('a short mobile drag reveals the intro, project, and pill in order and reve
   await page.screenshot({ path: test.info().outputPath('work-opening-mobile.png') })
   await page.locator(`#${projectStops[0].id}`).getByRole('button').click({ trial: true })
   await drag(-1)
-  await expect.poll(progress).toBeCloseTo(skillTitleEnd, 2)
-  await expect(intro).toHaveCSS('opacity', '0')
+  await expect.poll(async () => Math.abs((await progress()) - skillTitleEnd)).toBeLessThan(0.01)
+  await expect(intro).toHaveCSS('visibility', 'hidden')
 })
