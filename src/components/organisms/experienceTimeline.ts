@@ -295,16 +295,22 @@ export function getExperiencePositions(
   inset: number,
   compact: boolean,
   perspective: number,
+  focusReading: boolean,
 ) {
   if (boxes.length === 0) return []
 
   const clock = clamp(progress) * boxes.length
   const current = Math.min(boxes.length - 1, Math.floor(clock))
   const travel = (clock - current) * experienceRoleTravel
-  const center = (openHeight: number) =>
-    top + Math.max(0, (floor - inset - gap - top - openHeight) / 2)
+  const activeDisclosure = disclosureAt(travel)
+  const restY = (openHeight: number) => {
+    const room = Math.max(0, floor - inset - gap - top - openHeight)
+
+    return top + (focusReading ? Math.min(room * 0.36, gap * 4) : room / 2)
+  }
+
   const incoming = boxes[current]
-  const rest = center(incoming.openHeight)
+  const rest = restY(incoming.openHeight)
   const lift = getPillLift(travel, incoming.closedHeight, rest, floor)
   const release = lift.release
 
@@ -317,9 +323,9 @@ export function getExperiencePositions(
   const featured = current - (turn < 0.5 ? 1 : 0)
 
   const poses = boxes.map(({ closedHeight, openHeight }, index) => {
-    const rest = center(openHeight)
+    const rest = restY(openHeight)
     const recede = index < current ? current - index - 1 + turn : 0
-    const disclosure = index === current ? disclosureAt(travel) : 0
+    const disclosure = index === current ? activeDisclosure : 0
     const height = mix(closedHeight, openHeight, disclosure)
 
     // Use the outgoing half of Work's wheel, sized to fit between the heading and the focused pill.
@@ -359,7 +365,11 @@ export function getExperiencePositions(
     const edgeZ = halfHeight * Math.sin(angle)
     const topScale = 1 / (1 - (pose.depth - edgeZ) / perspective)
     const bottomScale = 1 / (1 - (pose.depth + edgeZ) / perspective)
-    const limit = nextTop - gap - origin
+    const stackLimit = nextTop - gap - origin
+    // Move the previous role past the stage edge as the reading card opens.
+    const limit = focusReading
+      ? mix(stackLimit, Math.min(stackLimit, top - origin - 1), activeDisclosure)
+      : stackLimit
 
     // Invert the projection for each edge to find how far down this pill can sit.
     const maxY =

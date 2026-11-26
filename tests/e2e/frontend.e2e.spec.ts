@@ -1354,24 +1354,23 @@ test('the ring centers each skill below the fixed intro on desktop and mobile', 
 
 test.describe('mobile wheel input', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
-  test('wheel advances and reverses the skills introduction fill on a touch device', async ({
+  test('wheel advances and reverses the settled Work heading fill on a touch device', async ({
     page,
   }) => {
     await page.goto(`${baseURL}/#skills`)
     await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 15000 })
 
     const work = page.locator('#skills')
-    const lines = work.locator('.skills-title-fill')
+    const lines = work.locator('[data-intro-title]')
+    const first = lines.first()
+    const firstFill = () =>
+      first.evaluate((line) => parseFloat(getComputedStyle(line).getPropertyValue('--title-fill')))
 
     await expect(work).toHaveAttribute('data-intro-drop-complete', '')
-    await expect(lines.first()).toHaveCSS('--title-fill', '0%')
+    await expect(first.locator('.intro-title-paint')).toBeVisible()
+    await expect(first).toHaveCSS('--title-fill', '0%')
     await page.mouse.move(180, 400)
     await page.mouse.wheel(0, 120)
-
-    const firstFill = () =>
-      lines
-        .first()
-        .evaluate((line) => parseFloat(getComputedStyle(line).getPropertyValue('--title-fill')))
 
     await expect.poll(firstFill).toBeGreaterThan(8)
     await expect(lines.nth(1)).toHaveCSS('--title-fill', '0%')

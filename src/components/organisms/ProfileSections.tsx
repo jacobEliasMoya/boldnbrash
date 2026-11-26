@@ -163,6 +163,7 @@ export function ProfileSections() {
     let inset = 0
     let gap = 0
     let perspective = 0
+    let focusReading = false
     let boxes: { width: number; closedHeight: number; openHeight: number; radius: number }[] = []
     let painted: ReturnType<typeof getExperiencePositions> = []
 
@@ -177,6 +178,7 @@ export function ProfileSections() {
         inset,
         viewportWidth <= 900,
         perspective,
+        focusReading,
       )
       let shape: ExperienceDock | null = null
 
@@ -251,6 +253,7 @@ export function ProfileSections() {
       inset = parseFloat(styles.getPropertyValue('--frame-inset')) || 12
       gap = parseFloat(wheelStyles.rowGap) || 20
       perspective = parseFloat(wheelStyles.perspective) || Infinity
+      focusReading = styles.getPropertyValue('--experience-focus-reading').trim() === '1'
       top = title.getBoundingClientRect().bottom - y + gap
 
       // The landing slot fits the open role. Measure untransformed boxes so a wheel

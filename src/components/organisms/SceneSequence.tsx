@@ -8,6 +8,7 @@ import {
   frame as motionFrame,
   motionValue,
   stagger,
+  steps,
   motion,
   MotionConfig,
   useReducedMotion,
@@ -126,42 +127,26 @@ const origins = [
   [82, 72],
 ]
 
-function revealWorkHeading(lines: HTMLElement[]) {
-  const duration = 0.82
-
-  // Leave a beat between the lines. Fading each wrapper keeps the period in place.
-  return animate(
-    lines,
-    { opacity: [0, 1] },
-    {
-      type: 'tween',
-      duration,
-      delay: stagger(duration + 0.14),
-      ease: [0.36, 0.1, 0.64, 0.9],
-    },
-  )
-}
-
-function dropAboutHeading(letters: HTMLElement[]) {
+function dropIntroHeading(letters: HTMLElement[]) {
   const secondLine = letters.filter((letter) => letter.closest('.skills-title-line:nth-child(2)'))
   const firstLine = letters.slice(0, letters.length - secondLine.length)
   const letterGap = 0.036
   const appear = {
     type: 'tween' as const,
     duration: introDropSpring.duration,
-    times: [0, 0.001, 1],
+    ease: steps(1, 'start'),
   }
 
-  // The About lettering follows the loader's drop. Scroll drives the paragraph.
+  // Each glyph appears at the start of its spring and the two lines share one stagger.
   return animate([
     [
       firstLine,
-      { y: ['-0.85em', '0em'], opacity: [0, 1, 1] },
+      { y: ['-0.85em', '0em'], opacity: [0, 1] },
       { ...introDropSpring, delay: stagger(letterGap), opacity: appear },
     ],
     [
       secondLine,
-      { y: ['-0.18em', '0em'], opacity: [0, 1, 1] },
+      { y: ['-0.18em', '0em'], opacity: [0, 1] },
       {
         ...introDropSpring,
         at: firstLine.length * letterGap,
@@ -227,12 +212,8 @@ export function SceneSequence({ children }: { children: ReactNode }) {
 
     if (!panel) return
 
-    const workHeading = activeScene === 'skills'
-    const selector = workHeading
-      ? '.skills-heading .skills-title-line'
-      : '[data-intro-drop="letter"]'
-    const subjects = Array.from(panel.querySelectorAll<HTMLElement>(selector))
-    const entrance = workHeading ? revealWorkHeading(subjects) : dropAboutHeading(subjects)
+    const letters = Array.from(panel.querySelectorAll<HTMLElement>('[data-intro-drop="letter"]'))
+    const entrance = dropIntroHeading(letters)
 
     panel.dataset.introDropStarted = ''
 
@@ -253,9 +234,9 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       panel.removeAttribute('data-intro-drop-complete')
       entrance.stop()
 
-      for (const subject of subjects) {
-        subject.style.removeProperty('opacity')
-        subject.style.removeProperty('transform')
+      for (const letter of letters) {
+        letter.style.removeProperty('opacity')
+        letter.style.removeProperty('transform')
       }
     }
   }, [active, activeScene, enhanced, introReady, reduceMotion])
@@ -452,9 +433,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
     let transitionLatch: { direction: number; lastInput: number } | null = null
     let transitionIntent = { direction: 0, pixels: 0, time: 0 }
     let transitionExpectedY = 0
-    let lastSkillProgress = -1
     let lastSkillIntro = -1
-    let lastSkillTextIntro = -1
     let lastAboutIntro = -1
     let lastJakeProgress = -1
     let lastHeroParagraph = -1
@@ -762,7 +741,7 @@ export function SceneSequence({ children }: { children: ReactNode }) {
       const direction = Math.sign(pixels)
       const introEnd = current === 1 ? skillTitleEnd : current === 2 ? aboutIntroEnd : null
 
-      // Consume forward input during the drop instead of queuing a fill jump behind it.
+      // Keep forward input from queuing a jump past the heading while it drops in.
       if (
         direction > 0 &&
         introEnd !== null &&
@@ -1380,21 +1359,10 @@ export function SceneSequence({ children }: { children: ReactNode }) {
         0,
         Math.min(1, (progress - sceneStops[1]) / (skillStart - sceneStops[1])),
       )
-      const skillTextIntro = introTextReady(1) ? skillIntro : 0
 
-      if (
-        skillProgress !== lastSkillProgress ||
-        skillIntro !== lastSkillIntro ||
-        skillTextIntro !== lastSkillTextIntro
-      ) {
-        lastSkillProgress = skillProgress
+      if (skillIntro !== lastSkillIntro) {
         lastSkillIntro = skillIntro
-        lastSkillTextIntro = skillTextIntro
-        window.dispatchEvent(
-          new CustomEvent('portfolio:skills-progress', {
-            detail: { progress: skillProgress, intro: skillIntro, textIntro: skillTextIntro },
-          }),
-        )
+        window.dispatchEvent(new CustomEvent('portfolio:skills-progress', { detail: skillIntro }))
       }
 
       const aboutIntro = introTextReady(2)

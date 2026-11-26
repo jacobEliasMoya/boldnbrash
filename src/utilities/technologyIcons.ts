@@ -2,15 +2,12 @@ type TechnologyDefinition = {
   name: string
   asset: string
   aliases?: readonly string[]
-  maskSize?: string
 }
 
 export type TechnologyIconMatch = {
   label: string
   src: string
-  format: 'mask' | 'image'
   isFallback: boolean
-  maskSize?: string
 }
 
 // Keep brand matching separate from rendering so every technology list uses
@@ -32,8 +29,6 @@ const technologies: readonly TechnologyDefinition[] = [
     name: 'React Three Fiber',
     asset: 'react-three-fiber.webp',
     aliases: ['R3F', '@react-three/fiber'],
-    // The artwork has a wide black matte around the central mark.
-    maskSize: '270%',
   },
   { name: 'Ollama', asset: 'ollama.svg' },
   { name: 'Local models', asset: 'cpu.svg' },
@@ -51,7 +46,7 @@ const technologies: readonly TechnologyDefinition[] = [
   { name: 'Python', asset: 'python.svg' },
   { name: 'Pillow', asset: 'pillow.svg' },
   { name: 'piexif', asset: 'file-image.svg' },
-  { name: 'WebP', asset: 'webp-site-mark.png', maskSize: '114%' },
+  { name: 'WebP', asset: 'webp-site-mark.png' },
 ]
 
 function normalizeTechnology(name: string) {
@@ -78,9 +73,7 @@ export function resolveTechnologyIcon(name: string): TechnologyIconMatch {
   return {
     label: match?.name ?? (name.trim() || 'Technology'),
     src: `/icons/technologies/${asset}`,
-    format: asset.endsWith('.svg') ? 'mask' : 'image',
     isFallback: !match,
-    maskSize: match?.maskSize,
   }
 }
 

@@ -49,7 +49,7 @@ import {
   getWorkOpeningTiming,
   projectStops,
   skills,
-  skillTitleFillPortion,
+  skillPeriodStartPortion,
   skillSegments,
   skillTravel,
   workIntroCopyTiming,
@@ -375,7 +375,7 @@ function SkillsWheelIntro({ compact, categoryIndex }: { compact: boolean; catego
 }
 
 export function SkillsScene() {
-  const [selection, setSelection] = useState({ intro: 0, textIntro: 0 })
+  const [intro, setIntro] = useState(0)
   const [pinned, setPinned] = useState(false)
   const [openedProject, setOpenedProject] = useState<Project | null>(null)
   const [projectOrigin, setProjectOrigin] = useState<{ x: number; y: number } | null>(null)
@@ -530,11 +530,13 @@ export function SkillsScene() {
   const scene = useRef<HTMLDivElement>(null)
   const period = useRef<HTMLSpanElement>(null)
   const [portal, setPortal] = useState({ x: 0, y: 0, radius: 0, dot: 0, borderWidth: 12 })
-  const revealStart = skillTitleFillPortion
-  const fillDuration = skillTitleFillPortion / 2
-  const expansion = animated ? clamp((selection.intro - revealStart) / (1 - revealStart)) : 1
+  const revealStart = skillPeriodStartPortion
+  const fillDuration = revealStart / 2
+  const expansion = animated ? clamp((intro - revealStart) / (1 - revealStart)) : 1
   const titleFill = (line: number) =>
-    animated ? clamp(selection.textIntro / fillDuration - line) * 100 : 0
+    ({
+      '--title-fill': `${animated ? clamp(intro / fillDuration - line) * 100 : 0}%`,
+    }) as CSSProperties
   const openingRadius =
     expansion > 0 ? getPeriodOpening(expansion, portal.dot, portal.radius).innerRadius : 0
 
@@ -568,7 +570,7 @@ export function SkillsScene() {
 
     if (heading) {
       observer.observe(heading)
-      heading.querySelectorAll('.skills-title-fill').forEach((line) => observer.observe(line))
+      heading.querySelectorAll('[data-intro-title]').forEach((line) => observer.observe(line))
     }
 
     document.fonts.ready.then(measure)
@@ -594,15 +596,8 @@ export function SkillsScene() {
   }, [categoryIndex])
   useEffect(() => {
     function update(event: Event) {
-      const { intro, textIntro } = (event as CustomEvent<{ intro: number; textIntro: number }>)
-        .detail
-
       setPinned(true)
-      setSelection((previous) => {
-        const unchanged = previous.intro === intro && previous.textIntro === textIntro
-
-        return unchanged ? previous : { intro, textIntro }
-      })
+      setIntro((event as CustomEvent<number>).detail)
     }
 
     window.addEventListener('portfolio:skills-progress', update)
@@ -652,23 +647,18 @@ export function SkillsScene() {
         <div className="skills-title-stack">
           <h2 aria-label="Here’s What I’m Building.">
             <span className="skills-title-line" aria-hidden="true">
-              <span
-                className="skills-title-fill"
-                data-intro-title=""
-                style={{ '--title-fill': `${titleFill(0)}%` } as CSSProperties}
-              >
+              <span className="skills-title-fill" data-intro-title="" style={titleFill(0)}>
                 <IntroDropText text="Here’s What" />
               </span>
             </span>
             <span className="skills-title-line" aria-hidden="true">
-              <span
-                className="skills-title-fill"
-                data-intro-title=""
-                style={{ '--title-fill': `${titleFill(1)}%` } as CSSProperties}
-              >
+              <span className="skills-title-fill" data-intro-title="" style={titleFill(1)}>
                 <IntroDropText text="I’m Building" />
               </span>
-              <span ref={period} className="skills-title-period" data-intro-drop="letter" />
+              {/* Measure the period's landing spot while its visible dot is moving. */}
+              <span ref={period} className="skills-title-period work-intro-period">
+                <span data-intro-drop="letter" />
+              </span>
             </span>
           </h2>
         </div>

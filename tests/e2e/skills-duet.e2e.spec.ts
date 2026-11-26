@@ -176,7 +176,7 @@ for (const viewport of [
       await expect(page.locator('.skills-scroll-cue')).toHaveCount(0)
       await expect(page.getByRole('heading', { name: 'Here’s What I’m Building.' })).toBeVisible()
 
-      for (const line of await intro.locator('.skills-title-fill').all()) {
+      for (const line of await intro.locator('[data-intro-title]').all()) {
         await expect(line).toBeInViewport({ ratio: 1 })
       }
 
@@ -376,7 +376,7 @@ test('period opening follows changes to the heading', async ({ page }) => {
   await page.goto(`${baseURL}/#skills`)
   await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 15000 })
   await page.locator('#skills .skills-heading').evaluate((heading) => {
-    heading.querySelectorAll('.skills-title-fill')[1].textContent = 'New stuff'
+    heading.querySelectorAll('[data-intro-title]')[1].textContent = 'New stuff'
   })
   await expect
     .poll(() =>

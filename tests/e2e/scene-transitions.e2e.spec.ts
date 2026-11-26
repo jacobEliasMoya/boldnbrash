@@ -645,6 +645,46 @@ test('Experience docks the entering role to the viewport and reverses cleanly', 
   await expect(page.locator('#contact')).toHaveAttribute('aria-hidden', 'false')
 })
 
+test('Experience keeps the reading card clear at tablet and laptop sizes', async ({ page }) => {
+  const start = experienceStart + 2 * experienceRoleTravel
+  const { openStart, openEnd, closeStart } = experienceDisclosureTiming
+  const current = page.locator('[data-role="biziq-developer-ii"]')
+  const previous = page.locator('[data-role="biziq-developer-i"]')
+  const stage = page.locator('.experience-stage')
+
+  for (const viewport of [
+    { width: 820, height: 1000 },
+    { width: 1280, height: 720 },
+  ]) {
+    await page.setViewportSize(viewport)
+    await page.goto(`${baseURL}/#about-profile`)
+    await expect(page.locator('.portfolio-loader')).toHaveCount(0, { timeout: 15000 })
+    await page.evaluate(() => document.fonts.ready)
+
+    await moveToBoundary(page, start + openStart + 0.06)
+    const headerY = (await current.locator('.experience-header').boundingBox())!.y
+    await moveToBoundary(page, start + (openEnd + closeStart) / 2)
+    await expect(current).toHaveAttribute('aria-current', 'true')
+    expect((await current.locator('.experience-header').boundingBox())!.y).toBeCloseTo(headerY, 0)
+
+    const stageTop = await stage.evaluate((el) => {
+      const inset = getComputedStyle(el).getPropertyValue('--experience-list-top')
+
+      return el.getBoundingClientRect().top + parseFloat(inset)
+    })
+    const outgoingBottom = await previous.evaluate((el) => el.getBoundingClientRect().bottom)
+    expect(outgoingBottom).toBeLessThanOrEqual(stageTop)
+
+    const badgeRows = await current
+      .locator('.experience-technologies [role="img"]')
+      .evaluateAll((marks) => marks.map((mark) => mark.getBoundingClientRect().top))
+    expect(badgeRows).toHaveLength(6)
+    expect(new Set(badgeRows).size).toBe(1)
+    await expect(current.getByText('Custom Features')).toBeInViewport()
+    expect((await current.boundingBox())!.height + headerY).toBeLessThan(viewport.height)
+  }
+})
+
 test('the focused Experience pill opens, holds for reading and closes before rotating', async ({
   page,
 }) => {

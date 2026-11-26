@@ -2934,7 +2934,7 @@ ul {
   stroke-width: 4px;
 }
 
-.portfolio[data-experience-active] .site-scrollbar-thumb {
+:root[data-theme='dark'] .portfolio[data-experience-active] .site-scrollbar-thumb {
   background: #8c6aa4;
 }
 
@@ -3269,26 +3269,14 @@ ul {
   gap: 5px;
   white-space: nowrap;
 }
-.technology-brand-mark,
 .technology-brand-glyph {
   width: 20px;
   height: 20px;
-}
-.technology-brand-mark {
-  background: currentColor;
-  mask: var(--technology-icon) center / var(--technology-icon-size, contain) no-repeat;
-}
-.technology-brand-glyph {
   display: block;
   fill: currentColor;
 }
-.technology-brand-mark[data-format='image'] {
-  /* The raster marks use brightness to keep their internal details in amber. */
-  mask-mode: luminance;
-}
 @media (forced-colors: active) {
   .skills-technology {
-    /* Preserve the mask while using the visitor's high-contrast colors. */
     forced-color-adjust: none;
     background: Canvas;
     color: CanvasText;
@@ -3644,7 +3632,7 @@ ul {
     .skills-duet .skills-technology {
       --technology-badge-size: 24px;
     }
-    .skills-duet :is(.technology-brand-mark, .technology-brand-glyph) {
+    .skills-duet .technology-brand-glyph {
       width: 15px;
       height: 15px;
     }
@@ -4839,7 +4827,7 @@ ul {
   color: var(--experience-accent);
 }
 
-.experience-technologies :is(.technology-brand-mark, .technology-brand-glyph) {
+.experience-technologies .technology-brand-glyph {
   width: 100%;
   height: 100%;
 }
@@ -4963,6 +4951,56 @@ ul {
   }
 }
 
+@media (760px < width <= 1440px) and (height > 560px),
+  (760px < width <= 1440px) and (pointer: fine) {
+  .experience {
+    --experience-focus-reading: 1;
+    --experience-width: min(85vw, 1040px);
+    --experience-gap: clamp(14px, 2.3dvh, 22px);
+    padding-top: clamp(90px, 13dvh, 120px);
+  }
+
+  .experience-heading {
+    font-size: clamp(42px, 4.3vw, 62px);
+  }
+
+  .experience-role {
+    --experience-inset: clamp(28px, 4vw, 52px);
+    --experience-block-inset: clamp(18px, 2.65dvh, 24px);
+    --experience-group-gap: clamp(16px, 2.6dvh, 22px);
+  }
+
+  .experience-header {
+    min-height: clamp(84px, 12dvh, 108px);
+  }
+
+  .experience-title {
+    font-size: clamp(30px, 4.6cqi, 54px);
+  }
+
+  .experience-detail {
+    font-size: clamp(17px, 1.45vw, 21px);
+  }
+
+  .experience-columns {
+    grid-template-columns: minmax(0, 1fr) minmax(12rem, 32%);
+  }
+
+  .experience-key-work ul {
+    gap: 5px;
+  }
+
+  .experience-technologies {
+    column-gap: clamp(8px, 1vw, 12px);
+  }
+}
+
+@media (760px < width <= 1100px) and (height >= 840px) {
+  .experience {
+    padding-top: clamp(120px, 50dvh - 300px, 220px);
+  }
+}
+
 .about-introduction {
   display: grid;
   align-content: center;
@@ -5034,6 +5072,18 @@ ul {
   display: inline-block;
 }
 
+.skills-title-period.work-intro-period {
+  position: relative;
+  background: none;
+}
+
+.work-intro-period > span {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--ink);
+}
+
 @media (prefers-reduced-motion: no-preference) {
   /* The scene aperture can expose the intro before Motion starts its text sequence. */
   .portfolio[data-enhanced]
@@ -5042,8 +5092,7 @@ ul {
     visibility: hidden;
   }
 
-  .portfolio[data-enhanced] .scene-skills .skills-heading .skills-title-line,
-  .portfolio[data-enhanced] .scene-about [data-intro-drop] {
+  .portfolio[data-enhanced] [data-intro-drop] {
     opacity: 0;
   }
 }

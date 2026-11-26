@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import sharp from 'sharp'
 import {
   experienceDisclosureTiming,
   experiencePillTravel,
@@ -425,7 +426,7 @@ test('a held drag reverses the walk promptly and settles after release', async (
   expect(Math.abs(result.settled - result.destination)).toBeLessThan(0.005)
 })
 
-test('skills introduction fill responds to mobile wheel input and vertical swipes', async ({
+test('the settled Work heading fill responds to mobile wheel input and vertical swipes', async ({
   page,
 }) => {
   await page.evaluate(() =>
@@ -433,47 +434,67 @@ test('skills introduction fill responds to mobile wheel input and vertical swipe
   )
 
   const work = page.locator('#skills')
-  const first = work.locator('.skills-title-fill').first()
-  const second = work.locator('.skills-title-fill').nth(1)
+  const line = '#skills [data-intro-title]'
+  const lines = page.locator(line)
+  const first = lines.first()
+  const fill = () =>
+    lines.evaluateAll((elements) =>
+      elements.reduce(
+        (total, element) =>
+          total + parseFloat(getComputedStyle(element).getPropertyValue('--title-fill')),
+        0,
+      ),
+    )
 
   await expect(work).toHaveAttribute('data-intro-drop-complete', '')
-  await expect(first).toHaveCSS('--title-fill', '0%')
+  await expect(first.locator('.intro-title-paint')).toBeVisible()
+  await expect.poll(fill).toBe(0)
   await expect(work.locator('.skills-heading p')).toHaveCount(0)
   await first.dispatchEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true })
-  await expect
-    .poll(async () =>
-      parseFloat(
-        await first.evaluate((line) => getComputedStyle(line).getPropertyValue('--title-fill')),
-      ),
-    )
-    .toBeGreaterThan(8)
+  await expect.poll(fill).toBeGreaterThan(8)
+  const afterWheel = await fill()
 
-  const consumed = await swipe(page, '.skills-title-fill', 620, 320)
+  const consumed = await swipe(page, line, 620, 320)
 
   expect(consumed.every(Boolean)).toBe(true)
-  await expect(first).toHaveCSS('--title-fill', '100%')
+  await expect.poll(fill).toBeGreaterThan(afterWheel + 40)
+  const afterSwipe = await fill()
 
-  await swipe(page, '.skills-title-fill', 620, 160)
-  await expect(page.locator('.skills-reveal')).toHaveAttribute('data-revealed', '')
-  await swipe(page, '.skills-title-fill', 160, 720)
-  // Returning from the project reveal finishes at the full title before the
-  // next gesture scrubs its fill backward.
-  await expect(page.locator('.skills-reveal')).toHaveAttribute('aria-hidden', 'true')
-  await swipe(page, '.skills-title-fill', 320, 620)
-
-  await expect
-    .poll(async () =>
-      parseFloat(
-        await second.evaluate((line) => getComputedStyle(line).getPropertyValue('--title-fill')),
-      ),
-    )
-    .toBeLessThan(100)
+  await swipe(page, line, 320, 620)
+  await expect.poll(fill).toBeLessThan(afterSwipe - 40)
 })
 
 test('long and short swipes advance one project and reverse across category gaps', async ({
   page,
 }) => {
   test.setTimeout(60000)
+
+  async function expectWorkBadgePaint() {
+    const glyphs = page.locator('#skills .skills-category-pill[data-active] .skills-technology svg')
+    const marks = await glyphs.all()
+    expect(marks.length).toBeGreaterThan(0)
+
+    for (const mark of marks) {
+      // Capture the settled glyph box inside the border so it cannot count as badge paint.
+      const pixels = await sharp(await mark.screenshot({ scale: 'css' }))
+        .removeAlpha()
+        .raw()
+        .toBuffer()
+      let painted = 0
+
+      for (let pixel = 0; pixel < pixels.length; pixel += 3) {
+        if (
+          pixels[pixel] > 140 &&
+          pixels[pixel + 1] > 95 &&
+          pixels[pixel + 2] < pixels[pixel] * 0.65
+        )
+          painted++
+      }
+
+      const label = await mark.locator('..').getAttribute('aria-label')
+      expect(painted, label ?? 'Work badge').toBeGreaterThan(3)
+    }
+  }
 
   const boundary =
     projectStops.findIndex(
@@ -499,6 +520,7 @@ test('long and short swipes advance one project and reverse across category gaps
     const initial = skillStart + stop.position
 
     await expect.poll(async () => Math.abs((await progress()) - initial)).toBeLessThan(0.01)
+    if (index === boundary) await expectWorkBadgePaint()
     const projectSlot = page.locator('.skills-projects')
     const initialSlot = await projectSlot.boundingBox()
     await swipe(page, '.skills-browser', 600, index === 0 ? 170 : 480)
@@ -518,12 +540,14 @@ test('long and short swipes advance one project and reverse across category gaps
       for (const name of ['Strapi', 'GraphQL']) {
         await expect(cms.getByRole('img', { name }).locator('svg')).toBeVisible()
       }
+      await expectWorkBadgePaint()
     }
 
     await swipe(page, '.skills-browser', 480, 600)
     await expect
       .poll(async () => Math.abs((await progress()) - initial), { timeout: 5000 })
       .toBeLessThan(0.01)
+    if (index === boundary) await expectWorkBadgePaint()
     await swipe(page, '.skills-browser', 600, 570)
     await expect
       .poll(async () => Math.abs((await progress()) - initial), { timeout: 5000 })

@@ -273,7 +273,7 @@ export function getScrollSection(position: number) {
 }
 
 const skillIntroTravel = skillStart - skillIntroStart
-export const skillTitleFillPortion = introTitleTravel / skillIntroTravel
+export const skillPeriodStartPortion = introTitleTravel / skillIntroTravel
 export const aboutTitleFillPortion = introTitleTravel / (aboutIntroEnd - aboutStart)
 
 export const clamp = (value: number, min = 0, max = 1) => Math.max(min, Math.min(max, value))
